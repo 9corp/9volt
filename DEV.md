@@ -14,6 +14,7 @@
 - `foo.Run()` for things that will *not* complete and should (probably) be launched in a goroutine
 - Use bailout blocks/negative logic/negated if blocks when possible
 - Make an effort to use interfaces - it will make testing *a lot* easier
+- Interface types should be prefixed with an `I` (sorry gophers!)
 - Using interfaces will allow you to use `counterfeiter` for generating fakes
     + https://github.com/maxbrunsfeld/counterfeiter
 - At minimum, use an assertion library when writing tests (ie. https://github.com/stretchr/testify)
