@@ -9,7 +9,6 @@
 ### Random musings
 - Use `gofmt`
 - Use the built-in race detector (`go run -race`)
-- `foo.New()` should never error; treat as constructor
 - `foo.Start()` for things that will complete (ie. may launch goroutines, etc.)
 - `foo.Run()` for things that will *not* complete and should (probably) be launched in a goroutine
 - Use bailout blocks/negative logic/negated if blocks when possible
