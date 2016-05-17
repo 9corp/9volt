@@ -1,4 +1,7 @@
 # 9volt
+
+[![Build Status](https://travis-ci.org/9corp/9volt.svg?branch=master)](https://travis-ci.org/9corp/9volt)
+
 A modern, distributed monitoring system written in Go.
 
 ### Another monitoring system? Why?
