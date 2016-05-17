@@ -32,3 +32,10 @@ warningMessage
 
 # Add initial config
 curl http://127.0.0.1:2379/v2/keys/$PREFIX/config -XPUT -d value="{\"HeartbeatInterval\":\"5s\",\"HeartbeatTimeout\":\"10s\"}"
+
+# Create initial dirs
+curl http://127.0.0.1:2379/v2/keys/$PREFIX/alert -XPUT -d dir=true
+curl http://127.0.0.1:2379/v2/keys/$PREFIX/host -XPUT -d dir=true
+curl http://127.0.0.1:2379/v2/keys/$PREFIX/monitor -XPUT -d dir=true
+curl http://127.0.0.1:2379/v2/keys/$PREFIX/cluster -XPUT -d dir=true
+curl http://127.0.0.1:2379/v2/keys/$PREFIX/cluster/members -XPUT -d dir=true

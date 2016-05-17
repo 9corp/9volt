@@ -1,13 +1,14 @@
 package main
 
 import (
+	"strings"
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/9corp/9volt/config"
-	// "github.com/9corp/9volt/dal"
+	"github.com/9corp/9volt/dal"
 )
 
 var (
@@ -37,22 +38,23 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
+	// Create an initial dal client
+	dalClient, err := dal.New(*etcdPrefix, *etcdMembers)
+	if err != nil {
+		log.Fatalf("Unable to start initial etcd client: %v", err.Error())
+	}
+
 	// Load our configuration
-	cfg := config.New(*listenAddress, *etcdPrefix, *etcdMembers)
+	cfg := config.New(*listenAddress, *etcdPrefix, *etcdMembers, dalClient)
 
 	if err := cfg.Load(); err != nil {
 		log.Fatalf("Unable to load configuration from etcd: %v", err.Error())
 	}
 
-	// Validate configuration in etcd
-	// dalClient, err := dal.New(*etcdPrefix, *etcdMembers)
-	// if err != nil {
-	// 	log.Fatalf("Unable to instantiate dal client: %v", err.Error())
-	// }
-
-	// if err := dalClient.ValidatePaths(); err != nil {
-	// 	log.Fatalf("Unable to validate all paths in etcd: %v", err.Error())
-	// }
+	// Perform etcd layout validation
+	if errorList := cfg.ValidateDirs(); len(errorList) != 0 {
+		log.Fatalf("Unable to complete etcd layout validation: %v", strings.Join(errorList, "; "))
+	}
 
 	// Start cluster engine
 	// cluster := Cluster.New(cfg)

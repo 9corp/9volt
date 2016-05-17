@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	log "github.com/Sirupsen/logrus"
+	// log "github.com/Sirupsen/logrus"
 
 	"github.com/9corp/9volt/dal"
 	"github.com/9corp/9volt/util"
@@ -14,6 +14,7 @@ type Config struct {
 	ListenAddress string
 	EtcdPrefix    string
 	EtcdMembers   []string
+	DalClient     dal.IDal
 	serverConfig
 }
 
@@ -22,23 +23,46 @@ type serverConfig struct {
 	HeartbeatTimeout  util.CustomDuration
 }
 
-func New(listenAddress, etcdPrefix string, etcdMembers []string) *Config {
+// Pass in the dal client in order to enable easier testing
+func New(listenAddress, etcdPrefix string, etcdMembers []string, dalClient dal.IDal) *Config {
 	cfg := &Config{
 		ListenAddress: listenAddress,
 		EtcdPrefix:    etcdPrefix,
 		EtcdMembers:   etcdMembers,
+		DalClient:     dalClient,
 	}
 
 	return cfg
 }
 
-func (c *Config) Load() error {
-	dalClient, err := dal.New(c.EtcdPrefix, c.EtcdMembers)
-	if err != nil {
-		return err
+func (c *Config) ValidateDirs() []string {
+	dirs := []string{"cluster", "cluster/members", "monitor", "alert", "host"}
+
+	var errorList []string
+
+	for _, d := range dirs {
+		exists, isDir, err := c.DalClient.KeyExists(d)
+		if err != nil {
+			errorList = append(errorList, fmt.Sprintf("dal returned error when validating key '%v' in etcd: %v", d, err.Error()))
+			continue
+		}
+
+		if !exists {
+			errorList = append(errorList, fmt.Sprintf("required key '%v' does not exist", d))
+			continue
+		}
+
+		if !isDir {
+			errorList = append(errorList, fmt.Sprintf("required key '%v' exists, but is not of dir type", d))
+			continue
+		}
 	}
 
-	values, notFound, err := dalClient.Get("config", false)
+	return errorList
+}
+
+func (c *Config) Load() error {
+	values, notFound, err := c.DalClient.Get("config", false)
 	if err != nil {
 		return err
 	}
@@ -75,6 +99,13 @@ func (c *Config) load(config string) error {
 }
 
 func (c *Config) validate(sc *serverConfig) error {
-	log.Warningf("serverConfig contents: %v", sc)
+	if sc.HeartbeatInterval == 0 {
+		return fmt.Errorf("'HeartbeatInterval' cannot be 0")
+	}
+
+	if sc.HeartbeatTimeout == 0 {
+		return fmt.Errorf("'HeartbeatTimeout' cannot be 0")
+	}
+
 	return nil
 }

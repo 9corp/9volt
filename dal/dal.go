@@ -1,3 +1,4 @@
+// An abstraction layer for accessing data in etcd
 package dal
 
 import (
@@ -9,6 +10,7 @@ import (
 
 type IDal interface {
 	Get(string, bool) (map[string]string, bool, error)
+	KeyExists(string) (bool, bool, error)
 }
 
 type Dal struct {
@@ -34,6 +36,21 @@ func New(prefix string, members []string) (IDal, error) {
 		Members: members,
 		Prefix:  prefix,
 	}, nil
+}
+
+// Check if a given key exists and whether it's a dir or not (or return error)
+func (d *Dal) KeyExists(key string) (bool, bool, error) {
+	resp, err := d.KeysAPI.Get(context.Background(), d.Prefix+"/"+key, nil)
+
+	if err != nil {
+		if client.IsKeyNotFound(err) {
+			return false, false, nil
+		}
+
+		return false, false, err
+	}
+
+	return true, resp.Node.Dir, nil
 }
 
 // Get wrapper; either returns the key contents, 'key not found' bool or error
