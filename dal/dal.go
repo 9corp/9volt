@@ -11,6 +11,7 @@ import (
 type IDal interface {
 	Get(string, bool) (map[string]string, bool, error)
 	KeyExists(string) (bool, bool, error)
+	IsKeyNotFound(error) bool
 }
 
 type Dal struct {
@@ -53,16 +54,11 @@ func (d *Dal) KeyExists(key string) (bool, bool, error) {
 	return true, resp.Node.Dir, nil
 }
 
-// Get wrapper; either returns the key contents, 'key not found' bool or error
-func (d *Dal) Get(key string, recurse bool) (map[string]string, bool, error) {
+// Get wrapper; either returns the key contents or error
+func (d *Dal) Get(key string, recurse bool) (map[string]string, error) {
 	resp, err := d.KeysAPI.Get(context.Background(), d.Prefix+"/"+key, nil)
-
 	if err != nil {
-		if client.IsKeyNotFound(err) {
-			return nil, true, nil
-		}
-
-		return nil, false, err
+		return nil, err
 	}
 
 	values := make(map[string]string, 0)
@@ -70,12 +66,12 @@ func (d *Dal) Get(key string, recurse bool) (map[string]string, bool, error) {
 	// If recurse is set, verify the key is a dir
 	if recurse {
 		if !resp.Node.Dir {
-			return nil, false, fmt.Errorf("Recurse is enabled, but '%v' is not a dir", key)
+			return nil, fmt.Errorf("Recurse is enabled, but '%v' is not a dir", key)
 		}
 
 		// Dir is empty; return empty map
 		if resp.Node.Nodes.Len() == 0 {
-			return values, false, nil
+			return values, nil
 		}
 
 		for _, val := range resp.Node.Nodes {
@@ -85,5 +81,10 @@ func (d *Dal) Get(key string, recurse bool) (map[string]string, bool, error) {
 		values[key] = resp.Node.Value
 	}
 
-	return values, false, nil
+	return values, nil
+}
+
+// wrapper for etcd client's KeyNotFound error
+func (d *Dal) IsKeyNotFound(err error) bool {
+	return client.IsKeyNotFound(err)
 }

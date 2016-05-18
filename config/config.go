@@ -23,7 +23,7 @@ type serverConfig struct {
 	HeartbeatTimeout  util.CustomDuration
 }
 
-// Pass in the dal client in order to enable easier testing
+// Pass in the dal client in order to facilitate better/easier testing story
 func New(listenAddress, etcdPrefix string, etcdMembers []string, dalClient dal.IDal) *Config {
 	cfg := &Config{
 		ListenAddress: listenAddress,
@@ -62,13 +62,22 @@ func (c *Config) ValidateDirs() []string {
 }
 
 func (c *Config) Load() error {
-	values, notFound, err := c.DalClient.Get("config", false)
+	exists, isDir, err := c.DalClient.KeyExists("config")
 	if err != nil {
-		return err
+		return fmt.Errorf("dal error verifying 'config' key: %v", err.Error())
 	}
 
-	if notFound {
+	if !exists {
 		return fmt.Errorf("'config' does not appear to exist in etcd")
+	}
+
+	if isDir {
+		return fmt.Errorf("'config' exists but is a dir")
+	}
+
+	values, err := c.DalClient.Get("config", false)
+	if err != nil {
+		return err
 	}
 
 	if _, ok := values["config"]; !ok {
