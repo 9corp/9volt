@@ -7,6 +7,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
 
+	"github.com/9corp/9volt/cluster"
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/dal"
 )
@@ -57,11 +58,11 @@ func main() {
 	}
 
 	// Start cluster engine
-	// cluster := Cluster.New(cfg)
+	cluster := cluster.New(cfg)
 
-	// if err := cluster.Init(); err != nil {
-	// 	log.Fatalf("Unable to complete cluster engine initialization: %v", err.Error())
-	// }
+	if err := cluster.Start(); err != nil {
+		log.Fatalf("Unable to complete cluster engine initialization: %v", err.Error())
+	}
 
 	// Naming convention; intended module purpose
 

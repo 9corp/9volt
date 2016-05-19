@@ -33,6 +33,7 @@ import (
 
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/dal"
+	"github.com/9corp/9volt/util"
 )
 
 const (
@@ -67,7 +68,7 @@ type Cluster struct {
 	Config        *config.Config
 	Identifier    string
 	DirectorState bool
-	DirectorLock  sync.Mutex
+	DirectorLock  *sync.Mutex
 	MemberID      string
 }
 
@@ -82,7 +83,7 @@ func New(cfg *config.Config) ICluster {
 		Identifier:    "cluster",
 		DirectorState: false,
 		DirectorLock:  new(sync.Mutex),
-		MemberID:      util.GetMemberID(),
+		MemberID:      util.GetMemberID(cfg.ListenAddress),
 	}
 }
 
@@ -173,7 +174,7 @@ func (c *Cluster) getState() (*DirectorJSON, error) {
 	}
 
 	// Fetch the current state
-	data, err := dalClient.Get("cluster/members/director")
+	data, err := dalClient.Get("cluster/members/director", false)
 
 	if dalClient.IsKeyNotFound(err) {
 		log.Debugf("%v-%v-directorMonitor: No active director found", c.Identifier, c.MemberID)
@@ -188,7 +189,7 @@ func (c *Cluster) getState() (*DirectorJSON, error) {
 	// Attempt to unmarshal
 	var directorJSON DirectorJSON
 
-	if err := json.Unmarshal([]byte(data["director"], &directorJSON)); err != nil {
+	if err := json.Unmarshal([]byte(data["director"]), &directorJSON); err != nil {
 		return nil, fmt.Errorf("Unable to unmarshal director JSON blob: %v", err.Error())
 	}
 
@@ -196,13 +197,11 @@ func (c *Cluster) getState() (*DirectorJSON, error) {
 }
 
 func (c *Cluster) handleState(directorJSON *DirectorJSON) error {
-	changeState := false
-
 	// nil directorJSON == no existing director entry
 	if directorJSON == nil {
 		log.Infof("%v-%v-directorMonitor: No existing director entry found - changing state!",
 			c.Identifier, c.MemberID)
-		return c.changeState(START, CREATE)
+		return c.changeState(START, nil, CREATE)
 	}
 
 	// etcd says we are director, but we do not realize it
@@ -211,7 +210,7 @@ func (c *Cluster) handleState(directorJSON *DirectorJSON) error {
 		if !c.amDirector() {
 			log.Infof("%v-%v-directorMonitor: Not a director, but etcd says we are!",
 				c.Identifier, c.MemberID)
-			return c.changeState(START, NOOP)
+			return c.changeState(START, nil, NOOP)
 		}
 	}
 
@@ -221,7 +220,7 @@ func (c *Cluster) handleState(directorJSON *DirectorJSON) error {
 		if c.amDirector() {
 			log.Warningf("%v-%v-directorMonitor: Running in director mode, but etcd says we are not!",
 				c.Identifier, c.MemberID)
-			return c.changeState(STOP, NOOP)
+			return c.changeState(STOP, nil, NOOP)
 		}
 	}
 
@@ -229,7 +228,7 @@ func (c *Cluster) handleState(directorJSON *DirectorJSON) error {
 	if directorJSON.MemberID != c.MemberID && c.isExpired(directorJSON.LastUpdate) {
 		log.Infof("%v-%v-directorMonitor: Current director '%v' expired; time to upscale!",
 			c.Identifier, c.MemberID, directorJSON.MemberID)
-		return c.changeState(START, UPDATE)
+		return c.changeState(START, directorJSON, UPDATE)
 	}
 
 	// Nothing happening
@@ -253,6 +252,13 @@ func (c *Cluster) changeState(action int, prevDirectorJSON *DirectorJSON, etcdAc
 	}
 
 	return nil
+}
+
+func (c *Cluster) setDirectorState(newState bool) {
+	c.DirectorLock.Lock()
+	defer c.DirectorLock.Unlock()
+
+	c.DirectorState = newState
 }
 
 func (c *Cluster) updateState(prevDirectorJSON *DirectorJSON, etcdAction int) error {
@@ -285,7 +291,7 @@ func (c *Cluster) updateState(prevDirectorJSON *DirectorJSON, etcdAction int) er
 			return fmt.Errorf("Unable to marshal previous director state data: %v", err.Error())
 		}
 
-		stateErr = dalClient.UpdateDirectorState(string(data), string(prevData), false)
+		stateErr = dalClient.UpdateDirectorState(string(data), string(prevData))
 		actionVerb = "update"
 	} else {
 		stateErr = dalClient.CreateDirectorState(string(data))

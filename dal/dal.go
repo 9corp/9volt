@@ -9,9 +9,11 @@ import (
 )
 
 type IDal interface {
-	Get(string, bool) (map[string]string, bool, error)
+	Get(string, bool) (map[string]string, error)
 	KeyExists(string) (bool, bool, error)
 	IsKeyNotFound(error) bool
+	CreateDirectorState(string) error
+	UpdateDirectorState(string, string) error
 }
 
 type Dal struct {
@@ -86,11 +88,12 @@ func (d *Dal) Get(key string, recurse bool) (map[string]string, error) {
 
 // Create director state entry (expecting director state key to not exist)
 func (d *Dal) CreateDirectorState(data string) error {
-	resp, err := d.KeysAPI.Set(
+	_, err := d.KeysAPI.Set(
 		context.Background(),
-		d.Prefix+"/cluster/director", data,
-		client.SetOptions{
-			PrevExist: false,
+		d.Prefix+"/cluster/director",
+		data,
+		&client.SetOptions{
+			PrevExist: client.PrevExist,
 		},
 	)
 
@@ -99,10 +102,11 @@ func (d *Dal) CreateDirectorState(data string) error {
 
 // Update director state entry (expecting previous director state to match 'prevValue')
 func (d *Dal) UpdateDirectorState(data, prevValue string) error {
-	resp, err := d.KeysAPI.Set(
+	_, err := d.KeysAPI.Set(
 		context.Background(),
 		d.Prefix+"/cluster/director",
-		client.SetOptions{
+		data,
+		&client.SetOptions{
 			PrevValue: prevValue,
 		},
 	)
