@@ -41,11 +41,13 @@ const (
 type ICluster interface {
 	Start() error
 
-	runDirectorMonitor()
-	runDirectorHeartbeat()
-	runMemberMonitor()
-	runMemberHeartbeat()
-	amDirector() bool
+	runDirectorMonitor()                         // done
+	runDirectorHeartbeat()                       // incomplete
+	runMemberMonitor()                           // incomplete
+	runMemberHeartbeat()                         // incomplete
+	amDirector() bool                            // done
+	shouldBecomeDirector() (bool, string, error) // done
+	becomeDirector() error                       // incomplete
 }
 
 type Cluster struct {
@@ -100,56 +102,31 @@ func (c *Cluster) runDirectorMonitor() {
 			continue
 		}
 
-		// Verify contents of '/cluster/director', becomeDirector (maybe)
-		data, err := dalClient.Get("cluster/members/director")
-
-		if dalClient.IsKeyNotFound(err) {
-			log.Infof("%v-%v-directorMonitor: No director found - upscaling ourselves!", c.Identifier, c.MemberID)
-
-			if err := c.becomeDirector(); err != nil {
-				log.Errorf("%v-%v-directorMonitor: Unable to become director: %v", c.Identifier, c.MemberID)
-				time.Sleep(RETRY_INTERVAL)
-				continue
-			}
-		}
-
-		// verify contents of director
-		if _, ok := data["director"]; !ok {
-			log.Errorf("%v-%v-directorMonitor: Uhh, no 'director' in map? Seems like a bug", c.Identifier, c.MemberID)
+		// We pass around the same directorJSON in order to utilize compareAndSwap in etcd
+		// and use current directorJSON as prevValue
+		ready, directorJSON, err := c.shouldBecomeDirector()
+		if err != nil {
+			log.Errorf("%v-%v-directorMonitor: %v", c.Identifier, c.MemberID)
 			time.Sleep(RETRY_INTERVAL)
 			continue
 		}
 
-		var directorJSON DirectorJSON
-
-		if err := json.Unmarshal([]byte(data["director"], &directorJSON)); err != nil {
-			log.Errorf("%v-%v-directorMonitor: Unable to unmarshal director JSON blob: %v",
-				c.Identifier, c.MemberID, err.Error())
-
+		if !ready {
+			log.Debugf("%v-%v-directorMonitor: Current director '%v' still up - nothing to do",
+				c.Identifier, c.MemberID, directorJSON.MemberID)
 			time.Sleep(RETRY_INTERVAL)
 			continue
 		}
 
-		// validate contents of director json blob
-		if err := c.validateDirectorJSON(*directorJSON); err != nil {
-			log.Errorf("%v-%v-directorMonitor: Unable to validate director JSON blob: %v", c.Identifier, c.MemberID, err.Error())
+		// Attempt to become director
+		if err := c.becomeDirector(directorJSON); err != nil {
+			log.Errorf("%v-%v-directorMonitor: Unable to become director: %v", c.Identifier, c.MemberID)
 			time.Sleep(RETRY_INTERVAL)
 			continue
 		}
 
-		// check if we are expired
-		if c.isExpired(directorJson.LastUpdated) {
-			log.Debugf("%v-%v-directorMonitor: timestamp expired in current director blob -> upscaling ourselves!", c.Identifier, c.MemberID)
-
-			if err := c.becomeDirector(); err != nil {
-				log.Errorf("%v-%v-directorMonitor: Unable to become director (case 2): %v", c.Identifier, c.MemberID, err.Error())
-				time.Sleep(RETRY_INTERVAL)
-				continue
-			}
-		}
-
-		log.Debugf("%v-%v-directorMonitor: Current director (%v) still alive - nothing to do", c.Identifier, c.MemberID, directorJSON.MemberID)
-		time.Sleep(RETRY_INTERVAL)
+		// We have taken over as director
+		log.Debugf("%v-%v-directorMonitor: Successfully taken over as new director!", c.Identifier, c.MemberID)
 	}
 }
 
@@ -192,6 +169,60 @@ func (c *Cluster) runMemberHeartbeat() {
 		// refresh our member dir; update (convenience) status blob
 		time.Sleep(time.Duration(c.Config.HeartbeatInterval))
 	}
+}
+
+// Try to perform a compare and swap
+func (c *Cluster) becomeDirector() error {
+	return nil
+}
+
+// Check if we should take over as director.
+//
+// Returns "should become director" bool, current director and possible error
+func (c *Cluster) shouldBecomeDirector() (bool, *DirectorJSON, error) {
+	// Verify contents of '/cluster/director', becomeDirector (maybe)
+	data, err := dalClient.Get("cluster/members/director")
+
+	if dalClient.IsKeyNotFound(err) {
+		log.Debugf("%v-%v-directorMonitor: No active director found - time to upscale", c.Identifier, c.MemberID)
+		return true, nil, nil
+	}
+
+	// verify contents of director
+	if _, ok := data["director"]; !ok {
+		return false, nil, fmt.Errorf("Uhh, no 'director' in map? Seems like a bug")
+	}
+
+	// Attempt to unmarshal
+	var directorJSON DirectorJSON
+
+	if err := json.Unmarshal([]byte(data["director"], &directorJSON)); err != nil {
+		return false, nil, fmt.Errorf("Unable to unmarshal director JSON blob: %v", err.Error())
+	}
+
+	// validate contents of director json blob
+	if err := c.validateDirectorJSON(*directorJSON); err != nil {
+		return false, nil, fmt.Errorf("Unable to validate director JSON blob: %v", err.Error())
+	}
+
+	// check if current director has not expired
+	if !c.isExpired(directorJson.LastUpdated) {
+		return false, &directorJSON, nil
+	}
+
+	// Ready for takeover
+	return true, &directorJSON, nil
+}
+
+func (c *Cluster) isExpired(lastUpdated time.Time) bool {
+	delta := time.Now().Sub(lastUpdated)
+
+	if delta.Seconds() > time.Duration(c.Config.HeartbeatTimeout).Seconds() {
+		return true
+	}
+
+	return false
+
 }
 
 func (c *Cluster) amDirector() bool {
