@@ -53,7 +53,7 @@ type ICluster interface {
 	Start() error
 
 	runDirectorMonitor()   // done
-	runDirectorHeartbeat() // incomplete
+	runDirectorHeartbeat() // done
 	runMemberMonitor()     // incomplete
 	runMemberHeartbeat()   // incomplete
 

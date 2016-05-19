@@ -7,3 +7,5 @@ env:
   global:
     - GOARCH=amd64
 install: true
+script:
+  - godep go test ./...
