@@ -6,7 +6,7 @@
 //	 - director/member monitoring
 //   - director/member heartbeats
 //
-// DirectorMonitor   - IF NOT DIRECTOR: monitor /cluster/director;
+// DirectorMonitor   - ALWAYS: monitor /cluster/director;
 //                     inform DirectorHeartbeat to start (if current director dies)
 //
 // DirectorHeartbeat - IF DIRECTOR: send HeartbeatInterval updates to
@@ -24,6 +24,7 @@
 package cluster
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -36,18 +37,18 @@ import (
 
 const (
 	RETRY_INTERVAL = time.Duration(5) * time.Second
+
+	START int = iota
+	STOP
 )
 
 type ICluster interface {
 	Start() error
 
-	runDirectorMonitor()                         // done
-	runDirectorHeartbeat()                       // incomplete
-	runMemberMonitor()                           // incomplete
-	runMemberHeartbeat()                         // incomplete
-	amDirector() bool                            // done
-	shouldBecomeDirector() (bool, string, error) // done
-	becomeDirector() error                       // incomplete
+	runDirectorMonitor()   // incomplete
+	runDirectorHeartbeat() // incomplete
+	runMemberMonitor()     // incomplete
+	runMemberHeartbeat()   // incomplete
 }
 
 type Cluster struct {
@@ -84,49 +85,30 @@ func (c *Cluster) Start() error {
 	return nil
 }
 
-// IF NOT DIRECTOR: monitor /9volt/cluster/director to expire; become director
+// ALWAYS: monitor /9volt/cluster/director to expire; become director
 func (c *Cluster) runDirectorMonitor() {
 	log.Debugf("%v: Launching director monitor...", c.Identifier)
 
-	dalClient, err := dal.New(c.Config.EtcdPrefix, c.Config.EtcdMembers)
-
+	// Test if we are able to create a dal client
+	_, err := dal.New(c.Config.EtcdPrefix, c.Config.EtcdMembers)
 	if err != nil {
-		log.Fatalf("%v-directorMonitor: Unable to start due to dal client error: %v",
-			c.Identifier, err.Error())
+		log.Fatalf("%v-%v-directorMonitor: Unable to start due to dal client error: %v",
+			c.Identifier, c.MemberID, err.Error())
 	}
 
 	for {
-		if c.amDirector() {
-			log.Debugf("%v-%v-directorMonitor: Current director - no need to monitor endpoint", c.Identifier, c.MemberID)
-			time.Sleep(RETRY_INTERVAL)
-			continue
-		}
-
-		// We pass around the same directorJSON in order to utilize compareAndSwap in etcd
-		// and use current directorJSON as prevValue
-		ready, directorJSON, err := c.shouldBecomeDirector()
+		directorJSON, err := c.getState()
 		if err != nil {
-			log.Errorf("%v-%v-directorMonitor: %v", c.Identifier, c.MemberID)
+			log.Errorf("%v-%v-directorMonitor: Unable to fetch director state: %v",
+				c.Identifier, c.MemberID, err.Error())
 			time.Sleep(RETRY_INTERVAL)
 			continue
 		}
 
-		if !ready {
-			log.Debugf("%v-%v-directorMonitor: Current director '%v' still up - nothing to do",
-				c.Identifier, c.MemberID, directorJSON.MemberID)
-			time.Sleep(RETRY_INTERVAL)
-			continue
+		if err := c.handleState(directorJSON); err != nil {
+			log.Errorf("%v-%v-directorMonitor: Unable to handle state: %v",
+				c.Identifier, c.MemberID, err.Error())
 		}
-
-		// Attempt to become director
-		if err := c.becomeDirector(directorJSON); err != nil {
-			log.Errorf("%v-%v-directorMonitor: Unable to become director: %v", c.Identifier, c.MemberID)
-			time.Sleep(RETRY_INTERVAL)
-			continue
-		}
-
-		// We have taken over as director
-		log.Debugf("%v-%v-directorMonitor: Successfully taken over as new director!", c.Identifier, c.MemberID)
 	}
 }
 
@@ -171,47 +153,117 @@ func (c *Cluster) runMemberHeartbeat() {
 	}
 }
 
-// Try to perform a compare and swap
-func (c *Cluster) becomeDirector() error {
-	return nil
-}
-
-// Check if we should take over as director.
-//
-// Returns "should become director" bool, current director and possible error
-func (c *Cluster) shouldBecomeDirector() (bool, *DirectorJSON, error) {
+func (c *Cluster) getState() (*DirectorJSON, error) {
 	// Verify contents of '/cluster/director', becomeDirector (maybe)
+	dalClient, err := dal.New(c.Config.EtcdPrefix, c.Config.EtcdMembers)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch the current state
 	data, err := dalClient.Get("cluster/members/director")
 
 	if dalClient.IsKeyNotFound(err) {
-		log.Debugf("%v-%v-directorMonitor: No active director found - time to upscale", c.Identifier, c.MemberID)
-		return true, nil, nil
+		log.Debugf("%v-%v-directorMonitor: No active director found", c.Identifier, c.MemberID)
+		return nil, nil
 	}
 
 	// verify contents of director
 	if _, ok := data["director"]; !ok {
-		return false, nil, fmt.Errorf("Uhh, no 'director' in map? Seems like a bug")
+		return nil, fmt.Errorf("Uhh, no 'director' entry in map? Seems like a bug")
 	}
 
 	// Attempt to unmarshal
 	var directorJSON DirectorJSON
 
 	if err := json.Unmarshal([]byte(data["director"], &directorJSON)); err != nil {
-		return false, nil, fmt.Errorf("Unable to unmarshal director JSON blob: %v", err.Error())
+		return nil, fmt.Errorf("Unable to unmarshal director JSON blob: %v", err.Error())
 	}
 
-	// validate contents of director json blob
-	if err := c.validateDirectorJSON(*directorJSON); err != nil {
-		return false, nil, fmt.Errorf("Unable to validate director JSON blob: %v", err.Error())
+	return &directorJSON, nil
+}
+
+func (c *Cluster) handleState(directorJSON *DirectorJSON) error {
+	changeState := false
+
+	// nil directorJSON == no existing director entry
+	if directorJSON == nil {
+		log.Infof("%v-%v-directorMonitor: No existing director entry found - changing state!",
+			c.Identifier, c.MemberID)
+		return c.changeState(START)
 	}
 
-	// check if current director has not expired
-	if !c.isExpired(directorJson.LastUpdated) {
-		return false, &directorJSON, nil
+	// etcd says we are director, but we do not realize it
+	// (ie. someone updated etcd manually and set us as director)
+	if directorJSON.MemberID == c.MemberID {
+		if !c.amDirector() {
+			log.Infof("%v-%v-directorMonitor: Not a director, but etcd says we are!",
+				c.Identifier, c.MemberID)
+			return c.changeState(START)
+		}
 	}
 
-	// Ready for takeover
-	return true, &directorJSON, nil
+	// etcd says we are not director, but we think we are
+	// (dealing with a potential race?)
+	if directorJSON.MemberID != c.MemberID {
+		if c.amDirector() {
+			log.Warningf("%v-%v-directorMonitor: Running in director mode, but etcd says we are not!",
+				c.Identifier, c.MemberID)
+			return c.changeState(STOP)
+		}
+	}
+
+	// happy path
+	if directorJSON.MemberID != c.MemberID && c.isExpired(directorJSON.LastUpdate) {
+		log.Infof("%v-%v-directorMonitor: Current director '%v' expired; time to upscale!",
+			c.Identifier, c.MemberID, directorJSON.MemberID)
+		return c.changeState(START)
+	}
+
+	// Nothing happening
+	return nil
+}
+
+func (c *Cluster) changeState(action int) error {
+	if START {
+		if err := c.updateState(); err != nil {
+			return fmt.Errorf("Unable to update director state: %v", err.Error())
+		}
+
+		// Notify things to start?
+		c.setDirectorState(true)
+	} else {
+		// notify things to shut down?
+		c.setDirectorState(false)
+	}
+
+	return nil
+}
+
+func (c *Cluster) updateState() error {
+	dalClient, err := dal.New(c.Config.EtcdPrefix, c.Config.EtcdMembers)
+	if err != nil {
+		return fmt.Errorf("Unable to instantiate dal client for state change: %v", err.Error())
+	}
+
+	directorJSON := &DirectorJSON{
+		MemberID:   c.MemberID,
+		LastUpdate: time.Now(),
+	}
+
+	data, err := json.Marshal(directorJSON)
+	if err != nil {
+		return fmt.Errorf("Unable to marshal director state blob: %v", err.Error())
+	}
+
+	if err := dalClient.UpdateDirectorState(string(data)); err != nil {
+		return fmt.Errorf("Unable to update director state in dal: %v", err.Error())
+	}
+
+	log.Debugf("%v-%v-directorMonitor: Successfully updated director state in dal",
+		c.Identifier, c.MemberID)
+
+	return nil
 }
 
 func (c *Cluster) isExpired(lastUpdated time.Time) bool {

@@ -84,6 +84,16 @@ func (d *Dal) Get(key string, recurse bool) (map[string]string, error) {
 	return values, nil
 }
 
+// Create director state entry (expecting director state key to not exist)
+func (d *Dal) CreateDirectorState(data string) error {
+	return nil
+}
+
+// Update director state entry (expecting previous director state to match 'prevValue')
+func (d *Dal) UpdateDirectorState(data string, prevValue string) error {
+	return nil
+}
+
 // wrapper for etcd client's KeyNotFound error
 func (d *Dal) IsKeyNotFound(err error) bool {
 	return client.IsKeyNotFound(err)
