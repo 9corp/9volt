@@ -86,12 +86,28 @@ func (d *Dal) Get(key string, recurse bool) (map[string]string, error) {
 
 // Create director state entry (expecting director state key to not exist)
 func (d *Dal) CreateDirectorState(data string) error {
-	return nil
+	resp, err := d.KeysAPI.Set(
+		context.Background(),
+		d.Prefix+"/cluster/director", data,
+		client.SetOptions{
+			PrevExist: false,
+		},
+	)
+
+	return err
 }
 
 // Update director state entry (expecting previous director state to match 'prevValue')
-func (d *Dal) UpdateDirectorState(data string, prevValue string) error {
-	return nil
+func (d *Dal) UpdateDirectorState(data, prevValue string) error {
+	resp, err := d.KeysAPI.Set(
+		context.Background(),
+		d.Prefix+"/cluster/director",
+		client.SetOptions{
+			PrevValue: prevValue,
+		},
+	)
+
+	return err
 }
 
 // wrapper for etcd client's KeyNotFound error
