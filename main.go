@@ -58,7 +58,10 @@ func main() {
 	}
 
 	// Start cluster engine
-	cluster := cluster.New(cfg)
+	cluster, err := cluster.New(cfg)
+	if err != nil {
+		log.Fatalf("Unable to instantiate cluster engine: %v", err.Error())
+	}
 
 	if err := cluster.Start(); err != nil {
 		log.Fatalf("Unable to complete cluster engine initialization: %v", err.Error())

@@ -13,7 +13,7 @@ type IDal interface {
 	KeyExists(string) (bool, bool, error)
 	IsKeyNotFound(error) bool
 	CreateDirectorState(string) error
-	UpdateDirectorState(string, string) error
+	UpdateDirectorState(string, string, bool) error
 }
 
 type Dal struct {
@@ -93,7 +93,7 @@ func (d *Dal) CreateDirectorState(data string) error {
 		d.Prefix+"/cluster/director",
 		data,
 		&client.SetOptions{
-			PrevExist: client.PrevExist,
+			PrevExist: client.PrevNoExist,
 		},
 	)
 
@@ -101,14 +101,19 @@ func (d *Dal) CreateDirectorState(data string) error {
 }
 
 // Update director state entry (expecting previous director state to match 'prevValue')
-func (d *Dal) UpdateDirectorState(data, prevValue string) error {
+// (or force the update, ignoring prevValue)
+func (d *Dal) UpdateDirectorState(data, prevValue string, force bool) error {
+	setOptions := new(client.SetOptions)
+
+	if !force {
+		setOptions.PrevValue = prevValue
+	}
+
 	_, err := d.KeysAPI.Set(
 		context.Background(),
 		d.Prefix+"/cluster/director",
 		data,
-		&client.SetOptions{
-			PrevValue: prevValue,
-		},
+		setOptions,
 	)
 
 	return err

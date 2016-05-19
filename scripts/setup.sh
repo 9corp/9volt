@@ -31,7 +31,7 @@ warningMessage() {
 warningMessage
 
 # Add initial config
-curl http://127.0.0.1:2379/v2/keys/$PREFIX/config -XPUT -d value="{\"HeartbeatInterval\":\"5s\",\"HeartbeatTimeout\":\"10s\"}"
+curl http://127.0.0.1:2379/v2/keys/$PREFIX/config -XPUT -d value="{\"HeartbeatInterval\":\"3s\",\"HeartbeatTimeout\":\"6s\"}"
 
 # Create initial dirs
 curl http://127.0.0.1:2379/v2/keys/$PREFIX/alert -XPUT -d dir=true
