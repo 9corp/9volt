@@ -6,6 +6,13 @@ go:
 env:
   global:
     - GOARCH=amd64
-install: true
+
+before_install:
+ - go get github.com/my_project_path
+ - go get github.com/tools/godep
+
+install:
+ - godep restore
+
 script:
-  - godep go test ./...
+  - go test -v ./...
