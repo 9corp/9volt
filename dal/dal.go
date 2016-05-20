@@ -18,6 +18,7 @@ type IDal interface {
 	IsKeyNotFound(error) bool
 	CreateDirectorState(string) error
 	UpdateDirectorState(string, string, bool) error
+	NewWatcher(string, bool) client.Watcher
 }
 
 type Dal struct {
@@ -147,6 +148,12 @@ func (d *Dal) Delete(key string, recursive bool) error {
 	)
 
 	return err
+}
+
+func (d *Dal) NewWatcher(key string, recursive bool) client.Watcher {
+	return d.KeysAPI.Watcher(d.Prefix+"/"+key, &client.WatcherOptions{
+		Recursive: recursive,
+	})
 }
 
 // Update director state entry (expecting previous director state to match 'prevValue')

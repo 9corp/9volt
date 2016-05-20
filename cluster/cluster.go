@@ -27,10 +27,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path"
 	"sync"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"golang.org/x/net/context"
 
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/dal"
@@ -53,16 +55,20 @@ const (
 type ICluster interface {
 	Start() error
 
-	runDirectorMonitor()   // done
-	runDirectorHeartbeat() // done
-	runMemberMonitor()     // incomplete
-	runMemberHeartbeat()   // incomplete
+	// TODO: Implement go-director for loop control
+	runDirectorMonitor()
+	runDirectorHeartbeat()
+	runMemberMonitor()
+	runMemberHeartbeat()
 
-	getState() (*DirectorJSON, error)          // done
-	handleState(*DirectorJSON) error           // done
-	changeState(int, *DirectorJSON, int) error // done
-	updateState(*DirectorJSON, int) error      // done
-	isExpired(time.Time) bool                  // done
+	getState() (*DirectorJSON, error)
+	handleState(*DirectorJSON) error
+	changeState(int, *DirectorJSON, int) error
+	updateState(*DirectorJSON, int) error
+	isExpired(time.Time) bool
+	amDirector() bool
+	setDirectorState(bool)
+	sendDirectorHeartbeat() error
 }
 
 type Cluster struct {
@@ -154,7 +160,7 @@ func (c *Cluster) runDirectorHeartbeat() {
 		}
 
 		// update */director with current state data
-		if err := c.sendHeartbeat(); err != nil {
+		if err := c.sendDirectorHeartbeat(); err != nil {
 			log.Errorf("%v-%v-directorHeartbeat: %v", err.Error())
 		} else {
 			log.Debugf("%v-%v-directorHeartbeat: Successfully sent periodic heartbeat",
@@ -164,7 +170,7 @@ func (c *Cluster) runDirectorHeartbeat() {
 	}
 }
 
-func (c *Cluster) sendHeartbeat() error {
+func (c *Cluster) sendDirectorHeartbeat() error {
 	newDirectorJSON := &DirectorJSON{
 		MemberID:   c.MemberID,
 		LastUpdate: time.Now(),
@@ -186,15 +192,45 @@ func (c *Cluster) sendHeartbeat() error {
 func (c *Cluster) runMemberMonitor() {
 	log.Debugf("%v: Launching member monitor...", c.Identifier)
 
+	membersDir := "cluster/members/"
+
+	// Create a watcher for cluster members
+	watcher := c.DalClient.NewWatcher(membersDir, true)
+
 	for {
 		if !c.amDirector() {
 			time.Sleep(time.Duration(c.Config.HeartbeatInterval))
 			continue
 		}
 
-		// launch /cluster/members/member_id monitor
+		// watch all dirs under /9volt/cluster/members/; alert if someone joins
+		// or leaves
+		resp, err := watcher.Next(context.Background())
+		if err != nil {
+			log.Errorf("%v-%v-memberMonitor: Unexpected watcher error: %v",
+				c.Identifier, c.MemberID, err.Error())
+			continue
+		}
 
-		time.Sleep(time.Duration(c.Config.HeartbeatInterval))
+		switch resp.Action {
+		case "set":
+			// Only care about set's on base dir
+			if !resp.Node.Dir {
+				log.Debugf("%v-%v-memberMonitor: Ignoring watcher action on key %v",
+					c.Identifier, c.MemberID, resp.Node.Key)
+				continue
+			}
+
+			newMemberID := path.Base(resp.Node.Key)
+			log.Infof("%v-%v-memberMonitor: New member has joined the cluster: %v",
+				c.Identifier, c.MemberID, newMemberID)
+		case "expire":
+			// only dirs expire under /cluster/members/; don't need to do anything fancy
+			oldMemberID := path.Base(resp.Node.Key)
+			log.Debugf("Detected an expire for old member %v", oldMemberID)
+		default:
+			continue
+		}
 	}
 }
 
