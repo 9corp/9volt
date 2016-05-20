@@ -26,6 +26,7 @@ package cluster
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -71,6 +72,7 @@ type Cluster struct {
 	DirectorLock  *sync.Mutex
 	MemberID      string
 	DalClient     dal.IDal // etcd client is/should-be thread safe
+	Hostname      string
 }
 
 type DirectorJSON struct {
@@ -78,10 +80,22 @@ type DirectorJSON struct {
 	LastUpdate time.Time
 }
 
+type MemberJSON struct {
+	MemberID      string
+	Hostname      string
+	ListenAddress string
+	LastUpdated   time.Time
+}
+
 func New(cfg *config.Config) (ICluster, error) {
 	dalClient, err := dal.New(cfg.EtcdPrefix, cfg.EtcdMembers)
 	if err != nil {
 		return nil, err
+	}
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		return nil, fmt.Errorf("Unable to fetch hostname: %v", hostname)
 	}
 
 	return &Cluster{
@@ -91,6 +105,7 @@ func New(cfg *config.Config) (ICluster, error) {
 		DirectorLock:  new(sync.Mutex),
 		MemberID:      util.GetMemberID(cfg.ListenAddress),
 		DalClient:     dalClient,
+		Hostname:      hostname,
 	}, nil
 }
 
@@ -173,23 +188,108 @@ func (c *Cluster) runMemberMonitor() {
 
 	for {
 		if !c.amDirector() {
-			// log.Debugf("%v-%v-memberMonitor: Not a director - nothing to do", c.Identifier, c.MemberID)
 			time.Sleep(time.Duration(c.Config.HeartbeatInterval))
 			continue
 		}
+
+		// launch /cluster/members/member_id monitor
 
 		time.Sleep(time.Duration(c.Config.HeartbeatInterval))
 	}
 }
 
+// Re-create member dir, set initial state
+func (c *Cluster) createInitialMemberDir(memberDir string, heartbeatTimeoutInt int) error {
+	// Pre-emptively remove potentially pre-existing memberdir and its children
+	exists, _, err := c.DalClient.KeyExists(memberDir)
+	if err != nil {
+		return fmt.Errorf("Unable to verify pre-existence of member dir: %v", err.Error())
+	}
+
+	if exists {
+		if err := c.DalClient.Delete(memberDir, true); err != nil {
+			return fmt.Errorf("Unable to delete pre-existing member dir '%v': %v", memberDir, err.Error())
+		}
+	}
+
+	// create initial dir
+	if err := c.DalClient.Set(memberDir, "", true, heartbeatTimeoutInt, ""); err != nil {
+		return fmt.Errorf("First member dir Set() failed: %v", err.Error())
+	}
+
+	// create initial member status
+	memberJSON, err := c.generateMemberJSON()
+	if err != nil {
+		return fmt.Errorf("Unable to generate initial member JSON: %v",
+			c.Config.HeartbeatInterval.String(), err.Error())
+	}
+
+	if err := c.DalClient.Set(memberDir+"/status", memberJSON, false, 0, ""); err != nil {
+		return fmt.Errorf("Unable to create initial state: %v", err.Error())
+	}
+
+	return nil
+}
+
 // ALWAYS: send member heartbeat updates
+// TODO: If we are not able to set the heartbeat - we should probably alert the
+//       rest of 9volt components to shutdown or pause until we recover.
 func (c *Cluster) runMemberHeartbeat() {
 	log.Debugf("%v: Launching member heartbeat...", c.Identifier)
 
+	memberDir := fmt.Sprintf("cluster/members/%v", c.MemberID)
+	heartbeatTimeoutInt := int(time.Duration(c.Config.HeartbeatTimeout).Seconds())
+
+	// create initial member dir
+	if err := c.createInitialMemberDir(memberDir, heartbeatTimeoutInt); err != nil {
+		log.Fatalf("%v-%v-memberHeartbeat: Unable to create initial member dir: %v",
+			c.Identifier, c.MemberID, err.Error())
+	}
+
 	for {
-		// refresh our member dir; update (convenience) status blob
+		memberJSON, err := c.generateMemberJSON()
+		if err != nil {
+			log.Errorf("%v-%v-memberHeartbeat: Unable to generate member JSON (retrying in %v): %v",
+				c.Identifier, c.MemberID, c.Config.HeartbeatInterval.String(), err.Error())
+			time.Sleep(time.Duration(c.Config.HeartbeatInterval))
+			continue
+		}
+
+		// set status key
+		go func(memberDir, memberJSON string) {
+			if err := c.DalClient.Set(memberDir+"/status", memberJSON, false, 0, "true"); err != nil {
+				log.Errorf("%v-%v-memberHeartbeat: Unable to save member JSON status (retrying in %v): %v",
+					c.Identifier, c.MemberID, c.Config.HeartbeatInterval.String(), err.Error())
+			}
+		}(memberDir, memberJSON)
+
+		// refresh dir
+		go func(memberDir string, ttl int) {
+			if err := c.DalClient.Refresh(memberDir, heartbeatTimeoutInt); err != nil {
+				// Not sure if this should cause a member dropout
+				log.Errorf("%v-%v-memberHeartbeat: Unable to refresh member dir '%v' (retrying in %v): %v",
+					memberDir, c.Config.HeartbeatInterval.String(), err.Error())
+			}
+		}(memberDir, heartbeatTimeoutInt)
+
 		time.Sleep(time.Duration(c.Config.HeartbeatInterval))
 	}
+}
+
+func (c *Cluster) generateMemberJSON() (string, error) {
+	memberJSON := &MemberJSON{
+		MemberID:      c.MemberID,
+		Hostname:      c.Hostname,
+		ListenAddress: c.Config.ListenAddress,
+		LastUpdated:   time.Now(),
+	}
+
+	data, err := json.Marshal(memberJSON)
+	if err != nil {
+		return "", fmt.Errorf("Unable to marshal memberJSON: %v", err.Error())
+	}
+
+	return string(data), nil
 }
 
 func (c *Cluster) getState() (*DirectorJSON, error) {

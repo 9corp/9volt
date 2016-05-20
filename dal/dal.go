@@ -3,6 +3,7 @@ package dal
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
@@ -10,6 +11,9 @@ import (
 
 type IDal interface {
 	Get(string, bool) (map[string]string, error)
+	Set(string, string, bool, int, string) error
+	Delete(string, bool) error
+	Refresh(string, int) error
 	KeyExists(string) (bool, bool, error)
 	IsKeyNotFound(error) bool
 	CreateDirectorState(string) error
@@ -56,6 +60,39 @@ func (d *Dal) KeyExists(key string) (bool, bool, error) {
 	return true, resp.Node.Dir, nil
 }
 
+// An unwieldy wrapper for setting a new key
+func (d *Dal) Set(key, value string, dir bool, ttl int, prevExist string) error {
+	existState := client.PrevExistType(prevExist)
+
+	_, err := d.KeysAPI.Set(
+		context.Background(),
+		d.Prefix+"/"+key,
+		value,
+		&client.SetOptions{
+			Dir:       dir,
+			TTL:       time.Duration(ttl) * time.Second,
+			PrevExist: existState,
+		},
+	)
+
+	return err
+}
+
+func (d *Dal) Refresh(key string, ttl int) error {
+	_, err := d.KeysAPI.Set(
+		context.Background(),
+		d.Prefix+"/"+key,
+		"",
+		&client.SetOptions{
+			Refresh:   true,
+			PrevExist: client.PrevExist,
+			TTL:       time.Duration(ttl) * time.Second,
+		},
+	)
+
+	return err
+}
+
 // Get wrapper; either returns the key contents or error
 func (d *Dal) Get(key string, recurse bool) (map[string]string, error) {
 	resp, err := d.KeysAPI.Get(context.Background(), d.Prefix+"/"+key, nil)
@@ -94,6 +131,18 @@ func (d *Dal) CreateDirectorState(data string) error {
 		data,
 		&client.SetOptions{
 			PrevExist: client.PrevNoExist,
+		},
+	)
+
+	return err
+}
+
+func (d *Dal) Delete(key string, recursive bool) error {
+	_, err := d.KeysAPI.Delete(
+		context.Background(),
+		d.Prefix+"/"+key,
+		&client.DeleteOptions{
+			Recursive: recursive,
 		},
 	)
 
