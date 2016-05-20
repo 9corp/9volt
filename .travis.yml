@@ -8,7 +8,7 @@ env:
     - GOARCH=amd64
 
 before_install:
- - go get github.com/my_project_path
+ - go get github.com/9corp/9volt
  - go get github.com/tools/godep
 
 install:
