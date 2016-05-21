@@ -10,6 +10,7 @@ import (
 	"github.com/9corp/9volt/cluster"
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/dal"
+	"github.com/9corp/9volt/director"
 )
 
 var (
@@ -57,14 +58,28 @@ func main() {
 		log.Fatalf("Unable to complete etcd layout validation: %v", strings.Join(errorList, "; "))
 	}
 
+	// Create necessary channels
+	stateChannel := make(chan bool)
+	distributeChannel := make(chan bool)
+
 	// Start cluster engine
-	cluster, err := cluster.New(cfg)
+	cluster, err := cluster.New(cfg, stateChannel, distributeChannel)
 	if err != nil {
 		log.Fatalf("Unable to instantiate cluster engine: %v", err.Error())
 	}
 
 	if err := cluster.Start(); err != nil {
 		log.Fatalf("Unable to complete cluster engine initialization: %v", err.Error())
+	}
+
+	// start director
+	director, err := director.New(cfg, stateChannel, distributeChannel)
+	if err != nil {
+		log.Fatalf("Unable to instantiate director: %v", err.Error())
+	}
+
+	if err := director.Start(); err != nil {
+		log.Fatalf("Unable to complete director initialization: %v", err.Error())
 	}
 
 	// Naming convention; intended module purpose

@@ -72,13 +72,15 @@ type ICluster interface {
 }
 
 type Cluster struct {
-	Config        *config.Config
-	Identifier    string
-	DirectorState bool
-	DirectorLock  *sync.Mutex
-	MemberID      string
-	DalClient     dal.IDal // etcd client is/should-be thread safe
-	Hostname      string
+	Config         *config.Config
+	Identifier     string
+	DirectorState  bool
+	DirectorLock   *sync.Mutex
+	MemberID       string
+	DalClient      dal.IDal // etcd client is/should-be thread safe
+	Hostname       string
+	StateChan      chan<- bool
+	DistributeChan chan<- bool
 }
 
 type DirectorJSON struct {
@@ -93,7 +95,7 @@ type MemberJSON struct {
 	LastUpdated   time.Time
 }
 
-func New(cfg *config.Config) (ICluster, error) {
+func New(cfg *config.Config, stateChan, distributeChan chan<- bool) (ICluster, error) {
 	dalClient, err := dal.New(cfg.EtcdPrefix, cfg.EtcdMembers)
 	if err != nil {
 		return nil, err
@@ -105,13 +107,15 @@ func New(cfg *config.Config) (ICluster, error) {
 	}
 
 	return &Cluster{
-		Config:        cfg,
-		Identifier:    "cluster",
-		DirectorState: false,
-		DirectorLock:  new(sync.Mutex),
-		MemberID:      util.GetMemberID(cfg.ListenAddress),
-		DalClient:     dalClient,
-		Hostname:      hostname,
+		Config:         cfg,
+		Identifier:     "cluster",
+		DirectorState:  false,
+		DirectorLock:   new(sync.Mutex),
+		MemberID:       util.GetMemberID(cfg.ListenAddress),
+		DalClient:      dalClient,
+		Hostname:       hostname,
+		StateChan:      stateChan,
+		DistributeChan: distributeChan,
 	}, nil
 }
 
@@ -224,10 +228,12 @@ func (c *Cluster) runMemberMonitor() {
 			newMemberID := path.Base(resp.Node.Key)
 			log.Infof("%v-%v-memberMonitor: New member has joined the cluster: %v",
 				c.Identifier, c.MemberID, newMemberID)
+			c.DistributeChan <- true
 		case "expire":
 			// only dirs expire under /cluster/members/; don't need to do anything fancy
 			oldMemberID := path.Base(resp.Node.Key)
-			log.Debugf("Detected an expire for old member %v", oldMemberID)
+			log.Infof("Detected an expire for old member %v", oldMemberID)
+			c.DistributeChan <- true
 		default:
 			continue
 		}
@@ -430,6 +436,9 @@ func (c *Cluster) setDirectorState(newState bool) {
 	defer c.DirectorLock.Unlock()
 
 	c.DirectorState = newState
+
+	// Update state channel to inform director to start watching etcd
+	c.StateChan <- newState
 }
 
 func (c *Cluster) updateState(prevDirectorJSON *DirectorJSON, etcdAction int) error {
