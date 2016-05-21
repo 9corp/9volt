@@ -110,12 +110,18 @@ func (d *Director) runHostConfigWatcher(ctx context.Context) {
 
 		// watch host config entries
 		resp, err := watcher.Next(ctx)
-		if err != nil {
-			log.Errorf("%v-hostConfigWatcher: Received an error: %v", d.Identifier, err.Error())
-		} else {
-			log.Infof("%v-hostConfigWatcher: Received resp: %v", d.Identifier, resp)
+		if err != nil && err.Error() == "context canceled" {
+			log.Errorf("%v-hostConfigWatcher: Received a notice to shutdown", d.Identifier)
+			break
+		} else if err != nil {
+			log.Errorf("%v-hostConfigWatcher: Unexpected error: %v", err.Error())
+			continue
 		}
+
+		log.Infof("%v-hostConfigWatcher: Received a resp: %v", d.Identifier, resp)
 	}
+
+	log.Warningf("%v-hostConfigWatcher: Exiting...", d.Identifier)
 }
 
 func (d *Director) runCheckConfigWatcher(ctx context.Context) {
@@ -130,12 +136,19 @@ func (d *Director) runCheckConfigWatcher(ctx context.Context) {
 
 		// watch check config entries
 		resp, err := watcher.Next(ctx)
-		if err != nil {
-			log.Errorf("%v-checkConfigWatcher: Received an error: %v", d.Identifier, err.Error())
-		} else {
-			log.Infof("%v-checkConfigWatcher: Received resp: %v", d.Identifier, resp)
+		if err != nil && err.Error() == "context canceled" {
+			log.Errorf("%v-checkConfigWatcher: Received a notice to shutdown", d.Identifier)
+			break
+		} else if err != nil {
+			log.Errorf("%v-checkConfigWatcher: Unexpected error: %v", err.Error())
+			continue
 		}
+
+		log.Infof("%v-checkConfigWatcher: Received resp: %v", d.Identifier, resp)
+
 	}
+
+	log.Warningf("%v-checkConfigWatcher: Exiting...", d.Identifier)
 }
 
 func (d *Director) setState(state bool) {
