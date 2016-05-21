@@ -226,13 +226,14 @@ func (c *Cluster) runMemberMonitor() {
 			}
 
 			newMemberID := path.Base(resp.Node.Key)
-			log.Infof("%v-%v-memberMonitor: New member has joined the cluster: %v",
+			log.Infof("%v-%v-memberMonitor: New member '%v' has joined the cluster",
 				c.Identifier, c.MemberID, newMemberID)
 			c.DistributeChan <- true
 		case "expire":
 			// only dirs expire under /cluster/members/; don't need to do anything fancy
 			oldMemberID := path.Base(resp.Node.Key)
-			log.Infof("Detected an expire for old member %v", oldMemberID)
+			log.Infof("%v-%v-memberMonitor: Detected an expire for old member '%v'",
+				c.Identifier, c.MemberID, oldMemberID)
 			c.DistributeChan <- true
 		default:
 			continue
