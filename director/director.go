@@ -1,7 +1,9 @@
 package director
 
 import (
+	"fmt"
 	"sync"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	etcd "github.com/coreos/etcd/client"
@@ -70,6 +72,13 @@ func (d *Director) runDistributeListener() {
 }
 
 func (d *Director) distributeChecks() error {
+	log.Debugf("%v-distributeChecks: Performing member existence verification", d.Identifier)
+
+	if err := d.verifyMemberExistence(); err != nil {
+		return fmt.Errorf("%v-distributeChecks: Unable to verify member existence in cluster: %v",
+			d.Identifier, err.Error())
+	}
+
 	log.Infof("%v-distributeChecks: Performing check distribution across members in cluster", d.Identifier)
 
 	// fetch all members in cluster
@@ -78,10 +87,14 @@ func (d *Director) distributeChecks() error {
 		return fmt.Errorf("Unable to fetch cluster members: %v", err.Error())
 	}
 
-	log.Debugf("%v-distributeChecks: Distributing checks between %v cluster members", len(members))
+	if len(members) == 0 {
+		return fmt.Errorf("No active cluster members found - bug?")
+	}
+
+	log.Debugf("%v-distributeChecks: Distributing checks between %v cluster members", d.Identifier, len(members))
 
 	// fetch all check keys
-	checkKeys, error := d.DalClient.GetCheckKeys()
+	checkKeys, err := d.DalClient.GetCheckKeys()
 	if err != nil {
 		return fmt.Errorf("Unable to fetch all check keys: %v", err.Error())
 	}
@@ -100,10 +113,9 @@ func (d *Director) distributeChecks() error {
 // A simple (and equal) check distributor
 //
 // Divide checks equally between all members; last member gets remainder of checks
-func (d *Director) performCheckDistribution(members, checkKey []string) error {
+func (d *Director) performCheckDistribution(members, checkKeys []string) error {
 	checksPerMember := len(checkKeys) / len(members)
 
-	memberNum := 0
 	checkKeyNum := 0
 
 	for memberNum := 0; memberNum < len(members); memberNum++ {
@@ -121,7 +133,7 @@ func (d *Director) performCheckDistribution(members, checkKey []string) error {
 		}
 
 		log.Debugf("%v-distributeChecks: Assigned %v checks to %v", d.Identifier,
-			totalAssigned, member)
+			totalAssigned, members[memberNum])
 	}
 
 	return nil
@@ -132,8 +144,9 @@ func (d *Director) runStateListener() {
 	var cancel context.CancelFunc
 
 	for {
-
 		state := <-d.StateChan
+
+		d.setState(state)
 
 		if state {
 			log.Infof("%v-stateListener: Starting up etcd watchers", d.Identifier)
@@ -141,19 +154,47 @@ func (d *Director) runStateListener() {
 			// create new context + cancel func
 			ctx, cancel = context.WithCancel(context.Background())
 
-			// distribute checks in case we just took over as director (or first start)
-			if err := d.distributeChecks(); err != nil {
-				log.Errorf("%v-stateListener: Unable to distribute checks: %v", d.Identifier, err.Error())
-			}
-
 			go d.runHostConfigWatcher(ctx)
 			go d.runCheckConfigWatcher(ctx)
+
+			// distribute checks in case we just took over as director (or first start)
+			if err := d.distributeChecks(); err != nil {
+				log.Errorf("%v-stateListener: Unable to (re)distribute checks: %v", d.Identifier, err.Error())
+			}
 		} else {
 			log.Infof("%v-stateListener: Shutting down etcd watchers", d.Identifier)
 			cancel()
 		}
+	}
+}
 
-		d.setState(state)
+// This method exists to deal with a case where a director launches for the
+// first time and attempts to distribute checks but the memberHeartbeat() has not
+// yet had a chance to populate itself under /cluster/members/*
+func (d *Director) verifyMemberExistence() error {
+	// TODO: This can probably go into dal.GetClusterMembers()
+
+	// Let's wait a `heartbeatInterval`*2 to ensure that at least 1 active member
+	// is in the cluster (if not - there's either a bug or the system is *massively* overloaded)
+	tmpCtx, _ := context.WithTimeout(context.Background(), time.Duration(d.Config.HeartbeatInterval)*2)
+	tmpWatcher := d.DalClient.NewWatcher("cluster/members/", true)
+
+	for {
+		resp, err := tmpWatcher.Next(tmpCtx)
+		if err != nil {
+			return fmt.Errorf("Error waiting on /cluster/members/*: %v", err.Error())
+		}
+
+		if resp.Action != "set" && resp.Action != "update" {
+			log.Debugf("%v-verifyMemberExistence: Ignoring '%v' action on key %v",
+				d.Identifier, resp.Action, resp.Node.Key)
+			continue
+		}
+
+		log.Debugf("%v-verifyMemberExistence: Detected '%v' action for key %v",
+			d.Identifier, resp.Action, resp.Node.Key)
+
+		return nil
 	}
 }
 
