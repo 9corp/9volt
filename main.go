@@ -11,6 +11,7 @@ import (
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/dal"
 	"github.com/9corp/9volt/director"
+	"github.com/9corp/9volt/util"
 )
 
 var (
@@ -93,6 +94,9 @@ func main() {
 	// alerter   --  send alerts to various destinations
 	// state     --  periodically dump state to etcd
 	// config    --  configuration validation and loading
+
+	log.Infof("9volt has started! API address: %v MemberID: %v", "http://"+
+		*listenAddress, util.GetMemberID(*listenAddress))
 
 	wg.Wait()
 }

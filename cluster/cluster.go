@@ -137,15 +137,15 @@ func (c *Cluster) runDirectorMonitor() {
 	for {
 		directorJSON, err := c.getState()
 		if err != nil {
-			log.Errorf("%v-%v-directorMonitor: Unable to fetch director state: %v",
-				c.Identifier, c.MemberID, err.Error())
+			log.Errorf("%v-directorMonitor: Unable to fetch director state: %v",
+				c.Identifier, err.Error())
 			time.Sleep(time.Duration(c.Config.HeartbeatInterval))
 			continue
 		}
 
 		if err := c.handleState(directorJSON); err != nil {
-			log.Errorf("%v-%v-directorMonitor: Unable to handle state: %v",
-				c.Identifier, c.MemberID, err.Error())
+			log.Errorf("%v-directorMonitor: Unable to handle state: %v",
+				c.Identifier, err.Error())
 		}
 
 		time.Sleep(time.Duration(c.Config.HeartbeatInterval))
@@ -158,16 +158,16 @@ func (c *Cluster) runDirectorHeartbeat() {
 
 	for {
 		if !c.amDirector() {
-			// log.Debugf("%v-%v-directorHeartbeat: Not a director - nothing to do", c.Identifier, c.MemberID)
+			// log.Debugf("%v-directorHeartbeat: Not a director - nothing to do", c.Identifier)
 			time.Sleep(time.Duration(c.Config.HeartbeatInterval))
 			continue
 		}
 
 		// update */director with current state data
 		if err := c.sendDirectorHeartbeat(); err != nil {
-			log.Errorf("%v-%v-directorHeartbeat: %v", err.Error())
+			log.Errorf("%v-directorHeartbeat: %v", c.Identifier, err.Error())
 		} else {
-			log.Debugf("%v-%v-directorHeartbeat: Successfully sent periodic heartbeat",
+			log.Debugf("%v-directorHeartbeat: Successfully sent periodic heartbeat (MemberID: %v)",
 				c.Identifier, c.MemberID)
 		}
 		time.Sleep(time.Duration(c.Config.HeartbeatInterval))
@@ -211,8 +211,8 @@ func (c *Cluster) runMemberMonitor() {
 		// or leaves
 		resp, err := watcher.Next(context.Background())
 		if err != nil {
-			log.Errorf("%v-%v-memberMonitor: Unexpected watcher error: %v",
-				c.Identifier, c.MemberID, err.Error())
+			log.Errorf("%v-memberMonitor: Unexpected watcher error: %v",
+				c.Identifier, err.Error())
 			continue
 		}
 
@@ -220,20 +220,20 @@ func (c *Cluster) runMemberMonitor() {
 		case "set":
 			// Only care about set's on base dir
 			if !resp.Node.Dir {
-				log.Debugf("%v-%v-memberMonitor: Ignoring watcher action on key %v",
-					c.Identifier, c.MemberID, resp.Node.Key)
+				log.Debugf("%v-memberMonitor: Ignoring watcher action on key %v",
+					c.Identifier, resp.Node.Key)
 				continue
 			}
 
 			newMemberID := path.Base(resp.Node.Key)
-			log.Infof("%v-%v-memberMonitor: New member '%v' has joined the cluster",
-				c.Identifier, c.MemberID, newMemberID)
+			log.Infof("%v-memberMonitor: New member '%v' has joined the cluster",
+				c.Identifier, newMemberID)
 			c.DistributeChan <- true
 		case "expire":
 			// only dirs expire under /cluster/members/; don't need to do anything fancy
 			oldMemberID := path.Base(resp.Node.Key)
-			log.Infof("%v-%v-memberMonitor: Detected an expire for old member '%v'",
-				c.Identifier, c.MemberID, oldMemberID)
+			log.Infof("%v-memberMonitor: Detected an expire for old member '%v'",
+				c.Identifier, oldMemberID)
 			c.DistributeChan <- true
 		default:
 			continue
@@ -285,15 +285,15 @@ func (c *Cluster) runMemberHeartbeat() {
 
 	// create initial member dir
 	if err := c.createInitialMemberDir(memberDir, heartbeatTimeoutInt); err != nil {
-		log.Fatalf("%v-%v-memberHeartbeat: Unable to create initial member dir: %v",
-			c.Identifier, c.MemberID, err.Error())
+		log.Fatalf("%v-memberHeartbeat: Unable to create initial member dir: %v",
+			c.Identifier, err.Error())
 	}
 
 	for {
 		memberJSON, err := c.generateMemberJSON()
 		if err != nil {
-			log.Errorf("%v-%v-memberHeartbeat: Unable to generate member JSON (retrying in %v): %v",
-				c.Identifier, c.MemberID, c.Config.HeartbeatInterval.String(), err.Error())
+			log.Errorf("%v-memberHeartbeat: Unable to generate member JSON (retrying in %v): %v",
+				c.Identifier, c.Config.HeartbeatInterval.String(), err.Error())
 			time.Sleep(time.Duration(c.Config.HeartbeatInterval))
 			continue
 		}
@@ -301,8 +301,8 @@ func (c *Cluster) runMemberHeartbeat() {
 		// set status key
 		go func(memberDir, memberJSON string) {
 			if err := c.DalClient.Set(memberDir+"/status", memberJSON, false, 0, "true"); err != nil {
-				log.Errorf("%v-%v-memberHeartbeat: Unable to save member JSON status (retrying in %v): %v",
-					c.Identifier, c.MemberID, c.Config.HeartbeatInterval.String(), err.Error())
+				log.Errorf("%v-memberHeartbeat: Unable to save member JSON status (retrying in %v): %v",
+					c.Identifier, c.Config.HeartbeatInterval.String(), err.Error())
 			}
 		}(memberDir, memberJSON)
 
@@ -310,8 +310,8 @@ func (c *Cluster) runMemberHeartbeat() {
 		go func(memberDir string, ttl int) {
 			if err := c.DalClient.Refresh(memberDir, heartbeatTimeoutInt); err != nil {
 				// Not sure if this should cause a member dropout
-				log.Errorf("%v-%v-memberHeartbeat: Unable to refresh member dir '%v' (retrying in %v): %v",
-					memberDir, c.Config.HeartbeatInterval.String(), err.Error())
+				log.Errorf("%v-memberHeartbeat: Unable to refresh member dir '%v' (retrying in %v): %v",
+					c.Identifier, memberDir, c.Config.HeartbeatInterval.String(), err.Error())
 			}
 		}(memberDir, heartbeatTimeoutInt)
 
@@ -340,13 +340,13 @@ func (c *Cluster) getState() (*DirectorJSON, error) {
 	data, err := c.DalClient.Get(DIRECTOR_KEY, false)
 
 	if c.DalClient.IsKeyNotFound(err) {
-		log.Debugf("%v-%v-directorMonitor: No active director found", c.Identifier, c.MemberID)
+		log.Debugf("%v-directorMonitor: No active director found", c.Identifier)
 		return nil, nil
 	}
 
 	if err != nil {
-		log.Warningf("%v-%v-directorMonitor: Unexpected dal get error: %v",
-			c.Identifier, c.MemberID, err.Error())
+		log.Warningf("%v-directorMonitor: Unexpected dal get error: %v",
+			c.Identifier, err.Error())
 		return nil, err
 	}
 
@@ -368,8 +368,8 @@ func (c *Cluster) getState() (*DirectorJSON, error) {
 func (c *Cluster) handleState(directorJSON *DirectorJSON) error {
 	// nil directorJSON == no existing director entry
 	if directorJSON == nil {
-		log.Infof("%v-%v-directorMonitor: No existing director entry found - changing state!",
-			c.Identifier, c.MemberID)
+		log.Infof("%v-directorMonitor: No existing director entry found - changing state!",
+			c.Identifier)
 		return c.changeState(START, nil, CREATE)
 	}
 
@@ -377,8 +377,8 @@ func (c *Cluster) handleState(directorJSON *DirectorJSON) error {
 	// (ie. someone updated etcd manually and set us as director)
 	if directorJSON.MemberID == c.MemberID {
 		if !c.amDirector() {
-			log.Infof("%v-%v-directorMonitor: Not a director, but etcd says we are (updating state)!",
-				c.Identifier, c.MemberID)
+			log.Infof("%v-directorMonitor: Not a director, but etcd says we are (updating state)!",
+				c.Identifier)
 			return c.changeState(START, nil, NOOP)
 		}
 	}
@@ -387,8 +387,8 @@ func (c *Cluster) handleState(directorJSON *DirectorJSON) error {
 	// (dealing with a potential race?)
 	if directorJSON.MemberID != c.MemberID {
 		if c.amDirector() {
-			log.Warningf("%v-%v-directorMonitor: Running in director mode, but etcd says we are not!",
-				c.Identifier, c.MemberID)
+			log.Warningf("%v-directorMonitor: Running in director mode, but etcd says we are not!",
+				c.Identifier)
 			return c.changeState(STOP, nil, NOOP)
 		}
 	}
@@ -396,12 +396,12 @@ func (c *Cluster) handleState(directorJSON *DirectorJSON) error {
 	// happy path
 	if directorJSON.MemberID != c.MemberID {
 		if c.isExpired(directorJSON.LastUpdate) {
-			log.Infof("%v-%v-directorMonitor: Current director '%v' expired; time to upscale!",
-				c.Identifier, c.MemberID, directorJSON.MemberID)
+			log.Infof("%v-directorMonitor: Current director '%v' expired; time to upscale!",
+				c.Identifier, directorJSON.MemberID)
 			return c.changeState(START, directorJSON, UPDATE)
 		} else {
-			log.Infof("%v-%v-directorMonitor: Current director '%v' not expired yet; waiting patiently",
-				c.Identifier, c.MemberID, directorJSON.MemberID)
+			log.Infof("%v-directorMonitor: Current director '%v' not expired yet; waiting patiently",
+				c.Identifier, directorJSON.MemberID)
 		}
 	}
 
@@ -411,7 +411,7 @@ func (c *Cluster) handleState(directorJSON *DirectorJSON) error {
 
 func (c *Cluster) changeState(action int, prevDirectorJSON *DirectorJSON, etcdAction int) error {
 	if action == START {
-		log.Infof("%v-%v-directorMonitor: Taking over director role", c.Identifier, c.MemberID)
+		log.Infof("%v-directorMonitor: Taking over director role", c.Identifier)
 
 		// Only attempt to update state if we have to write to etcd (for UPDATE/CREATE)
 		if etcdAction != NOOP {
@@ -423,7 +423,7 @@ func (c *Cluster) changeState(action int, prevDirectorJSON *DirectorJSON, etcdAc
 		// Notify things to start? (ie. DirectorHeartbeat)
 		c.setDirectorState(true)
 	} else {
-		log.Infof("%v-%v-directorMonitor: Shutting down director role", c.Identifier, c.MemberID)
+		log.Infof("%v-directorMonitor: Shutting down director role", c.Identifier)
 
 		// Notify things to shutdown?
 		c.setDirectorState(false)
@@ -478,8 +478,8 @@ func (c *Cluster) updateState(prevDirectorJSON *DirectorJSON, etcdAction int) er
 		return fmt.Errorf("Unable to %v director state in dal: %v", actionVerb, stateErr.Error())
 	}
 
-	log.Debugf("%v-%v-directorMonitor: Successfully %vd director state in dal",
-		c.Identifier, c.MemberID, actionVerb)
+	log.Debugf("%v-directorMonitor: Successfully %vd director state in dal",
+		c.Identifier, actionVerb)
 
 	return nil
 }
