@@ -175,6 +175,16 @@ func (d *Dal) UpdateDirectorState(data, prevValue string, force bool) error {
 	return err
 }
 
+// Get slice of all member id's under /cluster/members/*
+func (d *Dal) GetClusterMembers() ([]string, error) {
+	return []string{}, nil
+}
+
+// Get a slice of all check keys in etcd (under /monitor/*)
+func (d *Dal) GetCheckKeys() ([]string, error) {
+	return []string{}, nil
+}
+
 // wrapper for etcd client's KeyNotFound error
 func (d *Dal) IsKeyNotFound(err error) bool {
 	return client.IsKeyNotFound(err)
