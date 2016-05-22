@@ -7,6 +7,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
 
+	"github.com/9corp/9volt/api"
 	"github.com/9corp/9volt/cluster"
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/dal"
@@ -82,6 +83,10 @@ func main() {
 	if err := director.Start(); err != nil {
 		log.Fatalf("Unable to complete director initialization: %v", err.Error())
 	}
+
+	// start api server
+	apiServer := api.New(cfg, version)
+	go apiServer.Run()
 
 	// Naming convention; intended module purpose
 
