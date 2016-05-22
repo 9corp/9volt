@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
+	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
 
 	"github.com/9corp/9volt/config"
@@ -69,7 +70,60 @@ func (d *Director) runDistributeListener() {
 }
 
 func (d *Director) distributeChecks() error {
-	log.Infof("%v-distributeChecks: Distributing checks across all members in cluster", d.Identifier)
+	log.Infof("%v-distributeChecks: Performing check distribution across members in cluster", d.Identifier)
+
+	// fetch all members in cluster
+	members, err := d.DalClient.GetClusterMembers()
+	if err != nil {
+		return fmt.Errorf("Unable to fetch cluster members: %v", err.Error())
+	}
+
+	log.Debugf("%v-distributeChecks: Distributing checks between %v cluster members", len(members))
+
+	// fetch all check keys
+	checkKeys, error := d.DalClient.GetCheckKeys()
+	if err != nil {
+		return fmt.Errorf("Unable to fetch all check keys: %v", err.Error())
+	}
+
+	if len(checkKeys) == 0 {
+		return fmt.Errorf("Check configuration is empty - nothing to distribute!")
+	}
+
+	if err := d.performCheckDistribution(members, checkKeys); err != nil {
+		return fmt.Errorf("Unable to complete check distribution: %v", err.Error())
+	}
+
+	return nil
+}
+
+// A simple (and equal) check distributor
+//
+// Divide checks equally between all members; last member gets remainder of checks
+func (d *Director) performCheckDistribution(members, checkKey []string) error {
+	checksPerMember := len(checkKeys) / len(members)
+
+	memberNum := 0
+	checkKeyNum := 0
+
+	for memberNum := 0; memberNum < len(members); memberNum++ {
+		maxChecks := checkKeyNum + checksPerMember
+
+		// last member gets the remainder of the checks
+		if memberNum == len(members)-1 {
+			maxChecks = len(checkKeys)
+		}
+
+		totalAssigned := 0
+
+		for i := checkKeyNum; i != maxChecks; i++ {
+			totalAssigned++
+		}
+
+		log.Debugf("%v-distributeChecks: Assigned %v checks to %v", d.Identifier,
+			totalAssigned, member)
+	}
+
 	return nil
 }
 
@@ -123,7 +177,10 @@ func (d *Director) runHostConfigWatcher(ctx context.Context) {
 			continue
 		}
 
-		log.Infof("%v-hostConfigWatcher: Received a resp: %v", d.Identifier, resp)
+		if err := d.handleHostConfigChange(resp); err != nil {
+			log.Errorf("%v-hostConfigWatcher: Unable to process config change for %v: %v",
+				d.Identifier, resp.Node.Key, err.Error())
+		}
 	}
 
 	log.Warningf("%v-hostConfigWatcher: Exiting...", d.Identifier)
@@ -149,11 +206,27 @@ func (d *Director) runCheckConfigWatcher(ctx context.Context) {
 			continue
 		}
 
-		log.Infof("%v-checkConfigWatcher: Received resp: %v", d.Identifier, resp)
-
+		if err := d.handleCheckConfigChange(resp); err != nil {
+			log.Errorf("%v-hostConfigWatcher: Unable to process config change for %v: %v",
+				d.Identifier, resp.Node.Key, err.Error())
+		}
 	}
 
 	log.Warningf("%v-checkConfigWatcher: Exiting...", d.Identifier)
+}
+
+func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
+	log.Debugf("%v-handleCheckConfigChange: Received new response for key %v",
+		d.Identifier, resp.Node.Key)
+
+	return nil
+}
+
+func (d *Director) handleHostConfigChange(resp *etcd.Response) error {
+	log.Debugf("%v-handleHostConfigChange: Received new response for key %v",
+		d.Identifier, resp.Node.Key)
+
+	return nil
 }
 
 func (d *Director) setState(state bool) {
