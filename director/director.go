@@ -1,9 +1,12 @@
 package director
 
 import (
+	"fmt"
 	"sync"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
+	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
 
 	"github.com/9corp/9volt/config"
@@ -69,7 +72,70 @@ func (d *Director) runDistributeListener() {
 }
 
 func (d *Director) distributeChecks() error {
-	log.Infof("%v-distributeChecks: Distributing checks across all members in cluster", d.Identifier)
+	log.Debugf("%v-distributeChecks: Performing member existence verification", d.Identifier)
+
+	if err := d.verifyMemberExistence(); err != nil {
+		return fmt.Errorf("%v-distributeChecks: Unable to verify member existence in cluster: %v",
+			d.Identifier, err.Error())
+	}
+
+	log.Infof("%v-distributeChecks: Performing check distribution across members in cluster", d.Identifier)
+
+	// fetch all members in cluster
+	members, err := d.DalClient.GetClusterMembers()
+	if err != nil {
+		return fmt.Errorf("Unable to fetch cluster members: %v", err.Error())
+	}
+
+	if len(members) == 0 {
+		return fmt.Errorf("No active cluster members found - bug?")
+	}
+
+	log.Debugf("%v-distributeChecks: Distributing checks between %v cluster members", d.Identifier, len(members))
+
+	// fetch all check keys
+	checkKeys, err := d.DalClient.GetCheckKeys()
+	if err != nil {
+		return fmt.Errorf("Unable to fetch all check keys: %v", err.Error())
+	}
+
+	if len(checkKeys) == 0 {
+		return fmt.Errorf("Check configuration is empty - nothing to distribute!")
+	}
+
+	if err := d.performCheckDistribution(members, checkKeys); err != nil {
+		return fmt.Errorf("Unable to complete check distribution: %v", err.Error())
+	}
+
+	return nil
+}
+
+// A simple (and equal) check distributor
+//
+// Divide checks equally between all members; last member gets remainder of checks
+func (d *Director) performCheckDistribution(members, checkKeys []string) error {
+	checksPerMember := len(checkKeys) / len(members)
+
+	checkKeyNum := 0
+
+	for memberNum := 0; memberNum < len(members); memberNum++ {
+		maxChecks := checkKeyNum + checksPerMember
+
+		// last member gets the remainder of the checks
+		if memberNum == len(members)-1 {
+			maxChecks = len(checkKeys)
+		}
+
+		totalAssigned := 0
+
+		for i := checkKeyNum; i != maxChecks; i++ {
+			totalAssigned++
+		}
+
+		log.Debugf("%v-distributeChecks: Assigned %v checks to %v", d.Identifier,
+			totalAssigned, members[memberNum])
+	}
+
 	return nil
 }
 
@@ -78,8 +144,9 @@ func (d *Director) runStateListener() {
 	var cancel context.CancelFunc
 
 	for {
-
 		state := <-d.StateChan
+
+		d.setState(state)
 
 		if state {
 			log.Infof("%v-stateListener: Starting up etcd watchers", d.Identifier)
@@ -87,19 +154,47 @@ func (d *Director) runStateListener() {
 			// create new context + cancel func
 			ctx, cancel = context.WithCancel(context.Background())
 
-			// distribute checks in case we just took over as director (or first start)
-			if err := d.distributeChecks(); err != nil {
-				log.Errorf("%v-stateListener: Unable to distribute checks: %v", d.Identifier, err.Error())
-			}
-
 			go d.runHostConfigWatcher(ctx)
 			go d.runCheckConfigWatcher(ctx)
+
+			// distribute checks in case we just took over as director (or first start)
+			if err := d.distributeChecks(); err != nil {
+				log.Errorf("%v-stateListener: Unable to (re)distribute checks: %v", d.Identifier, err.Error())
+			}
 		} else {
 			log.Infof("%v-stateListener: Shutting down etcd watchers", d.Identifier)
 			cancel()
 		}
+	}
+}
 
-		d.setState(state)
+// This method exists to deal with a case where a director launches for the
+// first time and attempts to distribute checks but the memberHeartbeat() has not
+// yet had a chance to populate itself under /cluster/members/*
+func (d *Director) verifyMemberExistence() error {
+	// TODO: This can probably go into dal.GetClusterMembers()
+
+	// Let's wait a `heartbeatInterval`*2 to ensure that at least 1 active member
+	// is in the cluster (if not - there's either a bug or the system is *massively* overloaded)
+	tmpCtx, _ := context.WithTimeout(context.Background(), time.Duration(d.Config.HeartbeatInterval)*2)
+	tmpWatcher := d.DalClient.NewWatcher("cluster/members/", true)
+
+	for {
+		resp, err := tmpWatcher.Next(tmpCtx)
+		if err != nil {
+			return fmt.Errorf("Error waiting on /cluster/members/*: %v", err.Error())
+		}
+
+		if resp.Action != "set" && resp.Action != "update" {
+			log.Debugf("%v-verifyMemberExistence: Ignoring '%v' action on key %v",
+				d.Identifier, resp.Action, resp.Node.Key)
+			continue
+		}
+
+		log.Debugf("%v-verifyMemberExistence: Detected '%v' action for key %v",
+			d.Identifier, resp.Action, resp.Node.Key)
+
+		return nil
 	}
 }
 
@@ -123,7 +218,10 @@ func (d *Director) runHostConfigWatcher(ctx context.Context) {
 			continue
 		}
 
-		log.Infof("%v-hostConfigWatcher: Received a resp: %v", d.Identifier, resp)
+		if err := d.handleHostConfigChange(resp); err != nil {
+			log.Errorf("%v-hostConfigWatcher: Unable to process config change for %v: %v",
+				d.Identifier, resp.Node.Key, err.Error())
+		}
 	}
 
 	log.Warningf("%v-hostConfigWatcher: Exiting...", d.Identifier)
@@ -149,11 +247,27 @@ func (d *Director) runCheckConfigWatcher(ctx context.Context) {
 			continue
 		}
 
-		log.Infof("%v-checkConfigWatcher: Received resp: %v", d.Identifier, resp)
-
+		if err := d.handleCheckConfigChange(resp); err != nil {
+			log.Errorf("%v-hostConfigWatcher: Unable to process config change for %v: %v",
+				d.Identifier, resp.Node.Key, err.Error())
+		}
 	}
 
 	log.Warningf("%v-checkConfigWatcher: Exiting...", d.Identifier)
+}
+
+func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
+	log.Debugf("%v-handleCheckConfigChange: Received new response for key %v",
+		d.Identifier, resp.Node.Key)
+
+	return nil
+}
+
+func (d *Director) handleHostConfigChange(resp *etcd.Response) error {
+	log.Debugf("%v-handleHostConfigChange: Received new response for key %v",
+		d.Identifier, resp.Node.Key)
+
+	return nil
 }
 
 func (d *Director) setState(state bool) {

@@ -94,6 +94,20 @@ type FakeIDal struct {
 	newWatcherReturns struct {
 		result1 client.Watcher
 	}
+	GetClusterMembersStub        func() ([]string, error)
+	getClusterMembersMutex       sync.RWMutex
+	getClusterMembersArgsForCall []struct{}
+	getClusterMembersReturns     struct {
+		result1 []string
+		result2 error
+	}
+	GetCheckKeysStub        func() ([]string, error)
+	getCheckKeysMutex       sync.RWMutex
+	getCheckKeysArgsForCall []struct{}
+	getCheckKeysReturns     struct {
+		result1 []string
+		result2 error
+	}
 	invocations map[string][][]interface{}
 }
 
@@ -414,6 +428,60 @@ func (fake *FakeIDal) NewWatcherReturns(result1 client.Watcher) {
 	fake.newWatcherReturns = struct {
 		result1 client.Watcher
 	}{result1}
+}
+
+func (fake *FakeIDal) GetClusterMembers() ([]string, error) {
+	fake.getClusterMembersMutex.Lock()
+	fake.getClusterMembersArgsForCall = append(fake.getClusterMembersArgsForCall, struct{}{})
+	fake.guard("GetClusterMembers")
+	fake.invocations["GetClusterMembers"] = append(fake.invocations["GetClusterMembers"], []interface{}{})
+	fake.getClusterMembersMutex.Unlock()
+	if fake.GetClusterMembersStub != nil {
+		return fake.GetClusterMembersStub()
+	} else {
+		return fake.getClusterMembersReturns.result1, fake.getClusterMembersReturns.result2
+	}
+}
+
+func (fake *FakeIDal) GetClusterMembersCallCount() int {
+	fake.getClusterMembersMutex.RLock()
+	defer fake.getClusterMembersMutex.RUnlock()
+	return len(fake.getClusterMembersArgsForCall)
+}
+
+func (fake *FakeIDal) GetClusterMembersReturns(result1 []string, result2 error) {
+	fake.GetClusterMembersStub = nil
+	fake.getClusterMembersReturns = struct {
+		result1 []string
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeIDal) GetCheckKeys() ([]string, error) {
+	fake.getCheckKeysMutex.Lock()
+	fake.getCheckKeysArgsForCall = append(fake.getCheckKeysArgsForCall, struct{}{})
+	fake.guard("GetCheckKeys")
+	fake.invocations["GetCheckKeys"] = append(fake.invocations["GetCheckKeys"], []interface{}{})
+	fake.getCheckKeysMutex.Unlock()
+	if fake.GetCheckKeysStub != nil {
+		return fake.GetCheckKeysStub()
+	} else {
+		return fake.getCheckKeysReturns.result1, fake.getCheckKeysReturns.result2
+	}
+}
+
+func (fake *FakeIDal) GetCheckKeysCallCount() int {
+	fake.getCheckKeysMutex.RLock()
+	defer fake.getCheckKeysMutex.RUnlock()
+	return len(fake.getCheckKeysArgsForCall)
+}
+
+func (fake *FakeIDal) GetCheckKeysReturns(result1 []string, result2 error) {
+	fake.GetCheckKeysStub = nil
+	fake.getCheckKeysReturns = struct {
+		result1 []string
+		result2 error
+	}{result1, result2}
 }
 
 func (fake *FakeIDal) Invocations() map[string][][]interface{} {

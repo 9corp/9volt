@@ -3,8 +3,10 @@ package dal
 
 import (
 	"fmt"
+	"path"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
 )
@@ -19,6 +21,8 @@ type IDal interface {
 	CreateDirectorState(string) error
 	UpdateDirectorState(string, string, bool) error
 	NewWatcher(string, bool) client.Watcher
+	GetClusterMembers() ([]string, error)
+	GetCheckKeys() ([]string, error)
 }
 
 type Dal struct {
@@ -173,6 +177,29 @@ func (d *Dal) UpdateDirectorState(data, prevValue string, force bool) error {
 	)
 
 	return err
+}
+
+// Get slice of all member id's under /cluster/members/*
+func (d *Dal) GetClusterMembers() ([]string, error) {
+	data, err := d.Get("cluster/members/", true)
+	if err != nil {
+		return nil, err
+	}
+
+	members := make([]string, 0)
+
+	for k, _ := range data {
+		members = append(members, path.Base(k))
+	}
+
+	log.Infof("Contents of the members: %v", members)
+
+	return members, nil
+}
+
+// Get a slice of all check keys in etcd (under /monitor/*)
+func (d *Dal) GetCheckKeys() ([]string, error) {
+	return []string{}, nil
 }
 
 // wrapper for etcd client's KeyNotFound error
