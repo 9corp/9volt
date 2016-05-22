@@ -46,10 +46,8 @@ func New(cfg *config.Config, stateChan <-chan bool, distributeChan <-chan bool) 
 func (d *Director) Start() error {
 	log.Debugf("%v: Launching director components...", d.Identifier)
 
-	ctx, cancel := context.WithCancel(context.Background())
-
 	go d.runDistributeListener()
-	go d.runStateListener(ctx, cancel)
+	go d.runStateListener()
 
 	return nil
 }
@@ -75,12 +73,19 @@ func (d *Director) distributeChecks() error {
 	return nil
 }
 
-func (d *Director) runStateListener(ctx context.Context, cancel context.CancelFunc) {
+func (d *Director) runStateListener() {
+	var ctx context.Context
+	var cancel context.CancelFunc
+
 	for {
+
 		state := <-d.StateChan
 
 		if state {
 			log.Infof("%v-stateListener: Starting up etcd watchers", d.Identifier)
+
+			// create new context + cancel func
+			ctx, cancel = context.WithCancel(context.Background())
 
 			// distribute checks in case we just took over as director (or first start)
 			if err := d.distributeChecks(); err != nil {
@@ -111,7 +116,7 @@ func (d *Director) runHostConfigWatcher(ctx context.Context) {
 		// watch host config entries
 		resp, err := watcher.Next(ctx)
 		if err != nil && err.Error() == "context canceled" {
-			log.Errorf("%v-hostConfigWatcher: Received a notice to shutdown", d.Identifier)
+			log.Warningf("%v-hostConfigWatcher: Received a notice to shutdown", d.Identifier)
 			break
 		} else if err != nil {
 			log.Errorf("%v-hostConfigWatcher: Unexpected error: %v", err.Error())
@@ -137,7 +142,7 @@ func (d *Director) runCheckConfigWatcher(ctx context.Context) {
 		// watch check config entries
 		resp, err := watcher.Next(ctx)
 		if err != nil && err.Error() == "context canceled" {
-			log.Errorf("%v-checkConfigWatcher: Received a notice to shutdown", d.Identifier)
+			log.Warningf("%v-checkConfigWatcher: Received a notice to shutdown", d.Identifier)
 			break
 		} else if err != nil {
 			log.Errorf("%v-checkConfigWatcher: Unexpected error: %v", err.Error())
