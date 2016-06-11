@@ -5,7 +5,7 @@ import (
 )
 
 func makeExecCheck() ExecCheck {
-	return New()
+	return New("echo", "hello")
 }
 
 func TestStartCheck(t *testing.T) {
@@ -17,8 +17,9 @@ func TestStartCheck(t *testing.T) {
 }
 
 func TestKillCheck(t *testing.T) {
-	e := makeExecCheck()
+	e := New("/bin/sleep", "5")
 
+	e.StartCheck()
 	if e.KillCheck() != nil {
 		t.Fail()
 	}

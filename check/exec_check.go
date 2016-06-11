@@ -1,22 +1,30 @@
 package check
 
+import (
+	"os/exec"
+)
+
 type ExecCheck struct {
 	state     int
 	listeners map[int][]func(check ICheck)
+	command   *exec.Cmd
 }
 
-func New() ExecCheck {
+func New(command string, args string) ExecCheck {
 	e := ExecCheck{}
 	e.listeners = make(map[int][]func(check ICheck))
+	e.command = exec.Command(command, args)
 	return e
 }
 
 func (e *ExecCheck) StartCheck() error {
-	return nil
+	err := e.command.Start()
+	return err
 }
 
 func (e *ExecCheck) KillCheck() error {
-	return nil
+	err := e.command.Process.Kill()
+	return err
 }
 
 func (e *ExecCheck) CurrentState() int {
