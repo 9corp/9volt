@@ -1,11 +1,11 @@
 package check
 
 const (
-	PendingState  = iota
-	RunningState  = iota
-	FailedState   = iota
-	ResolvedState = iota
-	ErrorState    = iota
+	PendingState = iota
+	RunningState
+	FailedState
+	ResolvedState
+	ErrorState
 )
 
 type ICheck interface {
@@ -32,6 +32,8 @@ func New(checkType string, command string, args string) Check {
 	e := Check{}
 	e.listeners = make(map[int][]func(check ICheck))
 	switch checkType {
+	case "exec":
+		e.Executor = &ExecCheckExecutor{}
 	default:
 		e.Executor = &DummyCheckExecutor{}
 	}
