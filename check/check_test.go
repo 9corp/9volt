@@ -2,6 +2,7 @@ package check
 
 import (
 	"testing"
+	"time"
 )
 
 func makeCheck() Check {
@@ -64,6 +65,8 @@ func TestAddListener(t *testing.T) {
 	})
 
 	e.SetState(RunningState)
+
+	time.Sleep(2 * time.Millisecond)
 
 	if failed {
 		t.Fail()

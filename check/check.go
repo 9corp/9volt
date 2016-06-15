@@ -54,7 +54,7 @@ func (e *Check) CurrentState() int {
 
 func (e *Check) SetState(state int) error {
 	for _, listener := range e.listeners[state] {
-		listener(e)
+		go listener(e)
 	}
 
 	e.state = state
