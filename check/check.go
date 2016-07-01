@@ -34,6 +34,8 @@ func New(checkType string, command string, args string) Check {
 	switch checkType {
 	case "exec":
 		e.Executor = &ExecCheckExecutor{}
+	case "http":
+		e.Executor = &HTTPCheckExecutor{}
 	default:
 		e.Executor = &DummyCheckExecutor{}
 	}
