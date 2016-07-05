@@ -57,6 +57,7 @@ func (d *Director) Start() error {
 
 func (d *Director) runDistributeListener() {
 	for {
+		// Notification sent by cluster component
 		<-d.DistributeChan
 
 		// safety valve
@@ -118,10 +119,17 @@ func (d *Director) distributeChecks() error {
 func (d *Director) performCheckDistribution(members, checkKeys []string) error {
 	checksPerMember := len(checkKeys) / len(members)
 
-	checkKeyNum := 0
+	start := 0
 
 	for memberNum := 0; memberNum < len(members); memberNum++ {
-		maxChecks := checkKeyNum + checksPerMember
+		// Blow away any pre-existing config references
+		if err := d.DalClient.ClearCheckReferences(members[memberNum]); err != nil {
+			log.Errorf("%v: Unable to clear existing check references for member %v: %v",
+				d.Identifier, members[memberNum], err.Error())
+			return err
+		}
+
+		maxChecks := start + checksPerMember
 
 		// last member gets the remainder of the checks
 		if memberNum == len(members)-1 {
@@ -130,9 +138,20 @@ func (d *Director) performCheckDistribution(members, checkKeys []string) error {
 
 		totalAssigned := 0
 
-		for i := checkKeyNum; i != maxChecks; i++ {
+		for i := start; i != maxChecks; i++ {
+			log.Debugf("%v: Assigning check '%v' to member '%v'", d.Identifier, checkKeys[i], members[memberNum])
+
+			if err := d.DalClient.CreateCheckReference(members[memberNum], checkKeys[i]); err != nil {
+				log.Errorf("%v: Unable to create check reference for member %v: %v",
+					d.Identifier, members[memberNum], err.Error())
+				return err
+			}
+
 			totalAssigned++
 		}
+
+		// Update our start num
+		start = maxChecks
 
 		log.Debugf("%v-distributeChecks: Assigned %v checks to %v", d.Identifier,
 			totalAssigned, members[memberNum])
