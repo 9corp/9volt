@@ -83,6 +83,7 @@ func (d *Dal) Set(key, value string, dir bool, ttl int, prevExist string) error 
 	return err
 }
 
+// Set TTL for a given key
 func (d *Dal) Refresh(key string, ttl int) error {
 	_, err := d.KeysAPI.Set(
 		context.Background(),

@@ -113,6 +113,8 @@ func (d *Director) distributeChecks() error {
 // A simple (and equal) check distributor
 //
 // Divide checks equally between all members; last member gets remainder of checks
+//
+// TODO: Actually write per-member check configuration in '9volt/cluster/members/member_id/config/*'
 func (d *Director) performCheckDistribution(members, checkKeys []string) error {
 	checksPerMember := len(checkKeys) / len(members)
 
@@ -156,6 +158,7 @@ func (d *Director) runStateListener() {
 
 			go d.runHostConfigWatcher(ctx)
 			go d.runCheckConfigWatcher(ctx)
+			go d.runAlertConfigWatcher(ctx)
 
 			// distribute checks in case we just took over as director (or first start)
 			if err := d.distributeChecks(); err != nil {
@@ -227,7 +230,12 @@ func (d *Director) runHostConfigWatcher(ctx context.Context) {
 	log.Warningf("%v-hostConfigWatcher: Exiting...", d.Identifier)
 }
 
+// Watch /monitor config changes so that we can update individual member configs
+// ie. Something under /monitor changes -> figure out which member is responsible
+//     for that particular check -> NOOP update OR DELETE corresponding member key
 func (d *Director) runCheckConfigWatcher(ctx context.Context) {
+	log.Debugf("%v-checkConfigWatcher: Launching...", d.Identifier)
+
 	watcher := d.DalClient.NewWatcher("monitor/", true)
 
 	for {
@@ -256,8 +264,48 @@ func (d *Director) runCheckConfigWatcher(ctx context.Context) {
 	log.Warningf("%v-checkConfigWatcher: Exiting...", d.Identifier)
 }
 
+func (d *Director) runAlertConfigWatcher(ctx context.Context) {
+	log.Debugf("%v-alertConfigWatcher: Launching...", d.Identifier)
+
+	watcher := d.DalClient.NewWatcher("alert/", true)
+
+	for {
+		// safety valve
+		if !d.amDirector() {
+			log.Warningf("%v-alertConfigWatcher: Not active director - stopping", d.Identifier)
+			break
+		}
+
+		// watch check config entries
+		resp, err := watcher.Next(ctx)
+		if err != nil && err.Error() == "context canceled" {
+			log.Warningf("%v-alertConfigWatcher: Received a notice to shutdown", d.Identifier)
+			break
+		} else if err != nil {
+			log.Errorf("%v-alertConfigWatcher: Unexpected error: %v", err.Error())
+			continue
+		}
+
+		if err := d.handleAlertConfigChange(resp); err != nil {
+			log.Errorf("%v-hostConfigWatcher: Unable to process config change for %v: %v",
+				d.Identifier, resp.Node.Key, err.Error())
+		}
+	}
+
+	log.Warningf("%v-alertConfigWatcher: Exiting...", d.Identifier)
+}
+
+// TODO: Update '/9volt/cluster/members/member_id/config/*' entry
 func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
 	log.Debugf("%v-handleCheckConfigChange: Received new response for key %v",
+		d.Identifier, resp.Node.Key)
+
+	return nil
+}
+
+// TODO: Update '/9volt/cluster/members/member_id/config/*' entry
+func (d *Director) handleAlertConfigChange(resp *etcd.Response) error {
+	log.Debugf("%v-handleAlertConfigChange: Received new response for key %v",
 		d.Identifier, resp.Node.Key)
 
 	return nil
