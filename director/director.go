@@ -114,8 +114,6 @@ func (d *Director) distributeChecks() error {
 // A simple (and equal) check distributor
 //
 // Divide checks equally between all members; last member gets remainder of checks
-//
-// TODO: Actually write per-member check configuration in '9volt/cluster/members/member_id/config/*'
 func (d *Director) performCheckDistribution(members, checkKeys []string) error {
 	checksPerMember := len(checkKeys) / len(members)
 
@@ -330,6 +328,7 @@ func (d *Director) handleAlertConfigChange(resp *etcd.Response) error {
 	return nil
 }
 
+// TODO: Update '/9volt/cluster/members/member_id/config/*' entry
 func (d *Director) handleHostConfigChange(resp *etcd.Response) error {
 	log.Debugf("%v-handleHostConfigChange: Received new response for key %v",
 		d.Identifier, resp.Node.Key)
