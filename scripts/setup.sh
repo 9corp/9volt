@@ -3,14 +3,10 @@
 # Initial 9volt setup script
 #
 
-PREFIX="9volt"
+[ -z "$PREFIX" ] && PREFIX="9volt"
+[ -z "$ETCDHOST" ] && ETCDHOST="127.0.0.1:2379"
 
-if [ "$#" -ne 1 ]; then
-	echo "Usage: ./setup.sh http://some.etcd-host.com:2379"
-	exit 1
-fi
-
-EXISTS=$(which curl)
+EXISTS=$(hash curl)
 
 if [ $? != "0" ]; then
 	echo "ERROR: Curl does not appear to be available"
@@ -28,14 +24,18 @@ warningMessage() {
 	read
 }
 
-warningMessage
+setupEtcd() {
+  # Add initial config
+  curl -s http://$ETCDHOST/v2/keys/$PREFIX/config -XPUT -d value="{\"HeartbeatInterval\":\"3s\",\"HeartbeatTimeout\":\"6s\"}"
 
-# Add initial config
-curl http://127.0.0.1:2379/v2/keys/$PREFIX/config -XPUT -d value="{\"HeartbeatInterval\":\"3s\",\"HeartbeatTimeout\":\"6s\"}"
+  # Create initial dirs
+  curl -s http://$ETCDHOST/v2/keys/$PREFIX/alert -XPUT -d dir=true
+  curl -s http://$ETCDHOST/v2/keys/$PREFIX/host -XPUT -d dir=true
+  curl -s http://$ETCDHOST/v2/keys/$PREFIX/monitor -XPUT -d dir=true
+  curl -s http://$ETCDHOST/v2/keys/$PREFIX/cluster -XPUT -d dir=true
+  curl -s http://$ETCDHOST/v2/keys/$PREFIX/cluster/members -XPUT -d dir=true
+}
 
-# Create initial dirs
-curl http://127.0.0.1:2379/v2/keys/$PREFIX/alert -XPUT -d dir=true
-curl http://127.0.0.1:2379/v2/keys/$PREFIX/host -XPUT -d dir=true
-curl http://127.0.0.1:2379/v2/keys/$PREFIX/monitor -XPUT -d dir=true
-curl http://127.0.0.1:2379/v2/keys/$PREFIX/cluster -XPUT -d dir=true
-curl http://127.0.0.1:2379/v2/keys/$PREFIX/cluster/members -XPUT -d dir=true
+[ "$#" -ne 1 ] && warningMessage
+setupEtcd
+
