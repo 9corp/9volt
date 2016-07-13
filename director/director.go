@@ -173,7 +173,6 @@ func (d *Director) runStateListener() {
 			// create new context + cancel func
 			ctx, cancel = context.WithCancel(context.Background())
 
-			go d.runHostConfigWatcher(ctx)
 			go d.runCheckConfigWatcher(ctx)
 			go d.runAlertConfigWatcher(ctx)
 
@@ -218,35 +217,6 @@ func (d *Director) verifyMemberExistence() error {
 	}
 }
 
-func (d *Director) runHostConfigWatcher(ctx context.Context) {
-	watcher := d.DalClient.NewWatcher("host/", true)
-
-	for {
-		// safety valve
-		if !d.amDirector() {
-			log.Warningf("%v-hostConfigWatcher: Not active director - stopping", d.Identifier)
-			break
-		}
-
-		// watch host config entries
-		resp, err := watcher.Next(ctx)
-		if err != nil && err.Error() == "context canceled" {
-			log.Warningf("%v-hostConfigWatcher: Received a notice to shutdown", d.Identifier)
-			break
-		} else if err != nil {
-			log.Errorf("%v-hostConfigWatcher: Unexpected error: %v", err.Error())
-			continue
-		}
-
-		if err := d.handleHostConfigChange(resp); err != nil {
-			log.Errorf("%v-hostConfigWatcher: Unable to process config change for %v: %v",
-				d.Identifier, resp.Node.Key, err.Error())
-		}
-	}
-
-	log.Warningf("%v-hostConfigWatcher: Exiting...", d.Identifier)
-}
-
 // Watch /monitor config changes so that we can update individual member configs
 // ie. Something under /monitor changes -> figure out which member is responsible
 //     for that particular check -> NOOP update OR DELETE corresponding member key
@@ -268,7 +238,7 @@ func (d *Director) runCheckConfigWatcher(ctx context.Context) {
 			log.Warningf("%v-checkConfigWatcher: Received a notice to shutdown", d.Identifier)
 			break
 		} else if err != nil {
-			log.Errorf("%v-checkConfigWatcher: Unexpected error: %v", err.Error())
+			log.Errorf("%v-checkConfigWatcher: Unexpected error: %v", d.Identifier, err.Error())
 			continue
 		}
 
@@ -299,7 +269,7 @@ func (d *Director) runAlertConfigWatcher(ctx context.Context) {
 			log.Warningf("%v-alertConfigWatcher: Received a notice to shutdown", d.Identifier)
 			break
 		} else if err != nil {
-			log.Errorf("%v-alertConfigWatcher: Unexpected error: %v", err.Error())
+			log.Errorf("%v-alertConfigWatcher: Unexpected error: %v", d.Identifier, err.Error())
 			continue
 		}
 
@@ -317,20 +287,16 @@ func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
 	log.Debugf("%v-handleCheckConfigChange: Received new response for key %v",
 		d.Identifier, resp.Node.Key)
 
+	// If check is removed -> find referenced check under /cluster/member/$ID/check-ref -> remove
+	// If check is updated -> find referenced check under /cluster/member/$ID/check-ref -> push NOOP update
+	// If check is added   -> find referenced check under /cluster/member/$ID/check-ref -> add ref
+
 	return nil
 }
 
 // TODO: Update '/9volt/cluster/members/member_id/config/*' entry
 func (d *Director) handleAlertConfigChange(resp *etcd.Response) error {
 	log.Debugf("%v-handleAlertConfigChange: Received new response for key %v",
-		d.Identifier, resp.Node.Key)
-
-	return nil
-}
-
-// TODO: Update '/9volt/cluster/members/member_id/config/*' entry
-func (d *Director) handleHostConfigChange(resp *etcd.Response) error {
-	log.Debugf("%v-handleHostConfigChange: Received new response for key %v",
 		d.Identifier, resp.Node.Key)
 
 	return nil
