@@ -12,6 +12,7 @@ import (
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/dal"
 	"github.com/9corp/9volt/director"
+	"github.com/9corp/9volt/manager"
 	"github.com/9corp/9volt/util"
 )
 
@@ -84,21 +85,39 @@ func main() {
 		log.Fatalf("Unable to complete director initialization: %v", err.Error())
 	}
 
+	// start manager
+	manager, err := manager.New(cfg)
+	if err != nil {
+		log.Fatalf("Unable to instantiate manager: %v", err.Error())
+	}
+
+	if err := manager.Start(); err != nil {
+		log.Fatalf("Unable to complete manager initialization: %v", err.Error())
+	}
+
 	// start api server
 	apiServer := api.New(cfg, version)
 	go apiServer.Run()
 
 	// Naming convention; intended module purpose
-
-	// api       --  main API entry point
-	// director  --  performs check distribution
-	// manager   --  manages check lifetime
-	// cluster   --  performs leader election; heartbeat
-	// monitor   --  perform actual monitoring
-	// fetcher   --  fetch statistics from outside sources
-	// alerter   --  send alerts to various destinations
-	// state     --  periodically dump state to etcd
-	// config    --  configuration validation and loading
+	//
+	// D - DONE
+	// S - SKIP
+	// P - PENDING
+	// ? - UNSURE
+	//
+	// [ D ] api       --  main API entry point
+	// [ D ] director  --  performs check distribution
+	// [ P ] manager   --  manages check lifetime [ DAN ]
+	// [ D ] cluster   --  performs leader election; heartbeat
+	// [ ? ] monitor   --  perform actual monitoring
+	//                     (needs additional discussion)
+	// [ ? ] fetcher   --  fetch statistics from outside sources
+	//                     (needs additional discussion)
+	// [ P ] alerter   --  send alerts to various destinations
+	// [ P ] state     --  periodically dump state to etcd [ JESSE ]
+	// [ D ] config    --  configuration validation and loading
+	//
 
 	log.Infof("9volt has started! API address: %v MemberID: %v", "http://"+
 		*listenAddress, util.GetMemberID(*listenAddress))

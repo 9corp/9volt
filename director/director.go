@@ -57,6 +57,7 @@ func (d *Director) Start() error {
 
 func (d *Director) runDistributeListener() {
 	for {
+		// Notification sent by cluster component
 		<-d.DistributeChan
 
 		// safety valve
@@ -116,10 +117,17 @@ func (d *Director) distributeChecks() error {
 func (d *Director) performCheckDistribution(members, checkKeys []string) error {
 	checksPerMember := len(checkKeys) / len(members)
 
-	checkKeyNum := 0
+	start := 0
 
 	for memberNum := 0; memberNum < len(members); memberNum++ {
-		maxChecks := checkKeyNum + checksPerMember
+		// Blow away any pre-existing config references
+		if err := d.DalClient.ClearCheckReferences(members[memberNum]); err != nil {
+			log.Errorf("%v: Unable to clear existing check references for member %v: %v",
+				d.Identifier, members[memberNum], err.Error())
+			return err
+		}
+
+		maxChecks := start + checksPerMember
 
 		// last member gets the remainder of the checks
 		if memberNum == len(members)-1 {
@@ -128,9 +136,20 @@ func (d *Director) performCheckDistribution(members, checkKeys []string) error {
 
 		totalAssigned := 0
 
-		for i := checkKeyNum; i != maxChecks; i++ {
+		for i := start; i != maxChecks; i++ {
+			log.Debugf("%v: Assigning check '%v' to member '%v'", d.Identifier, checkKeys[i], members[memberNum])
+
+			if err := d.DalClient.CreateCheckReference(members[memberNum], checkKeys[i]); err != nil {
+				log.Errorf("%v: Unable to create check reference for member %v: %v",
+					d.Identifier, members[memberNum], err.Error())
+				return err
+			}
+
 			totalAssigned++
 		}
+
+		// Update our start num
+		start = maxChecks
 
 		log.Debugf("%v-distributeChecks: Assigned %v checks to %v", d.Identifier,
 			totalAssigned, members[memberNum])
@@ -154,8 +173,8 @@ func (d *Director) runStateListener() {
 			// create new context + cancel func
 			ctx, cancel = context.WithCancel(context.Background())
 
-			go d.runHostConfigWatcher(ctx)
 			go d.runCheckConfigWatcher(ctx)
+			go d.runAlertConfigWatcher(ctx)
 
 			// distribute checks in case we just took over as director (or first start)
 			if err := d.distributeChecks(); err != nil {
@@ -198,36 +217,12 @@ func (d *Director) verifyMemberExistence() error {
 	}
 }
 
-func (d *Director) runHostConfigWatcher(ctx context.Context) {
-	watcher := d.DalClient.NewWatcher("host/", true)
-
-	for {
-		// safety valve
-		if !d.amDirector() {
-			log.Warningf("%v-hostConfigWatcher: Not active director - stopping", d.Identifier)
-			break
-		}
-
-		// watch host config entries
-		resp, err := watcher.Next(ctx)
-		if err != nil && err.Error() == "context canceled" {
-			log.Warningf("%v-hostConfigWatcher: Received a notice to shutdown", d.Identifier)
-			break
-		} else if err != nil {
-			log.Errorf("%v-hostConfigWatcher: Unexpected error: %v", err.Error())
-			continue
-		}
-
-		if err := d.handleHostConfigChange(resp); err != nil {
-			log.Errorf("%v-hostConfigWatcher: Unable to process config change for %v: %v",
-				d.Identifier, resp.Node.Key, err.Error())
-		}
-	}
-
-	log.Warningf("%v-hostConfigWatcher: Exiting...", d.Identifier)
-}
-
+// Watch /monitor config changes so that we can update individual member configs
+// ie. Something under /monitor changes -> figure out which member is responsible
+//     for that particular check -> NOOP update OR DELETE corresponding member key
 func (d *Director) runCheckConfigWatcher(ctx context.Context) {
+	log.Debugf("%v-checkConfigWatcher: Launching...", d.Identifier)
+
 	watcher := d.DalClient.NewWatcher("monitor/", true)
 
 	for {
@@ -243,7 +238,7 @@ func (d *Director) runCheckConfigWatcher(ctx context.Context) {
 			log.Warningf("%v-checkConfigWatcher: Received a notice to shutdown", d.Identifier)
 			break
 		} else if err != nil {
-			log.Errorf("%v-checkConfigWatcher: Unexpected error: %v", err.Error())
+			log.Errorf("%v-checkConfigWatcher: Unexpected error: %v", d.Identifier, err.Error())
 			continue
 		}
 
@@ -256,15 +251,52 @@ func (d *Director) runCheckConfigWatcher(ctx context.Context) {
 	log.Warningf("%v-checkConfigWatcher: Exiting...", d.Identifier)
 }
 
+func (d *Director) runAlertConfigWatcher(ctx context.Context) {
+	log.Debugf("%v-alertConfigWatcher: Launching...", d.Identifier)
+
+	watcher := d.DalClient.NewWatcher("alert/", true)
+
+	for {
+		// safety valve
+		if !d.amDirector() {
+			log.Warningf("%v-alertConfigWatcher: Not active director - stopping", d.Identifier)
+			break
+		}
+
+		// watch check config entries
+		resp, err := watcher.Next(ctx)
+		if err != nil && err.Error() == "context canceled" {
+			log.Warningf("%v-alertConfigWatcher: Received a notice to shutdown", d.Identifier)
+			break
+		} else if err != nil {
+			log.Errorf("%v-alertConfigWatcher: Unexpected error: %v", d.Identifier, err.Error())
+			continue
+		}
+
+		if err := d.handleAlertConfigChange(resp); err != nil {
+			log.Errorf("%v-hostConfigWatcher: Unable to process config change for %v: %v",
+				d.Identifier, resp.Node.Key, err.Error())
+		}
+	}
+
+	log.Warningf("%v-alertConfigWatcher: Exiting...", d.Identifier)
+}
+
+// TODO: Update '/9volt/cluster/members/member_id/config/*' entry
 func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
 	log.Debugf("%v-handleCheckConfigChange: Received new response for key %v",
 		d.Identifier, resp.Node.Key)
 
+	// If check is removed -> find referenced check under /cluster/member/$ID/check-ref -> remove
+	// If check is updated -> find referenced check under /cluster/member/$ID/check-ref -> push NOOP update
+	// If check is added   -> find referenced check under /cluster/member/$ID/check-ref -> add ref
+
 	return nil
 }
 
-func (d *Director) handleHostConfigChange(resp *etcd.Response) error {
-	log.Debugf("%v-handleHostConfigChange: Received new response for key %v",
+// TODO: Update '/9volt/cluster/members/member_id/config/*' entry
+func (d *Director) handleAlertConfigChange(resp *etcd.Response) error {
+	log.Debugf("%v-handleAlertConfigChange: Received new response for key %v",
 		d.Identifier, resp.Node.Key)
 
 	return nil

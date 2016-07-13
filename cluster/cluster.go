@@ -218,8 +218,8 @@ func (c *Cluster) runMemberMonitor() {
 
 		switch resp.Action {
 		case "set":
-			// Only care about set's on base dir
-			if !resp.Node.Dir {
+			// Only care about set's on base dir and 'config'
+			if !resp.Node.Dir || path.Base(resp.Node.Key) == "config" {
 				log.Debugf("%v-memberMonitor: Ignoring watcher action on key %v",
 					c.Identifier, resp.Node.Key)
 				continue
@@ -241,8 +241,8 @@ func (c *Cluster) runMemberMonitor() {
 	}
 }
 
-// Re-create member dir, set initial state
-func (c *Cluster) createInitialMemberDir(memberDir string, heartbeatTimeoutInt int) error {
+// Re-create member dir structure, set initial state
+func (c *Cluster) createInitialMemberStructure(memberDir string, heartbeatTimeoutInt int) error {
 	// Pre-emptively remove potentially pre-existing memberdir and its children
 	exists, _, err := c.DalClient.KeyExists(memberDir)
 	if err != nil {
@@ -271,6 +271,11 @@ func (c *Cluster) createInitialMemberDir(memberDir string, heartbeatTimeoutInt i
 		return fmt.Errorf("Unable to create initial state: %v", err.Error())
 	}
 
+	// create member config dir
+	if err := c.DalClient.Set(memberDir+"/config", "", true, 0, ""); err != nil {
+		return fmt.Errorf("Creating member config dir failed: %v", err.Error())
+	}
+
 	return nil
 }
 
@@ -284,7 +289,7 @@ func (c *Cluster) runMemberHeartbeat() {
 	heartbeatTimeoutInt := int(time.Duration(c.Config.HeartbeatTimeout).Seconds())
 
 	// create initial member dir
-	if err := c.createInitialMemberDir(memberDir, heartbeatTimeoutInt); err != nil {
+	if err := c.createInitialMemberStructure(memberDir, heartbeatTimeoutInt); err != nil {
 		log.Fatalf("%v-memberHeartbeat: Unable to create initial member dir: %v",
 			c.Identifier, err.Error())
 	}
