@@ -42,3 +42,13 @@ TODO
 ### Minimum requirements
 - 1 x 9volt instance (2+ cores, 4GB RAM each)
 - 1 x 3-node etcd cluster (2+ cores, 2GB RAM each)
+
+### Suggestions/ideas
+- Variable TTL's for member dirs
+- Automatically monitor cluster nodes
+    + Possibly watch etcd cluster members?
+    + Each node monitors the rest of the nodes
+- Slow/trickle check distribution
+    + Do not "blast" out check configs across the cluster
+
+

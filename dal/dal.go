@@ -2,11 +2,12 @@
 package dal
 
 import (
+	"encoding/base64"
 	"fmt"
 	"path"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	// log "github.com/Sirupsen/logrus"
 	"github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
 )
@@ -23,6 +24,8 @@ type IDal interface {
 	NewWatcher(string, bool) client.Watcher
 	GetClusterMembers() ([]string, error)
 	GetCheckKeys() ([]string, error)
+	CreateCheckReference(string, string) error
+	ClearCheckReferences(string) error
 }
 
 type Dal struct {
@@ -83,6 +86,7 @@ func (d *Dal) Set(key, value string, dir bool, ttl int, prevExist string) error 
 	return err
 }
 
+// Set TTL for a given key
 func (d *Dal) Refresh(key string, ttl int) error {
 	_, err := d.KeysAPI.Set(
 		context.Background(),
@@ -126,6 +130,23 @@ func (d *Dal) Get(key string, recurse bool) (map[string]string, error) {
 	}
 
 	return values, nil
+}
+
+// Create a check reference for a specific member under /cluster/members/*/config/*;
+// check ref key is base64 encodded, value is set to the keyName
+func (d *Dal) CreateCheckReference(memberID, keyName string) error {
+	b64Key := base64.StdEncoding.EncodeToString([]byte(keyName))
+
+	_, err := d.KeysAPI.Set(
+		context.Background(),
+		d.Prefix+"/cluster/members/"+memberID+"/config/"+b64Key,
+		keyName,
+		&client.SetOptions{
+			PrevExist: client.PrevIgnore,
+		},
+	)
+
+	return err
 }
 
 // Create director state entry (expecting director state key to not exist)
@@ -179,6 +200,20 @@ func (d *Dal) UpdateDirectorState(data, prevValue string, force bool) error {
 	return err
 }
 
+// Remove all key refs under individual member config dir
+func (d *Dal) ClearCheckReferences(memberID string) error {
+	_, err := d.KeysAPI.Delete(
+		context.Background(),
+		d.Prefix+"/cluster/members/"+memberID+"/config/",
+		&client.DeleteOptions{
+			Recursive: true,
+			Dir:       false,
+		},
+	)
+
+	return err
+}
+
 // Get slice of all member id's under /cluster/members/*
 func (d *Dal) GetClusterMembers() ([]string, error) {
 	data, err := d.Get("cluster/members/", true)
@@ -192,14 +227,23 @@ func (d *Dal) GetClusterMembers() ([]string, error) {
 		members = append(members, path.Base(k))
 	}
 
-	log.Infof("Contents of the members: %v", members)
-
 	return members, nil
 }
 
 // Get a slice of all check keys in etcd (under /monitor/*)
 func (d *Dal) GetCheckKeys() ([]string, error) {
-	return []string{}, nil
+	data, err := d.Get("monitor/", true)
+	if err != nil {
+		return nil, err
+	}
+
+	checkKeys := make([]string, 0)
+
+	for k, _ := range data {
+		checkKeys = append(checkKeys, k)
+	}
+
+	return checkKeys, nil
 }
 
 // wrapper for etcd client's KeyNotFound error

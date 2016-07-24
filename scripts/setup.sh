@@ -39,3 +39,8 @@ setupEtcd() {
 [ "$#" -ne 1 ] && warningMessage
 setupEtcd
 
+# Create some sample checks
+curl http://127.0.0.1:2379/v2/keys/$PREFIX/monitor/some_config_1 -XPUT -d value="{\"stuff\" : 1}"
+curl http://127.0.0.1:2379/v2/keys/$PREFIX/monitor/some_config_2 -XPUT -d value="{\"stuff\" : 2}"
+curl http://127.0.0.1:2379/v2/keys/$PREFIX/monitor/some_config_3 -XPUT -d value="{\"stuff\" : 3}"
+curl http://127.0.0.1:2379/v2/keys/$PREFIX/monitor/some_config_4 -XPUT -d value="{\"stuff\" : 4}"
