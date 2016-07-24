@@ -4,7 +4,7 @@
 #
 
 [ -z "$PREFIX" ] && PREFIX="9volt"
-[ -z "$ETCDHOST" ] && ETCDHOST="127.0.0.1:2379"
+[ -z "$ETCDHOST" ] && ETCDHOST="http://127.0.0.1:2379"
 
 EXISTS=$(hash curl)
 
@@ -26,21 +26,23 @@ warningMessage() {
 
 setupEtcd() {
   # Add initial config
-  curl -s http://$ETCDHOST/v2/keys/$PREFIX/config -XPUT -d value="{\"HeartbeatInterval\":\"3s\",\"HeartbeatTimeout\":\"6s\"}"
+  curl -s $ETCDHOST/v2/keys/$PREFIX/config -XPUT -d value="{\"HeartbeatInterval\":\"3s\",\"HeartbeatTimeout\":\"6s\"}"
 
   # Create initial dirs
-  curl -s http://$ETCDHOST/v2/keys/$PREFIX/alert -XPUT -d dir=true
-  curl -s http://$ETCDHOST/v2/keys/$PREFIX/host -XPUT -d dir=true
-  curl -s http://$ETCDHOST/v2/keys/$PREFIX/monitor -XPUT -d dir=true
-  curl -s http://$ETCDHOST/v2/keys/$PREFIX/cluster -XPUT -d dir=true
-  curl -s http://$ETCDHOST/v2/keys/$PREFIX/cluster/members -XPUT -d dir=true
+  curl -s $ETCDHOST/v2/keys/$PREFIX/alert -XPUT -d dir=true
+  curl -s $ETCDHOST/v2/keys/$PREFIX/host -XPUT -d dir=true
+  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor -XPUT -d dir=true
+  curl -s $ETCDHOST/v2/keys/$PREFIX/cluster -XPUT -d dir=true
+  curl -s $ETCDHOST/v2/keys/$PREFIX/cluster/members -XPUT -d dir=true
 }
 
-[ "$#" -ne 1 ] && warningMessage
-setupEtcd
+createSampleChecks() {
+  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/some_config_1 -XPUT -d value="{\"stuff\" : 1}"
+  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/some_config_2 -XPUT -d value="{\"stuff\" : 2}"
+  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/some_config_3 -XPUT -d value="{\"stuff\" : 3}"
+  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/some_config_4 -XPUT -d value="{\"stuff\" : 4}"
+}
 
-# Create some sample checks
-curl http://127.0.0.1:2379/v2/keys/$PREFIX/monitor/some_config_1 -XPUT -d value="{\"stuff\" : 1}"
-curl http://127.0.0.1:2379/v2/keys/$PREFIX/monitor/some_config_2 -XPUT -d value="{\"stuff\" : 2}"
-curl http://127.0.0.1:2379/v2/keys/$PREFIX/monitor/some_config_3 -XPUT -d value="{\"stuff\" : 3}"
-curl http://127.0.0.1:2379/v2/keys/$PREFIX/monitor/some_config_4 -XPUT -d value="{\"stuff\" : 4}"
+warningMessage
+setupEtcd
+createSampleChecks
