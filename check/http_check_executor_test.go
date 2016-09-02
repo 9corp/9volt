@@ -1,36 +1,45 @@
 package check
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
-
-	fake "github.com/9corp/9volt/check/checkfakes"
 )
 
-func createHTTPExecutor() (HTTPCheckExecutor, *fake.FakeIHttp) {
-	dummy := &fake.FakeIHttp{}
-	exec := HTTPCheckExecutor{
-		HTTPClient: dummy,
-	}
+func handler(resp http.ResponseWriter, req *http.Request) {
+	resp.Write([]byte("Testing"))
+}
 
-	return exec, dummy
+func failureHandler(resp http.ResponseWriter, req *http.Request) {
+	resp.WriteHeader(http.StatusInternalServerError)
+	resp.Write([]byte("Error"))
+}
+
+var ts *httptest.Server
+
+func createHTTPExecutor() *HTTPCheckExecutor {
+	exec := &HTTPCheckExecutor{}
+	ts = httptest.NewServer(http.HandlerFunc(handler))
+	exec.URL = ts.URL
+
+	return exec
 }
 
 func TestHTTPStart(t *testing.T) {
-	h, c := createHTTPExecutor()
+	h := createHTTPExecutor()
 
-	if h.Start() != nil {
-		t.Fail()
-	}
-
-	if c.DoCallCount() == 0 {
-		t.Fail()
-	}
+	h.Start()
 }
 
-func TestHTTPStop(t *testing.T) {
-	h, _ := createHTTPExecutor()
+func TestFailed(t *testing.T) {
+	ets := httptest.NewServer(http.HandlerFunc(failureHandler))
+	h := createHTTPExecutor()
 
-	if h.Stop() != nil {
-		t.Fail()
+	h.URL = ets.URL
+
+	h.Start()
+
+	if h.Failed() != true {
+		t.Errorf("HTTP executor Failed() should have returned true instead returned: %t\n", h.Failed())
 	}
 }

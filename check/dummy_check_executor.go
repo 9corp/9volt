@@ -2,15 +2,16 @@ package check
 
 type DummyCheckExecutor struct {
 	Started bool
-	Stopped bool
 }
 
-func (d *DummyCheckExecutor) Start() error {
+func (d *DummyCheckExecutor) Start() {
 	d.Started = true
-	return nil
 }
 
-func (d *DummyCheckExecutor) Stop() error {
-	d.Stopped = true
+func (d *DummyCheckExecutor) Failed() bool {
+	return false
+}
+
+func (d *DummyCheckExecutor) LastError() error {
 	return nil
 }

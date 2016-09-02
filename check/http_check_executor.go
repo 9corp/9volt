@@ -1,40 +1,46 @@
 package check
 
-import "net/http"
+import (
+	"net/http"
+	"net/url"
+)
 
 // HTTPCheckExecutor actually runs the HTTP check
 type HTTPCheckExecutor struct {
-	HTTPRequest   http.Request
-	HTTPResponse  *http.Response
-	HTTPClient    IHttp
+	URL           string
+	request       http.Request
+	response      *http.Response
+	client        http.Client
 	httpTransport http.Transport
-}
-
-type IHttp interface {
-	Do(req *http.Request) (resp *http.Response, err error)
-}
-
-func (e *HTTPCheckExecutor) client() IHttp {
-	if e.HTTPClient == nil {
-		trans := &http.Transport{}
-		e.HTTPClient = &http.Client{
-			Timeout:   3,
-			Transport: trans,
-		}
-	}
-
-	return e.HTTPClient
+	failed        bool
+	lastError     error
 }
 
 // Start will actually start the check
-func (e *HTTPCheckExecutor) Start() error {
-	resp, err := e.client().Do(&e.HTTPRequest)
-	e.HTTPResponse = resp
-	return err
+func (e *HTTPCheckExecutor) Start() {
+	url, err := url.Parse(e.URL)
+	if err != nil {
+		e.failed = true
+		e.lastError = err
+		return
+	}
+	e.request.URL = url
+	resp, err := e.client.Do(&e.request)
+	e.response = resp
+	if err != nil {
+		e.failed = true
+		e.lastError = err
+	}
+
+	if !(e.response.StatusCode >= 200 && e.response.StatusCode <= 299) {
+		e.failed = true
+	}
 }
 
-// Cancels the inflight HTTP request
-func (e *HTTPCheckExecutor) Stop() error {
-	e.httpTransport.CancelRequest(&e.HTTPRequest)
-	return nil
+func (e *HTTPCheckExecutor) Failed() bool {
+	return e.failed
+}
+
+func (e *HTTPCheckExecutor) LastError() error {
+	return e.lastError
 }

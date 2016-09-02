@@ -1,41 +1,50 @@
 package check
 
+import (
+	"os/exec"
+)
+
 const (
 	PendingState = iota
 	RunningState
 	FailedState
-	ResolvedState
 	ErrorState
+	SuccessState
 )
+
+type CheckState int
 
 type ICheck interface {
 	StartCheck() error
-	KillCheck() error
-	CurrentState() int
-	SetState(state int) error
-	AddListener(state int, callback func(check ICheck)) error
-	ClearListeners(state int) error
+	CurrentState() CheckState
+	SetState(state CheckState)
 }
 
 type ICheckExecutor interface {
-	Start() error
-	Stop() error
+	Start()
+	Failed() bool
+	LastError() error
 }
 
 type Check struct {
-	state     int
-	listeners map[int][]func(check ICheck)
-	Executor  ICheckExecutor
+	state      CheckState
+	Executor   ICheckExecutor
+	UpdateChan chan CheckState
 }
 
-func New(checkType string, command string, args string) Check {
-	e := Check{}
-	e.listeners = make(map[int][]func(check ICheck))
+func New(checkType string, args ...string) Check {
+	e := Check{
+		UpdateChan: make(chan CheckState),
+	}
 	switch checkType {
 	case "exec":
-		e.Executor = &ExecCheckExecutor{}
+		e.Executor = &ExecCheckExecutor{
+			Command: exec.Command(args[0], args[1:]...),
+		}
 	case "http":
-		e.Executor = &HTTPCheckExecutor{}
+		e.Executor = &HTTPCheckExecutor{
+			URL: args[0],
+		}
 	default:
 		e.Executor = &DummyCheckExecutor{}
 	}
@@ -43,33 +52,27 @@ func New(checkType string, command string, args string) Check {
 }
 
 func (e *Check) StartCheck() error {
-	return e.Executor.Start()
+	e.SetState(RunningState)
+	e.Executor.Start()
+
+	if e.Executor.LastError() != nil {
+		e.SetState(ErrorState)
+		return e.Executor.LastError()
+	}
+	if e.Executor.Failed() {
+		e.SetState(FailedState)
+	} else {
+		e.SetState(SuccessState)
+	}
+
+	return nil
 }
 
-func (e *Check) KillCheck() error {
-	return e.Executor.Stop()
-}
-
-func (e *Check) CurrentState() int {
+func (e *Check) CurrentState() CheckState {
 	return e.state
 }
 
-func (e *Check) SetState(state int) error {
-	for _, listener := range e.listeners[state] {
-		go listener(e)
-	}
-
+func (e *Check) SetState(state CheckState) {
 	e.state = state
-
-	return nil
-}
-
-func (e *Check) AddListener(state int, callback func(check ICheck)) error {
-	e.listeners[state] = append(e.listeners[state], callback)
-	return nil
-}
-
-func (e *Check) ClearListeners(state int) error {
-	e.listeners[state] = []func(check ICheck){}
-	return nil
+	e.UpdateChan <- state
 }
