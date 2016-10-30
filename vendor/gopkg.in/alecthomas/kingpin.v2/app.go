@@ -224,32 +224,11 @@ func (a *Application) writeUsage(context *ParseContext, err error) {
 func (a *Application) maybeHelp(context *ParseContext) {
 	for _, element := range context.Elements {
 		if flag, ok := element.Clause.(*FlagClause); ok && flag == a.HelpFlag {
+			// Re-parse the command-line ignoring defaults, so that help works correctly.
+			context, _ = a.parseContext(true, context.rawArgs)
 			a.writeUsage(context, nil)
 		}
 	}
-}
-
-// findCommandFromArgs finds a command (if any) from the given command line arguments.
-func (a *Application) findCommandFromArgs(args []string) (command string, err error) {
-	if err := a.init(); err != nil {
-		return "", err
-	}
-	context := tokenize(args, false)
-	if _, err := a.parse(context); err != nil {
-		return "", err
-	}
-	return a.findCommandFromContext(context), nil
-}
-
-// findCommandFromContext finds a command (if any) from a parsed context.
-func (a *Application) findCommandFromContext(context *ParseContext) string {
-	commands := []string{}
-	for _, element := range context.Elements {
-		if c, ok := element.Clause.(*CmdClause); ok {
-			commands = append(commands, c.name)
-		}
-	}
-	return strings.Join(commands, " ")
 }
 
 // Version adds a --version flag for displaying the application version.
@@ -424,11 +403,8 @@ func (a *Application) setDefaults(context *ParseContext) error {
 
 	for _, arg := range context.arguments.args {
 		if argElements[arg.name] == nil {
-			// Set defaults, if any.
-			for _, defaultValue := range arg.defaultValues {
-				if err := arg.value.Set(defaultValue); err != nil {
-					return err
-				}
+			if err := arg.setDefault(); err != nil {
+				return err
 			}
 		}
 	}
@@ -463,7 +439,7 @@ func (a *Application) validateRequired(context *ParseContext) error {
 
 	for _, arg := range context.arguments.args {
 		if argElements[arg.name] == nil {
-			if arg.required {
+			if arg.needsValue() {
 				return fmt.Errorf("required argument '%s' not provided", arg.name)
 			}
 		}
@@ -650,7 +626,7 @@ func (a *Application) completionOptions(context *ParseContext) []string {
 		options, flagMatched, valueMatched := target.FlagCompletion(flagName, flagValue)
 		if valueMatched {
 			// Value Matched. Show cmdCompletions
-			return target.CmdCompletion()
+			return target.CmdCompletion(context)
 		}
 
 		// Add top level flags if we're not at the top level and no match was found.
@@ -658,7 +634,7 @@ func (a *Application) completionOptions(context *ParseContext) []string {
 			topOptions, topFlagMatched, topValueMatched := a.FlagCompletion(flagName, flagValue)
 			if topValueMatched {
 				// Value Matched. Back to cmdCompletions
-				return target.CmdCompletion()
+				return target.CmdCompletion(context)
 			}
 
 			if topFlagMatched {
@@ -670,10 +646,10 @@ func (a *Application) completionOptions(context *ParseContext) []string {
 			}
 		}
 		return options
-	} else {
-		// Perform completion for sub commands.
-		return target.CmdCompletion()
 	}
+
+	// Perform completion for sub commands and arguments.
+	return target.CmdCompletion(context)
 }
 
 func (a *Application) generateBashCompletion(context *ParseContext) {
