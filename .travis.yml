@@ -1,7 +1,8 @@
 language: go
 sudo: false
 go:
-  - 1.6.2
+  - 1.6.3
+  - 1.7.3
   - tip
 env:
   global:
@@ -14,7 +15,6 @@ before_install:
  - go get github.com/onsi/gomega
 
 install:
- - godep restore
 
 script:
   - go test -v ./...
