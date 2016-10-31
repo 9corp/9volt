@@ -14,6 +14,10 @@ import (
 	"github.com/9corp/9volt/util"
 )
 
+const (
+	COLLECT_CHECK_STATS_INTERVAL = time.Duration(60 * time.Second)
+)
+
 type IDirector interface {
 	Start() error
 }
@@ -27,6 +31,9 @@ type Director struct {
 	DistributeChan <-chan bool
 	StateLock      *sync.Mutex
 	DalClient      dal.IDal
+
+	CheckStats      map[string]int
+	CheckStatsMutex *sync.Mutex
 }
 
 func New(cfg *config.Config, stateChan <-chan bool, distributeChan <-chan bool) (IDirector, error) {
@@ -36,13 +43,15 @@ func New(cfg *config.Config, stateChan <-chan bool, distributeChan <-chan bool) 
 	}
 
 	return &Director{
-		Identifier:     "director",
-		MemberID:       util.GetMemberID(cfg.ListenAddress),
-		Config:         cfg,
-		StateChan:      stateChan,
-		DistributeChan: distributeChan,
-		StateLock:      &sync.Mutex{},
-		DalClient:      dalClient,
+		Identifier:      "director",
+		MemberID:        util.GetMemberID(cfg.ListenAddress),
+		Config:          cfg,
+		StateChan:       stateChan,
+		DistributeChan:  distributeChan,
+		StateLock:       &sync.Mutex{},
+		DalClient:       dalClient,
+		CheckStats:      make(map[string]int, 0),
+		CheckStatsMutex: &sync.Mutex{},
 	}, nil
 }
 
@@ -51,8 +60,29 @@ func (d *Director) Start() error {
 
 	go d.runDistributeListener()
 	go d.runStateListener()
+	go d.collectCheckStats()
 
 	return nil
+}
+
+func (d *Director) collectCheckStats() {
+	for {
+		// To avoid a potential race here; all members have a count of how many
+		// checks each member is assigned.
+		// This will *probably* be switched to utilize `state` later on.
+		checkStats, err := d.DalClient.FetchCheckStats()
+		if err != nil {
+			log.Errorf("%v-collectCheckStats: Unable to fetch check stats: %v", d.Identifier, err.Error())
+		}
+
+		d.CheckStatsMutex.Lock()
+		d.CheckStats = checkStats
+		d.CheckStatsMutex.Unlock()
+
+		log.Debugf("CollectCheckStats: %v", checkStats)
+
+		time.Sleep(COLLECT_CHECK_STATS_INTERVAL)
+	}
 }
 
 func (d *Director) runDistributeListener() {
@@ -287,9 +317,42 @@ func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
 	log.Debugf("%v-handleCheckConfigChange: Received new response for key %v",
 		d.Identifier, resp.Node.Key)
 
-	// If check is removed -> find referenced check under /cluster/member/$ID/check-ref -> remove
-	// If check is updated -> find referenced check under /cluster/member/$ID/check-ref -> push NOOP update
-	// If check is added   -> find referenced check under /cluster/member/$ID/check-ref -> add ref
+	memberRefs, err := d.DalClient.FetchAllMemberRefs()
+	if err != nil {
+		return fmt.Errorf("Unable to fetch all member refs: %v", err.Error())
+	}
+
+	log.Debugf("handleCheckConfigChange: contents of memberRefs: %v", memberRefs)
+
+	var memberID string
+
+	// If the check is brand new (ie. does not run on any node) - pick a node to run it on
+	if val, ok := memberRefs[resp.Node.Key]; !ok {
+		memberID = d.PickNextMember()
+		log.Debugf("Check '%v' IS brand new; picked new node '%v' for it", resp.Node.Key, memberID)
+	} else {
+		log.Debugf("Check '%v' is NOT brand new and exists on member %v", resp.Node.Key, val)
+		memberID = val
+	}
+
+	var actionErr error
+
+	switch resp.Action {
+	case "set":
+		actionErr = d.DalClient.CreateCheckReference(memberID, resp.Node.Key)
+	case "update":
+		actionErr = d.DalClient.CreateCheckReference(memberID, resp.Node.Key)
+	case "create":
+		actionErr = d.DalClient.CreateCheckReference(memberID, resp.Node.Key)
+	case "delete":
+		actionErr = d.DalClient.ClearCheckReference(memberID, resp.Node.Key)
+	default:
+		return fmt.Errorf("%v-handleCheckConfigChange: Unrecognized action '%v'", d.Identifier, resp.Action)
+	}
+
+	if actionErr != nil {
+		return fmt.Errorf("%v-handleCheckConfigChange: Unable to complete check config update: %v", d.Identifier, err.Error())
+	}
 
 	return nil
 }
@@ -300,6 +363,37 @@ func (d *Director) handleAlertConfigChange(resp *etcd.Response) error {
 		d.Identifier, resp.Node.Key)
 
 	return nil
+}
+
+// Return the least taxed cluster member
+func (d *Director) PickNextMember() string {
+	d.CheckStatsMutex.Lock()
+	defer d.CheckStatsMutex.Unlock()
+
+	if len(d.CheckStats) == 0 {
+		// Check stats not yet populated, return self
+		log.Debug("PickNextMember: Check stats are not yet populated, returning self")
+		return d.MemberID
+	}
+
+	var leastTaxedMember string
+	var leastChecks int
+
+	for k, v := range d.CheckStats {
+		// Handle first iteration
+		if leastTaxedMember == "" {
+			leastTaxedMember = k
+			leastChecks = v
+			continue
+		}
+
+		if v < leastChecks {
+			leastTaxedMember = k
+			leastChecks = v
+		}
+	}
+
+	return leastTaxedMember
 }
 
 func (d *Director) setState(state bool) {

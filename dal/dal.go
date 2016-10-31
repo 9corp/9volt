@@ -25,7 +25,10 @@ type IDal interface {
 	GetClusterMembers() ([]string, error)
 	GetCheckKeys() ([]string, error)
 	CreateCheckReference(string, string) error
+	ClearCheckReference(string, string) error
 	ClearCheckReferences(string) error
+	FetchAllMemberRefs() (map[string]string, error)
+	FetchCheckStats() (map[string]int, error)
 }
 
 type Dal struct {
@@ -149,6 +152,36 @@ func (d *Dal) CreateCheckReference(memberID, keyName string) error {
 	return err
 }
 
+// Recursively fetch '/cluster/members/*/config/*', construct and return dataset
+// that has 'map[check_key]memberID' structure
+//
+// TODO: This is not great; should utilize caching at some point
+func (d *Dal) FetchAllMemberRefs() (map[string]string, error) {
+	// Fetch all cluster members
+	memberIDs, err := d.GetClusterMembers()
+	if err != nil {
+		return nil, fmt.Errorf("Unable to fetch cluster members: %v", err.Error())
+	}
+
+	memberRefs := make(map[string]string, 0)
+
+	// Recursively fetch every member ref and build our memberRefs structure
+	for _, memberID := range memberIDs {
+		refs, err := d.Get(fmt.Sprintf("/cluster/members/%v/config", memberID), true)
+		if err != nil {
+			return nil, fmt.Errorf("Problem fetching refs for '%v': %v", memberID, err.Error())
+		}
+
+		for _, v := range refs {
+			memberRefs[v] = memberID
+		}
+	}
+
+	fmt.Printf("Contents of memberRefs: %v\n", memberRefs)
+
+	return memberRefs, nil
+}
+
 // Create director state entry (expecting director state key to not exist)
 func (d *Dal) CreateDirectorState(data string) error {
 	_, err := d.KeysAPI.Set(
@@ -200,6 +233,19 @@ func (d *Dal) UpdateDirectorState(data, prevValue string, force bool) error {
 	return err
 }
 
+// Remove check reference for a given memberID + checkName
+func (d *Dal) ClearCheckReference(memberID, keyName string) error {
+	b64Key := base64.StdEncoding.EncodeToString([]byte(keyName))
+
+	_, err := d.KeysAPI.Delete(
+		context.Background(),
+		d.Prefix+"/cluster/members/"+memberID+"/config/"+b64Key,
+		nil,
+	)
+
+	return err
+}
+
 // Remove all key refs under individual member config dir
 func (d *Dal) ClearCheckReferences(memberID string) error {
 	_, err := d.KeysAPI.Delete(
@@ -210,6 +256,11 @@ func (d *Dal) ClearCheckReferences(memberID string) error {
 			Dir:       false,
 		},
 	)
+
+	// Prevent erroring on a 404
+	if client.IsKeyNotFound(err) {
+		return nil
+	}
 
 	return err
 }
@@ -228,6 +279,22 @@ func (d *Dal) GetClusterMembers() ([]string, error) {
 	}
 
 	return members, nil
+}
+
+// Fetch how many checks each cluster member has
+func (d *Dal) FetchCheckStats() (map[string]int, error) {
+	memberRefs, err := d.FetchAllMemberRefs()
+	if err != nil {
+		return nil, fmt.Errorf("Unable to fetch memberRefs for FetchCheckStats(): %v", err.Error())
+	}
+
+	checkStats := make(map[string]int)
+
+	for _, v := range memberRefs {
+		checkStats[v] = checkStats[v] + 1
+	}
+
+	return checkStats, nil
 }
 
 // Get a slice of all check keys in etcd (under /monitor/*)

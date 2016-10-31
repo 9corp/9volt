@@ -75,7 +75,7 @@ func main() {
 		log.Fatalf("Unable to complete cluster engine initialization: %v", err.Error())
 	}
 
-	// start director
+	// start director (check distributor)
 	director, err := director.New(cfg, stateChannel, distributeChannel)
 	if err != nil {
 		log.Fatalf("Unable to instantiate director: %v", err.Error())

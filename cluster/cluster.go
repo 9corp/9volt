@@ -503,7 +503,7 @@ func (c *Cluster) amDirector() bool {
 	c.DirectorLock.Lock()
 	defer c.DirectorLock.Unlock()
 
-	// hmm - can we just `return c.DirectorState` here?
+	// TODO: hmm - can we just `return c.DirectorState` here?
 	if c.DirectorState {
 		return true
 	}
