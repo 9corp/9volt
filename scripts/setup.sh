@@ -29,20 +29,27 @@ setupEtcd() {
   curl -s $ETCDHOST/v2/keys/$PREFIX/config -XPUT -d value="{\"HeartbeatInterval\":\"3s\",\"HeartbeatTimeout\":\"6s\"}"
 
   # Create initial dirs
-  curl -s $ETCDHOST/v2/keys/$PREFIX/alert -XPUT -d dir=true
-  curl -s $ETCDHOST/v2/keys/$PREFIX/host -XPUT -d dir=true
+  curl -s $ETCDHOST/v2/keys/$PREFIX/alerter -XPUT -d dir=true
   curl -s $ETCDHOST/v2/keys/$PREFIX/monitor -XPUT -d dir=true
   curl -s $ETCDHOST/v2/keys/$PREFIX/cluster -XPUT -d dir=true
   curl -s $ETCDHOST/v2/keys/$PREFIX/cluster/members -XPUT -d dir=true
 }
 
-createSampleChecks() {
-  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/some_config_1 -XPUT -d value="{\"stuff\" : 1}"
-  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/some_config_2 -XPUT -d value="{\"stuff\" : 2}"
-  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/some_config_3 -XPUT -d value="{\"stuff\" : 3}"
-  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/some_config_4 -XPUT -d value="{\"stuff\" : 4}"
+createSampleMonitorConfigs() {
+  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/monitor_config_1 -XPUT -d value="{\"monitor\" : 1}"
+  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/monitor_config_2 -XPUT -d value="{\"monitor\" : 2}"
+  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/monitor_config_3 -XPUT -d value="{\"monitor\" : 3}"
+  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/monitor_config_4 -XPUT -d value="{\"monitor\" : 4}"
+}
+
+createSampleAlerterConfigs() {
+  curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/alerter_config_1 -XPUT -d value="{\"alerter\" : 1}"
+  curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/alerter_config_2 -XPUT -d value="{\"alerter\" : 2}"
+  curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/alerter_config_3 -XPUT -d value="{\"alerter\" : 3}"
+  curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/alerter_config_4 -XPUT -d value="{\"alerter\" : 4}" 
 }
 
 warningMessage
 setupEtcd
-createSampleChecks
+createSampleMonitorConfigs
+createSampleAlerterConfigs

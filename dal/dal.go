@@ -29,6 +29,7 @@ type IDal interface {
 	ClearCheckReferences(string) error
 	FetchAllMemberRefs() (map[string]string, error)
 	FetchCheckStats() (map[string]int, error)
+	FetchAlerterConfig(string) (string, error)
 }
 
 type Dal struct {
@@ -311,6 +312,16 @@ func (d *Dal) GetCheckKeys() ([]string, error) {
 	}
 
 	return checkKeys, nil
+}
+
+// Fetch a specific alerter config by its key name
+func (d *Dal) FetchAlerterConfig(alertKey string) (string, error) {
+	data, err := d.Get("alerter/"+alertKey, false)
+	if err != nil {
+		return "", err
+	}
+
+	return data[alertKey], nil
 }
 
 // wrapper for etcd client's KeyNotFound error

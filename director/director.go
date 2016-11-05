@@ -204,7 +204,6 @@ func (d *Director) runStateListener() {
 			ctx, cancel = context.WithCancel(context.Background())
 
 			go d.runCheckConfigWatcher(ctx)
-			go d.runAlertConfigWatcher(ctx)
 
 			// distribute checks in case we just took over as director (or first start)
 			if err := d.distributeChecks(); err != nil {
@@ -281,38 +280,6 @@ func (d *Director) runCheckConfigWatcher(ctx context.Context) {
 	log.Warningf("%v-checkConfigWatcher: Exiting...", d.Identifier)
 }
 
-func (d *Director) runAlertConfigWatcher(ctx context.Context) {
-	log.Debugf("%v-alertConfigWatcher: Launching...", d.Identifier)
-
-	watcher := d.DalClient.NewWatcher("alert/", true)
-
-	for {
-		// safety valve
-		if !d.amDirector() {
-			log.Warningf("%v-alertConfigWatcher: Not active director - stopping", d.Identifier)
-			break
-		}
-
-		// watch check config entries
-		resp, err := watcher.Next(ctx)
-		if err != nil && err.Error() == "context canceled" {
-			log.Warningf("%v-alertConfigWatcher: Received a notice to shutdown", d.Identifier)
-			break
-		} else if err != nil {
-			log.Errorf("%v-alertConfigWatcher: Unexpected error: %v", d.Identifier, err.Error())
-			continue
-		}
-
-		if err := d.handleAlertConfigChange(resp); err != nil {
-			log.Errorf("%v-hostConfigWatcher: Unable to process config change for %v: %v",
-				d.Identifier, resp.Node.Key, err.Error())
-		}
-	}
-
-	log.Warningf("%v-alertConfigWatcher: Exiting...", d.Identifier)
-}
-
-// TODO: Update '/9volt/cluster/members/member_id/config/*' entry
 func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
 	log.Debugf("%v-handleCheckConfigChange: Received new response for key %v",
 		d.Identifier, resp.Node.Key)
@@ -353,14 +320,6 @@ func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
 	if actionErr != nil {
 		return fmt.Errorf("%v-handleCheckConfigChange: Unable to complete check config update: %v", d.Identifier, err.Error())
 	}
-
-	return nil
-}
-
-// TODO: Update '/9volt/cluster/members/member_id/config/*' entry
-func (d *Director) handleAlertConfigChange(resp *etcd.Response) error {
-	log.Debugf("%v-handleAlertConfigChange: Received new response for key %v",
-		d.Identifier, resp.Node.Key)
 
 	return nil
 }
