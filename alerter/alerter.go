@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/relistan/go-director"
 	"github.com/satori/go.uuid"
 
 	"github.com/9corp/9volt/config"
@@ -28,6 +29,7 @@ type Alerter struct {
 	Config         *config.Config
 	Alerters       map[string]IAlerter
 	MessageChannel <-chan *Message
+	Looper         director.Looper
 }
 
 type Message struct {
@@ -44,6 +46,7 @@ func New(cfg *config.Config, messageChannel <-chan *Message) *Alerter {
 		MemberID:       util.GetMemberID(cfg.ListenAddress),
 		Config:         cfg,
 		MessageChannel: messageChannel,
+		Looper:         director.NewFreeLooper(director.FOREVER, make(chan error)),
 	}
 }
 
@@ -65,9 +68,8 @@ func (a *Alerter) Start() error {
 	return nil
 }
 
-// TODO: Looper + graceful shutdown
 func (a *Alerter) run() {
-	for {
+	a.Looper.Loop(func() error {
 		msg := <-a.MessageChannel
 
 		// tag message
@@ -76,7 +78,9 @@ func (a *Alerter) run() {
 		log.Debugf("%v: Received message (%v) from checker '%v' -> '%v'", msg.UUID, a.Identifier, msg.Source, msg.Key)
 
 		go a.handleMessage(msg)
-	}
+
+		return nil
+	})
 }
 
 func (a *Alerter) handleMessage(msg *Message) error {

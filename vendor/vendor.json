@@ -219,6 +219,18 @@
 			"revisionTime": "2016-05-16T22:24:31Z"
 		},
 		{
+			"checksumSHA1": "jEZSFOoC5WBhJHP+LDBw8+Goatg=",
+			"path": "github.com/relistan/go-director",
+			"revision": "9273dae8c839a114aa4472165f84e057d5b12e09",
+			"revisionTime": "2016-10-14T14:10:51Z"
+		},
+		{
+			"checksumSHA1": "zmC8/3V4ls53DJlNTKDZwPSC/dA=",
+			"path": "github.com/satori/go.uuid",
+			"revision": "b061729afc07e77a8aa4fad0a2fd840958f1942a",
+			"revisionTime": "2016-09-27T10:08:44Z"
+		},
+		{
 			"checksumSHA1": "tHm2SMtuRfrwh6NnnymsuoJ6e0Q=",
 			"path": "github.com/ugorji/go/codec",
 			"revision": "a396ed22fc049df733440d90efe17475e3929ccb",
