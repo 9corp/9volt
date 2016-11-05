@@ -43,10 +43,10 @@ createSampleMonitorConfigs() {
 }
 
 createSampleAlerterConfigs() {
-  curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/alerter_config_1 -XPUT -d value="{\"alerter\" : 1}"
-  curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/alerter_config_2 -XPUT -d value="{\"alerter\" : 2}"
-  curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/alerter_config_3 -XPUT -d value="{\"alerter\" : 3}"
-  curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/alerter_config_4 -XPUT -d value="{\"alerter\" : 4}" 
+  curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/pd_config_1 -XPUT -d value="{\"type\":\"pagerduty\",\"description\":\"foobar1-pd\",\"options\":{\"apikey\":\"api-key-1\",\"custom-key\":\"custom-data-1\"}}"
+  curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/pd_config_2 -XPUT -d value="{\"type\":\"pagerduty\",\"description\":\"foobar2-pd\",\"options\":{\"apikey\":\"api-key-2\",\"custom-key\":\"custom-data-2\"}}"
+  curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/sl_config_1 -XPUT -d value="{\"type\":\"slack\",\"description\":\"foobar1-sl\",\"options\":{\"apikey\":\"api-key-1\",\"custom-key\":\"custom-data-1\"}}"
+  curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/sl_config_2 -XPUT -d value="{\"type\":\"slack\",\"description\":\"foobar2-sl\",\"options\":{\"apikey\":\"api-key-2\",\"custom-key\":\"custom-data-2\"}}" 
 }
 
 warningMessage
