@@ -123,7 +123,19 @@ func (a *Alerter) handleMessage(msg *Message) error {
 	return nil
 }
 
-// TODO: Perform message content validation
+// Perform message validation; return err if one of required fields is not filled out
 func (a *Alerter) validateMessage(msg *Message) error {
+	if msg.Key == "" {
+		return errors.New("Message must have the 'Key' value filled out")
+	}
+
+	if msg.Source == "" {
+		return errors.New("Message must have the 'Source' value filled out")
+	}
+
+	if msg.Contents == nil {
+		return errors.New("Message 'Contents' must be filled out")
+	}
+
 	return nil
 }
