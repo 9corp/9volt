@@ -2,6 +2,7 @@ package alerter
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	log "github.com/Sirupsen/logrus"
