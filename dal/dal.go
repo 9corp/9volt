@@ -2,14 +2,13 @@
 package dal
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"path"
 	"time"
 
-	// log "github.com/Sirupsen/logrus"
 	"github.com/coreos/etcd/client"
-	"golang.org/x/net/context"
 )
 
 type IDal interface {
@@ -177,8 +176,6 @@ func (d *Dal) FetchAllMemberRefs() (map[string]string, error) {
 			memberRefs[v] = memberID
 		}
 	}
-
-	fmt.Printf("Contents of memberRefs: %v\n", memberRefs)
 
 	return memberRefs, nil
 }

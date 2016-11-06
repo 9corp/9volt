@@ -69,7 +69,7 @@ func (a *Alerter) Start() error {
 	return nil
 }
 
-func (a *Alerter) run() {
+func (a *Alerter) run() error {
 	a.Looper.Loop(func() error {
 		msg := <-a.MessageChannel
 
@@ -82,6 +82,8 @@ func (a *Alerter) run() {
 
 		return nil
 	})
+
+	return nil
 }
 
 func (a *Alerter) handleMessage(msg *Message) error {

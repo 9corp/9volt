@@ -1,13 +1,13 @@
 package director
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
 	etcd "github.com/coreos/etcd/client"
-	"golang.org/x/net/context"
 
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/dal"

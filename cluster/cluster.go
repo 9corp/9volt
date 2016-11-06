@@ -24,6 +24,7 @@
 package cluster
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -32,7 +33,6 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"golang.org/x/net/context"
 
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/dal"
