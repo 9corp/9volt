@@ -7,6 +7,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
 
+	"github.com/9corp/9volt/alerter"
 	"github.com/9corp/9volt/api"
 	"github.com/9corp/9volt/cluster"
 	"github.com/9corp/9volt/config"
@@ -64,6 +65,7 @@ func main() {
 	// Create necessary channels
 	stateChannel := make(chan bool)
 	distributeChannel := make(chan bool)
+	messageChannel := make(chan *alerter.Message)
 
 	// Start cluster engine
 	cluster, err := cluster.New(cfg, stateChannel, distributeChannel)
@@ -95,6 +97,13 @@ func main() {
 		log.Fatalf("Unable to complete manager initialization: %v", err.Error())
 	}
 
+	// start the alerter
+	alerter := alerter.New(cfg, messageChannel)
+
+	if err := alerter.Start(); err != nil {
+		log.Fatalf("Unable to complete alerter initialization: %v", err.Error())
+	}
+
 	// start api server
 	apiServer := api.New(cfg, version)
 	go apiServer.Run()
@@ -110,8 +119,6 @@ func main() {
 	// [ D ] director  --  performs check distribution
 	// [ P ] manager   --  manages check lifetime [ DAN ]
 	// [ D ] cluster   --  performs leader election; heartbeat
-	// [ ? ] monitor   --  perform actual monitoring
-	//                     (needs additional discussion)
 	// [ ? ] fetcher   --  fetch statistics from outside sources
 	//                     (needs additional discussion)
 	// [ P ] alerter   --  send alerts to various destinations

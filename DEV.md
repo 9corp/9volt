@@ -10,22 +10,25 @@
 ## Random musings
 - Use `gofmt`
 - Use the built-in race detector (`go run -race`)
-- `foo.Start()` for things that will run continuously but return control to caller (ie. not block forever)
-- `foo.Run()` for things that will continously run and NOT return control (ie. block)
+- `foo.Start()` for things that will not block and return control to the caller
+- `foo.Run()` for things that will block forever and not return control to the caller
 - Use bailout blocks/negative logic/negated if blocks when possible
 - Make an effort to use interfaces - it will make testing *a lot* easier
 - Interface types should be prefixed with an `I` (sorry gophers!)
 - Using interfaces will allow you to use `counterfeiter` for generating fakes
     + https://github.com/maxbrunsfeld/counterfeiter
-- At minimum, use an assertion library when writing tests (ie. https://github.com/stretchr/testify)
+- Use `ginkgo` and `gomega` for testing
 - Make an effort to ensure everything is unit testable first
-- Tests should be tagged as follows (at the top of each test file):
+- Tests should be tagged and named as follows (at the top of each test file):
     + For unit tests
-        * `// +build unit`
+        * No tag
+        * `filename_test.go`
     + For integration tests
         * `// +build integration`
+        * `filename_integration_test.go`
     + For functional tests
         * `// +build functional`
+        * `filename_functional_test.go`
 
 ## What does what?
 
@@ -35,20 +38,25 @@ API; primary way to interact with `9volt`.
 ### Cluster [ DONE ]
 Performs leader election; heartbeat.
 
-### Director [ ALMOST DONE ]
+### Director [ DONE ]
 Performs check (re)distribution between all cluster members.
 
 ### Manager [ PENDING ] @dselans
 Manages check lifetime (ie. start/stop/reload).
 
-### Monitor [ ? ]
-Not sure if this is still needed since checks manage themselves. *Needs additional discussion.*
-
 ### Fetcher [ ? ]
 Fetch statistics/metrics from outside sources and expose them to checks. *Needs additional discussion.*
 
-### Alerter [ ? ]
-Sends alerts to various destinations. Not sure what this will end up looking like. *Needs additional discussion.*
+### Alerter [ PENDING ]
+Sends alerts to various destinations.
+
+To simplify alerting story:
+
+* Check configs reference <a href=""></a>n alert key (ie. "my-pagerduty-alert")
+* Checks run into a changed state -> construct an alert message with given alert key ("my-pagerduty-alert")
+* Alerter picks up the alert message from the channel and spins up the outbound alert in a separate goroutine
+    - That spun-up alerter fetches the config for "my-pagerduty-alert" on the fly and uses it to send the alert
+    - This can be optimized later to cache the alert-configuration (or maybe just do it from the start - depends on how much work is involved; if we already have a watcher, the entirety of alert configs could be stored in mem (?). Not sold on either way.)
 
 ### State [ PENDING ] @jesse
 Periodically dump state to etcd.
@@ -66,3 +74,15 @@ Configuration loading and validation.
         * director goroutine idles/does nothing; manager goroutine watches its own config namespace
 3. Director goroutine redistributes check configuration between all cluster members (including itself).
 4. Each 9volt's manager goroutines notice changes inside their members config dirs and start/stop checkers as needed.
+
+# Potential AlerterConfig structure
+```javascript
+{
+    "type"        : "pagerduty",
+    "description" : "description about this alerter entry",
+    "options"     : {
+        "apikey"     : "1234567890",
+        "custom-key" : "custom data used by the pagerduty alerter"
+    }
+}
+
