@@ -29,6 +29,7 @@ type IDal interface {
 	FetchAllMemberRefs() (map[string]string, error)
 	FetchCheckStats() (map[string]int, error)
 	FetchAlerterConfig(string) (string, error)
+	FetchMonitorConfig(string) (string, error)
 }
 
 type Dal struct {
@@ -324,4 +325,9 @@ func (d *Dal) FetchAlerterConfig(alertKey string) (string, error) {
 // wrapper for etcd client's KeyNotFound error
 func (d *Dal) IsKeyNotFound(err error) bool {
 	return client.IsKeyNotFound(err)
+}
+
+// TODO
+func (d *Dal) FetchMonitorConfig(monitorConfigLocation string) (string, error) {
+	return "{}", nil
 }

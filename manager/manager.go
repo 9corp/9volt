@@ -11,6 +11,7 @@ import (
 	"github.com/coreos/etcd/client"
 	"github.com/relistan/go-director"
 
+	"github.com/9corp/9volt/alerter"
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/monitor"
 	"github.com/9corp/9volt/util"
@@ -24,13 +25,13 @@ type Manager struct {
 	Monitor    *monitor.Monitor
 }
 
-func New(cfg *config.Config) (*Manager, error) {
+func New(cfg *config.Config, messageChannel chan *alerter.Message) (*Manager, error) {
 	return &Manager{
 		Identifier: "manager",
 		MemberID:   util.GetMemberID(cfg.ListenAddress),
 		Config:     cfg,
 		Looper:     director.NewFreeLooper(director.FOREVER, make(chan error)),
-		Monitor:    monitor.New(cfg),
+		Monitor:    monitor.New(cfg, messageChannel),
 	}, nil
 }
 
@@ -65,9 +66,9 @@ func (m *Manager) run() error {
 
 		switch resp.Action {
 		case "set":
-			go m.Monitor.StartCheck(path.Base(resp.Node.Key), resp.Node.Value)
+			go m.Monitor.Handle(monitor.START, path.Base(resp.Node.Key), resp.Node.Value)
 		case "delete":
-			go m.Monitor.StopCheck(path.Base(resp.Node.Key), resp.Node.Value)
+			go m.Monitor.Handle(monitor.STOP, path.Base(resp.Node.Key), resp.Node.Value)
 		default:
 			log.Errorf("%v: Received an unrecognized action '%v' - skipping",
 				m.Identifier, resp.Action)

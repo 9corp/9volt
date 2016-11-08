@@ -3,47 +3,67 @@ package monitor
 import (
 	"fmt"
 	"sync"
+	"time"
 
+	log "github.com/Sirupsen/logrus"
+
+	"github.com/9corp/9volt/alerter"
 	"github.com/9corp/9volt/config"
+	"github.com/9corp/9volt/util"
 )
 
 const (
 	START int = iota
 	STOP
+
+	GOROUTINE_ID_LENGTH = 8
 )
+
+type IMonitor interface {
+	Run() error
+	Stop()
+	Identifier() string
+}
 
 type Monitor struct {
 	Config             *config.Config
 	Identifier         string
 	runningMonitorLock *sync.Mutex
-	runningMonitors    map[string]string
+	runningMonitors    map[string]IMonitor
+	MessageChannel     chan *alerter.Message
+	SupportedMonitors  map[string]func(*RootMonitorConfig) IMonitor // monitor name : NewXMonitor
+}
+
+type RootMonitorConfig struct {
+	GID            string // goroutine id
+	Name           string
+	Config         *MonitorConfig
+	MessageChannel chan *alerter.Message
+	Ticker         *time.Ticker
 }
 
 type MonitorConfig struct {
-	Type        string
-	Description string
-	Tags        []string
+	Type          string
+	Description   string
+	Timeout       util.CustomDuration
+	CheckInterval util.CustomDuration
 }
 
-func New(cfg *config.Config) *Monitor {
+type Response struct{}
+
+func New(cfg *config.Config, messageChannel chan *alerter.Message) *Monitor {
 	return &Monitor{
-		Identifier: "monitor",
-		Config:     cfg,
+		Identifier:     "monitor",
+		Config:         cfg,
+		MessageChannel: messageChannel,
+		SupportedMonitors: map[string]func(*RootMonitorConfig) IMonitor{
+			"http": NewHTTPMonitor,
+		},
 	}
 }
 
-// Wrapper for handle(START, monitorConfig)
-func (m *Monitor) Start(monitorName, monitorConfigLocation string) error {
-	return m.handle(START, monitorName, monitorConfigLocation)
-}
-
-// Wrapper for
-func (m *Monitor) Stop(monitorName, monitorConfigLocation string) error {
-	return m.handle(STOP, monitorName, monitorConfigLocation)
-}
-
 // Start/stop or restart a monitor with a specific config
-func (m *Monitor) handle(action int, monitorName, monitorConfigLocation string) error {
+func (m *Monitor) Handle(action int, monitorName, monitorConfigLocation string) error {
 	// if stop action, check if we have a running instance of the check, if not, return an error
 	if action == STOP {
 		if m.monitorRunning(monitorName) {
@@ -82,7 +102,7 @@ func (m *Monitor) handle(action int, monitorName, monitorConfigLocation string) 
 
 	// start check with new monitor configuration
 	log.Debugf("%v: Starting new monitor for %v...", m.Identifier, monitorName)
-	if err := m.start(monitorConfig); err != nil {
+	if err := m.start(monitorName, monitorConfig); err != nil {
 		log.Errorf("%v: Unable to start new monitor '%v': %v", m.Identifier, monitorName, err.Error())
 		return fmt.Errorf("Unable to start new monitor %v: %v", monitorName, err.Error())
 	}
@@ -95,17 +115,49 @@ func (m *Monitor) handle(action int, monitorName, monitorConfigLocation string) 
 // Perform the actual stop of a given monitor; update running monitor slice
 func (m *Monitor) stop(monitorName string) error {
 	// Stop the given monitor
+	m.runningMonitorLock.Lock()
+	defer m.runningMonitorLock.Unlock()
+
+	// Double check
+	if _, ok := m.runningMonitors[monitorName]; !ok {
+		return fmt.Errorf("%v: Unable to stop monitor '%v' - this monitor is NOT running!", m.Identifier, monitorName)
+	}
+
+	// Stop the actual check
+	m.runningMonitors[monitorName].Stop()
 
 	// Remove it from runningMonitors
+	delete(m.runningMonitors, monitorName)
 
 	return nil
 }
 
 // Perform the actual start of a monitor; update running monitor slice
 func (m *Monitor) start(monitorName string, monitorConfig *MonitorConfig) error {
-	// Create a new monitor
+	// Let's be overly safe and ensure this monitor type exists
+	if _, ok := m.SupportedMonitors[monitorConfig.Type]; !ok {
+		return fmt.Errorf("%v: No such monitor type found '%v'", m.Identifier, monitorConfig.Type)
+	}
+
+	// Create a new monitor instance
+	newMonitor := m.SupportedMonitors[monitorConfig.Type](
+		&RootMonitorConfig{
+			Name:           monitorName,
+			GID:            util.RandomString(GOROUTINE_ID_LENGTH, false),
+			Config:         monitorConfig,
+			MessageChannel: m.MessageChannel,
+			Ticker:         time.NewTicker(time.Duration(monitorConfig.CheckInterval)),
+		},
+	)
+
+	m.runningMonitorLock.Lock()
+	defer m.runningMonitorLock.Unlock()
 
 	// Add monitor to runningMonitors
+	m.runningMonitors[monitorName] = newMonitor
+
+	// Launch the monitor
+	go m.runningMonitors[monitorName].Run()
 
 	return nil
 }
@@ -122,4 +174,9 @@ func (m *Monitor) monitorRunning(monitorName string) bool {
 	}
 
 	return false
+}
+
+// Ensure that the monitoring config is valid
+func (m *Monitor) validateMonitorConfig(monitorConfig *MonitorConfig) error {
+	return nil
 }

@@ -88,7 +88,7 @@ func main() {
 	}
 
 	// start manager
-	manager, err := manager.New(cfg)
+	manager, err := manager.New(cfg, messageChannel)
 	if err != nil {
 		log.Fatalf("Unable to instantiate manager: %v", err.Error())
 	}
