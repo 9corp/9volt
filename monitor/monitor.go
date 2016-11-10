@@ -1,6 +1,8 @@
 package monitor
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -9,6 +11,7 @@ import (
 
 	"github.com/9corp/9volt/alerter"
 	"github.com/9corp/9volt/config"
+	"github.com/9corp/9volt/dal"
 	"github.com/9corp/9volt/util"
 )
 
@@ -76,11 +79,11 @@ func (m *Monitor) Handle(action int, monitorName, monitorConfigLocation string) 
 	}
 
 	// fetch fresh configuration from etcd
-	monitorConfig, err := m.Config.DalClient.FetchMonitorConfig(monitorConfigLocation)
+	monitorConfig, err := m.fetchMonitorConfig(monitorConfigLocation)
 	if err != nil {
 		log.Errorf("%v: Unable to fetch monitor configuration for '%v' (%v): %v",
 			m.Identifier, monitorName, monitorConfigLocation, err.Error())
-		return fmt.Errorf("Unable to fetch monitor configuration for %v: %v", monitorName, err.Error())
+		return err
 	}
 
 	// validate monitor configuration
@@ -167,7 +170,7 @@ func (m *Monitor) monitorRunning(monitorName string) bool {
 	m.runningMonitorLock.Lock()
 	defer m.runningMonitorLock.Unlock()
 
-	for k, v := range m.runningMonitors {
+	for k, _ := range m.runningMonitors {
 		if k == monitorName {
 			return true
 		}
@@ -179,4 +182,26 @@ func (m *Monitor) monitorRunning(monitorName string) bool {
 // Ensure that the monitoring config is valid
 func (m *Monitor) validateMonitorConfig(monitorConfig *MonitorConfig) error {
 	return nil
+}
+
+// Wrapper for fetching (and unmarshaling) MonitorConfig by etcd location
+func (m *Monitor) fetchMonitorConfig(monitorConfigLocation string) (*MonitorConfig, error) {
+	monitorConfigData, err := m.Config.DalClient.Get(monitorConfigLocation, &dal.GetOptions{
+		NoPrefix: true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("Unable to fetch monitor configuration for '%v': %v", monitorConfigLocation, err.Error())
+	}
+
+	if _, ok := monitorConfigData[monitorConfigLocation]; !ok {
+		return nil, errors.New("Returned monitor config data missing... bug?")
+	}
+
+	var monitorConfig *MonitorConfig
+
+	if err := json.Unmarshal([]byte(monitorConfigData[monitorConfigLocation]), monitorConfig); err != nil {
+		return nil, fmt.Errorf("Unable to unmarshal fetched monitorConfig for '%v': %v", monitorConfigLocation, err.Error())
+	}
+
+	return monitorConfig, nil
 }

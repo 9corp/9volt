@@ -342,7 +342,7 @@ func (c *Cluster) generateMemberJSON() (string, error) {
 
 func (c *Cluster) getState() (*DirectorJSON, error) {
 	// Fetch the current state
-	data, err := c.DalClient.Get(DIRECTOR_KEY, false)
+	data, err := c.DalClient.Get(DIRECTOR_KEY, nil)
 
 	if c.DalClient.IsKeyNotFound(err) {
 		log.Debugf("%v-directorMonitor: No active director found", c.Identifier)

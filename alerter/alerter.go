@@ -93,6 +93,8 @@ func (a *Alerter) handleMessage(msg *Message) error {
 		return err
 	}
 
+	// TODO: This fetch+unmarshal block needs to go into a helper method
+	//
 	// fetch alert configuration
 	jsonAlerterConfig, err := a.Config.DalClient.FetchAlerterConfig(msg.Key)
 	if err != nil {

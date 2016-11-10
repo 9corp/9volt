@@ -12,7 +12,7 @@ import (
 )
 
 type IDal interface {
-	Get(string, bool) (map[string]string, error)
+	Get(string, *GetOptions) (map[string]string, error)
 	Set(string, string, bool, int, string) error
 	Delete(string, bool) error
 	Refresh(string, int) error
@@ -29,7 +29,14 @@ type IDal interface {
 	FetchAllMemberRefs() (map[string]string, error)
 	FetchCheckStats() (map[string]int, error)
 	FetchAlerterConfig(string) (string, error)
-	FetchMonitorConfig(string) (string, error)
+}
+
+type GetOptions struct {
+	Recurse  bool
+	NoPrefix bool
+
+	// GetOptions modifies this internal prefix state based on call
+	prefix string
 }
 
 type Dal struct {
@@ -106,9 +113,24 @@ func (d *Dal) Refresh(key string, ttl int) error {
 	return err
 }
 
-// Get wrapper; either returns the key contents or error
-func (d *Dal) Get(key string, recurse bool) (map[string]string, error) {
-	resp, err := d.KeysAPI.Get(context.Background(), d.Prefix+"/"+key, nil)
+// Get wrapper; either returns the key contents or error; accepts *GoOptions for
+// specifying whether the method should recurse and/or use the default prefix.
+//
+// By default, passing a nil for Options will NOT recurse and use the default
+// prefix of `d.Prefix`. Passing in a `GetOptions{NoPrefix: true}` will cause
+// GET to not use ANY prefix (assuming key name includes full path).
+func (d *Dal) Get(key string, getOptions *GetOptions) (map[string]string, error) {
+	// if given no options, instantiate default GetOptions
+	if getOptions == nil {
+		getOptions = &GetOptions{}
+	}
+
+	// If we ARE supposed to use a prefix, use the default one
+	if !getOptions.NoPrefix {
+		getOptions.prefix = d.Prefix
+	}
+
+	resp, err := d.KeysAPI.Get(context.Background(), getOptions.prefix+"/"+key, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +138,7 @@ func (d *Dal) Get(key string, recurse bool) (map[string]string, error) {
 	values := make(map[string]string, 0)
 
 	// If recurse is set, verify the key is a dir
-	if recurse {
+	if getOptions.Recurse {
 		if !resp.Node.Dir {
 			return nil, fmt.Errorf("Recurse is enabled, but '%v' is not a dir", key)
 		}
@@ -168,7 +190,9 @@ func (d *Dal) FetchAllMemberRefs() (map[string]string, error) {
 
 	// Recursively fetch every member ref and build our memberRefs structure
 	for _, memberID := range memberIDs {
-		refs, err := d.Get(fmt.Sprintf("/cluster/members/%v/config", memberID), true)
+		refs, err := d.Get(fmt.Sprintf("/cluster/members/%v/config", memberID), &GetOptions{
+			Recurse: true,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("Problem fetching refs for '%v': %v", memberID, err.Error())
 		}
@@ -266,7 +290,10 @@ func (d *Dal) ClearCheckReferences(memberID string) error {
 
 // Get slice of all member id's under /cluster/members/*
 func (d *Dal) GetClusterMembers() ([]string, error) {
-	data, err := d.Get("cluster/members/", true)
+	data, err := d.Get("cluster/members/", &GetOptions{
+		Recurse: true,
+	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +325,10 @@ func (d *Dal) FetchCheckStats() (map[string]int, error) {
 
 // Get a slice of all check keys in etcd (under /monitor/*)
 func (d *Dal) GetCheckKeys() ([]string, error) {
-	data, err := d.Get("monitor/", true)
+	data, err := d.Get("monitor/", &GetOptions{
+		Recurse: true,
+	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +344,7 @@ func (d *Dal) GetCheckKeys() ([]string, error) {
 
 // Fetch a specific alerter config by its key name
 func (d *Dal) FetchAlerterConfig(alertKey string) (string, error) {
-	data, err := d.Get("alerter/"+alertKey, false)
+	data, err := d.Get("alerter/"+alertKey, nil)
 	if err != nil {
 		return "", err
 	}
@@ -325,9 +355,4 @@ func (d *Dal) FetchAlerterConfig(alertKey string) (string, error) {
 // wrapper for etcd client's KeyNotFound error
 func (d *Dal) IsKeyNotFound(err error) bool {
 	return client.IsKeyNotFound(err)
-}
-
-// TODO
-func (d *Dal) FetchMonitorConfig(monitorConfigLocation string) (string, error) {
-	return "{}", nil
 }

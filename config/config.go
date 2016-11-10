@@ -75,7 +75,7 @@ func (c *Config) Load() error {
 		return fmt.Errorf("'config' exists but is a dir")
 	}
 
-	values, err := c.DalClient.Get("config", false)
+	values, err := c.DalClient.Get("config", nil)
 	if err != nil {
 		return err
 	}

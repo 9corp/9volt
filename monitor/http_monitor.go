@@ -20,6 +20,8 @@ func (h *HTTPMonitor) Run() error {
 
 	for t := range h.RMC.Ticker.C {
 		// execute the check
+		log.Warningf("%v-%v: Tick at %v", h.Identifier(), h.RMC.GID, t.String())
+
 		h.httpCheck()
 	}
 

@@ -6,6 +6,7 @@ package manager
 import (
 	"context"
 	"fmt"
+	"path"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/coreos/etcd/client"
