@@ -11,7 +11,8 @@ type HTTPMonitor struct {
 
 func NewHTTPMonitor(rmc *RootMonitorConfig) IMonitor {
 	return &HTTPMonitor{
-		RMC: rmc,
+		RMC:        rmc,
+		identifier: "http",
 	}
 }
 

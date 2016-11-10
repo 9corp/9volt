@@ -46,10 +46,10 @@ type RootMonitorConfig struct {
 }
 
 type MonitorConfig struct {
-	Type          string
-	Description   string
-	Timeout       util.CustomDuration
-	CheckInterval util.CustomDuration
+	Type        string              `json:"type"`
+	Description string              `json:"description"`
+	Timeout     util.CustomDuration `json:"timeout"`
+	Interval    util.CustomDuration `json:"interval"`
 }
 
 type Response struct{}
@@ -62,6 +62,8 @@ func New(cfg *config.Config, messageChannel chan *alerter.Message) *Monitor {
 		SupportedMonitors: map[string]func(*RootMonitorConfig) IMonitor{
 			"http": NewHTTPMonitor,
 		},
+		runningMonitors:    make(map[string]IMonitor, 0),
+		runningMonitorLock: &sync.Mutex{},
 	}
 }
 
@@ -149,7 +151,7 @@ func (m *Monitor) start(monitorName string, monitorConfig *MonitorConfig) error 
 			GID:            util.RandomString(GOROUTINE_ID_LENGTH, false),
 			Config:         monitorConfig,
 			MessageChannel: m.MessageChannel,
-			Ticker:         time.NewTicker(time.Duration(monitorConfig.CheckInterval)),
+			Ticker:         time.NewTicker(time.Duration(monitorConfig.Interval)),
 		},
 	)
 
@@ -199,7 +201,7 @@ func (m *Monitor) fetchMonitorConfig(monitorConfigLocation string) (*MonitorConf
 
 	var monitorConfig *MonitorConfig
 
-	if err := json.Unmarshal([]byte(monitorConfigData[monitorConfigLocation]), monitorConfig); err != nil {
+	if err := json.Unmarshal([]byte(monitorConfigData[monitorConfigLocation]), &monitorConfig); err != nil {
 		return nil, fmt.Errorf("Unable to unmarshal fetched monitorConfig for '%v': %v", monitorConfigLocation, err.Error())
 	}
 

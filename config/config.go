@@ -36,7 +36,7 @@ func New(listenAddress, etcdPrefix string, etcdMembers []string, dalClient dal.I
 }
 
 func (c *Config) ValidateDirs() []string {
-	dirs := []string{"cluster", "cluster/members", "monitor", "alert", "host"}
+	dirs := []string{"cluster", "cluster/members", "monitor", "alerter"}
 
 	var errorList []string
 
