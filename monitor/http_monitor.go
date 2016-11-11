@@ -12,16 +12,16 @@ func NewHTTPMonitor(rmc *RootMonitorConfig) IMonitor {
 	h := &HTTPMonitor{
 		Base: Base{
 			RMC:        rmc,
-			identifier: "http",
+			Identifier: "http",
 		},
 	}
 
-	h.monitorFunc = h.httpCheck
+	h.MonitorFunc = h.httpCheck
 
 	return h
 }
 
 func (h *HTTPMonitor) httpCheck() *Response {
-	log.Debugf("%v-%v: Performing http check!", h.Identifier(), h.RMC.GID)
+	log.Debugf("%v-%v: Performing http check!", h.Identify(), h.RMC.GID)
 	return nil
 }

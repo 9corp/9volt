@@ -25,7 +25,7 @@ const (
 type IMonitor interface {
 	Run() error
 	Stop()
-	Identifier() string
+	Identify() string
 }
 
 type Monitor struct {
@@ -46,6 +46,7 @@ type RootMonitorConfig struct {
 }
 
 type MonitorConfig struct {
+	URL         string
 	Type        string              `json:"type"`
 	Description string              `json:"description"`
 	Timeout     util.CustomDuration `json:"timeout"`

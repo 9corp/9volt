@@ -15,7 +15,7 @@ import (
 
 type IAlerter interface {
 	Send(*Message, *AlerterConfig) error
-	Identifier() string
+	Identify() string
 }
 
 type AlerterConfig struct {
@@ -59,8 +59,8 @@ func (a *Alerter) Start() error {
 	sl := NewSlack(a.Config)
 
 	a.Alerters = map[string]IAlerter{
-		pd.Identifier(): pd,
-		sl.Identifier(): sl,
+		pd.Identify(): pd,
+		sl.Identify(): sl,
 	}
 
 	// Launch our alerter message handler
