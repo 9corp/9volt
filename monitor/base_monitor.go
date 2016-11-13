@@ -7,7 +7,7 @@ import (
 type Base struct {
 	RMC         *RootMonitorConfig
 	Identifier  string
-	MonitorFunc func() *Response
+	MonitorFunc func() error
 }
 
 func (b *Base) Stop() {

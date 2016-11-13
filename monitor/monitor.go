@@ -49,9 +49,9 @@ type RootMonitorConfig struct {
 // TODO: This should probably be split up between each individual check type
 type MonitorConfig struct {
 	// Generic attributes that fit more than one monitor type
-	Type        string   // 'tcp', 'http', 'ssh', 'exec', 'icmp', 'dns'
-	Description string   // optional
-	Hosts       []string // required for all checks except 'exec'
+	Type        string // 'tcp', 'http', 'ssh', 'exec', 'icmp', 'dns'
+	Description string // optional
+	Host        string // required for all checks except 'exec'
 	Interval    util.CustomDuration
 	Timeout     util.CustomDuration
 	Port        int    // works for all checks except 'icmp' and 'exec'
