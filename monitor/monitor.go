@@ -42,15 +42,39 @@ type RootMonitorConfig struct {
 	Name           string
 	Config         *MonitorConfig
 	MessageChannel chan *alerter.Message
+	StopChannel    chan bool
 	Ticker         *time.Ticker
 }
 
+// TODO: This should probably be split up between each individual check type
 type MonitorConfig struct {
-	URL         string
-	Type        string              `json:"type"`
-	Description string              `json:"description"`
-	Timeout     util.CustomDuration `json:"timeout"`
-	Interval    util.CustomDuration `json:"interval"`
+	// Generic attributes that fit more than one monitor type
+	Type        string   // 'tcp', 'http', 'ssh', 'exec', 'icmp', 'dns'
+	Description string   // optional
+	Hosts       []string // required for all checks except 'exec'
+	Interval    util.CustomDuration
+	Timeout     util.CustomDuration
+	Port        int    // works for all checks except 'icmp' and 'exec'
+	Expect      string // works for 'tcp', 'ssh', 'http', 'exec' checks except 'icmp'
+	Enabled     bool
+	Tags        []string
+
+	// HTTP specific attributes
+	HTTPURL         string
+	HTTPMethod      string
+	HTTPSSL         bool
+	HTTPStatusCode  int
+	HTTPRequestBody string // Only used if 'Method' is 'GET'
+
+	// Exec specific attributes
+	ExecCommand    string
+	ExecReturnCode int
+
+	// Alerting related configuration
+	WarningThreshold  int      // how many times a check must fail before a warning alert is emitted
+	CriticalThreshold int      // how many times a check must fail before a critical alert is emitted
+	WarningAlerters   []string // these alerters will be contacted when a warning threshold is hit
+	CriticalAlerters  []string // these alerters will be contacted when a critical threshold is hit
 }
 
 type Response struct{}
@@ -152,6 +176,7 @@ func (m *Monitor) start(monitorName string, monitorConfig *MonitorConfig) error 
 			GID:            util.RandomString(GOROUTINE_ID_LENGTH, false),
 			Config:         monitorConfig,
 			MessageChannel: m.MessageChannel,
+			StopChannel:    make(chan bool, 1),
 			Ticker:         time.NewTicker(time.Duration(monitorConfig.Interval)),
 		},
 	)

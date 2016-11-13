@@ -11,7 +11,7 @@ type Base struct {
 }
 
 func (b *Base) Stop() {
-	b.RMC.Ticker.Stop()
+	b.RMC.StopChannel <- true
 }
 
 func (b *Base) Identify() string {
@@ -22,13 +22,19 @@ func (b *Base) Identify() string {
 func (b *Base) Run() error {
 	log.Debugf("%v-%v: Starting work for monitor %v...", b.Identify(), b.RMC.GID, b.RMC.Name)
 
-	for t := range b.RMC.Ticker.C {
-		// execute the check
-		log.Warningf("%v-%v: Tick at %v", b.Identify(), b.RMC.GID, t.String())
+	defer b.RMC.Ticker.Stop()
 
-		b.MonitorFunc()
+Mainloop:
+	for {
+		select {
+		case <-b.RMC.Ticker.C:
+			log.Debugf("%v-%v: Tick for monitor %v", b.Identify(), b.RMC.GID, b.RMC.Name)
+			b.MonitorFunc()
+		case <-b.RMC.StopChannel:
+			break Mainloop
+		}
 	}
 
-	log.Debugf("%v-%v: Goroutine has been stopped for monitor %v; exiting...", b.Identify(), b.RMC.GID, b.RMC.Name)
+	log.Warningf("%v-%v: Goroutine has been stopped for monitor %v; exiting...", b.Identify(), b.RMC.GID, b.RMC.Name)
 	return nil
 }

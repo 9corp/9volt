@@ -23,5 +23,6 @@ func NewHTTPMonitor(rmc *RootMonitorConfig) IMonitor {
 
 func (h *HTTPMonitor) httpCheck() *Response {
 	log.Debugf("%v-%v: Performing http check!", h.Identify(), h.RMC.GID)
+
 	return nil
 }

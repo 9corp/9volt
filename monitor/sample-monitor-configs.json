@@ -1,0 +1,89 @@
+// Basic HTTP check
+{
+  "Type": "http",
+  "Description": "200 http status check",
+  "Hosts": ["docker-state.nr-ops.net"],
+  "Timeout": "5s",
+  "CheckInterval": "1m",
+  "Enabled": true,
+  "Method": "GET",
+  "Port": 80,
+  "SSL": false,
+  "URL": "/healthcheck",
+  "StatusCode": 200,
+  "Tags" : ["team-core", "golang"],
+  "WarningThreshold": 1,
+  "CriticalThreshold": 3,
+  "WarningAlerter": ["core-email", "core-slack"],
+  "CriticalAlerter" : ["core-slack", "core-pagerduty"]
+}
+
+// HTTP check w/ output
+{
+  "Type": "http",
+  "Description": "200 http status check",
+  "Hosts": ["auth-api.invisionapp.com"],
+  "Timeout": "5s",
+  "CheckInterval": "1m",
+  "Enabled": true,
+  "Method": "GET",
+  "Expect": "auth-api",
+  "Port": 80,
+  "SSL": false,
+  "URL": "/healthcheck",
+  "StatusCode": 200,
+  "WarningThreshold": 1,
+  "CriticalThreshold": 3,
+  "WarningAlerter": ["core-email", "core-slack"],
+  "CriticalAlerter" : ["core-slack", "core-pagerduty"],
+  "Tags" : ["team-core", "golang"],
+}
+
+// SSH check w/ output
+{
+  "Type": "ssh",
+  "Description": "Check that SSH is up",
+  "Hosts": ["auth-api.invisionapp.com"],
+  "Timeout": "5s",
+  "CheckInterval": "1m",
+  "Enabled": true,
+  "Expect": "OpenSSH",
+  "Port": 22,
+  "WarningThreshold": 1,
+  "CriticalThreshold": 3,
+  "WarningAlerter": ["core-email", "core-slack"],
+  "CriticalAlerter" : ["core-slack", "core-pagerduty"],
+  "Tags" : ["team-core", "golang", "auth-api"],
+}
+
+// icmp ping check
+{
+  "Type": "icmp",
+  "Description": "check that auth-api LB responds to ICMP",
+  "Hosts": ["auth-api.invisionapp.com"],
+  "Timeout": "5s",
+  "CheckInterval": "1m",
+  "Enabled": true,
+  "WarningThreshold": 1,
+  "CriticalThreshold": 3,
+  "WarningAlerter": ["core-email", "core-slack"],
+  "CriticalAlerter" : ["core-slack", "core-pagerduty"],
+  "Tags" : ["team-core", "golang", "auth-api"]
+}
+
+// exec check w/ expected output + return code
+{
+  "Type": "exec",
+  "Description": "check that command returns",
+  "Timeout": "5s",
+  "CheckInterval": "1m",
+  "Enabled": true,
+  "Command" : "python scripts/some_script.py",
+  "Expect" : "some expected output",
+  "ReturnCode" : 0,
+  "WarningThreshold": 1, // how many times a cmd must fail before a warning alert is emitted
+  "CriticalThreshold": 3, // how many times a cmd must fail before a critical alert is emitted
+  "WarningAlerter": ["core-email", "core-slack"],
+  "CriticalAlerter" : ["core-slack", "core-pagerduty"],
+  "Tags" : ["team-core", "golang", "auth-api"]
+}
