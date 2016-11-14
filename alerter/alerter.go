@@ -34,13 +34,15 @@ type Alerter struct {
 }
 
 type Message struct {
-	Key      string
-	Contents map[string]string
-	Source   string
-	Resolve  bool
-	Warning  bool
-	Critical bool
-	uuid     string // for private use
+	Key      []string          // Keys coming from the monitor config for Critical or WarningAlerters
+	Text     string            // Message that describes the alert
+	Source   string            // Origin of the alert
+	Count    int               // How many check attempts were made
+	Resolve  bool              // Allows alerters to react differently to up/down messages
+	Warning  bool              // Either 'Warning' or 'Critical' must be set
+	Critical bool              // Either 'Warning' or 'Critical' must be set
+	Contents map[string]string // Set checker-specific data (ensuring alerters know how to use the data)
+	uuid     string            // For private use within the alerter
 }
 
 func New(cfg *config.Config, messageChannel <-chan *Message) *Alerter {
@@ -95,45 +97,70 @@ func (a *Alerter) handleMessage(msg *Message) error {
 		return err
 	}
 
-	// TODO: This fetch+unmarshal block needs to go into a helper method
-	//
-	// fetch alert configuration
-	jsonAlerterConfig, err := a.Config.DalClient.FetchAlerterConfig(msg.Key)
+	errorList := make([]string, 0)
+
+	// fetch alert configuration for each individual key, send alert for each.
+	// keep track of any encountered errors; report result in the end
+	for _, alerterKey := range msg.Key {
+		alerterConfig, err := a.loadAlerterConfig(alerterKey, msg)
+		if err != nil {
+			errorMessage := fmt.Sprintf("Unable to load alerter key for %v: %v", msg.uuid, err.Error())
+			errorList = append(errorList, errorMessage)
+			log.Errorf("%v: %v", a.Identifier, errorMessage)
+			continue
+		}
+
+		// send the actual alert
+		log.Debugf("%v: Sending %v to alerter %v!", a.Identifier, msg.uuid, alerterConfig.Type)
+		if err := a.Alerters[alerterConfig.Type].Send(msg, alerterConfig); err != nil {
+			errorMessage := fmt.Sprintf("Unable to complete message send for %v: %v", msg.uuid, err.Error())
+			errorList = append(errorList, errorMessage)
+			log.Errorf("%v: %v", a.Identifier, errorMessage)
+			continue
+		}
+	}
+
+	if len(errorList) != 0 {
+		log.Warningf("%v: Ran into %v errors during alert send for %v (alerters: %v)",
+			a.Identifier, len(errorList), msg.Source, msg.Key)
+	} else {
+		log.Debugf("%v: Successfully sent %v alert messages for %v (alerters: %v)",
+			a.Identifier, len(msg.Key), msg.uuid, msg.Key)
+	}
+
+	return nil
+}
+
+// Fetch an alert config for a given alert key; ensure we can unmarshal it
+func (a *Alerter) loadAlerterConfig(alerterKey string, msg *Message) (*AlerterConfig, error) {
+	jsonAlerterConfig, err := a.Config.DalClient.FetchAlerterConfig(alerterKey)
 	if err != nil {
-		log.Errorf("%v: Unable to fetch alerter config for message %v: %v", a.Identifier, msg.uuid, err.Error())
-		return err
+		log.Errorf("Unable to fetch alerter config for message %v: %v", msg.uuid, err.Error())
+		return nil, err
 	}
 
 	// try to unmarshal the data
 	var alerterConfig *AlerterConfig
 
 	if err := json.Unmarshal([]byte(jsonAlerterConfig), alerterConfig); err != nil {
-		log.Errorf("%v: Unable to unmarshal alerter config for message %v: %v", a.Identifier, msg.uuid, err.Error())
-		return err
+		log.Errorf("Unable to unmarshal alerter config for message %v: %v", msg.uuid, err.Error())
+		return nil, err
 	}
 
 	// check if we have given alerter
 	if _, ok := a.Alerters[alerterConfig.Type]; !ok {
-		err := fmt.Errorf("%v: Unable to find any alerter named %v", a.Identifier, alerterConfig.Type)
+		err := fmt.Errorf("Unable to find any alerter named %v", alerterConfig.Type)
 		log.Error(err.Error())
-		return err
+		return nil, err
 	}
 
-	// send the actual alert
-	log.Debugf("%v: Sending %v to alerter %v!", a.Identifier, msg.uuid, alerterConfig.Type)
-	if err := a.Alerters[alerterConfig.Type].Send(msg, alerterConfig); err != nil {
-		log.Errorf("%v: Unable to complete message send for %v: %v", a.Identifier, msg.uuid, err.Error())
-		return err
-	}
-
-	log.Debugf("%v: Successfully sent %v alert message %v", a.Identifier, alerterConfig.Type, msg.uuid)
-	return nil
+	return alerterConfig, nil
 }
 
 // Perform message validation; return err if one of required fields is not filled out
 func (a *Alerter) validateMessage(msg *Message) error {
-	if msg.Key == "" {
-		return errors.New("Message must have the 'Key' value filled out")
+	if len(msg.Key) == 0 {
+		return errors.New("Message must have at least one element in the 'Key' slice")
 	}
 
 	if msg.Source == "" {
@@ -142,6 +169,10 @@ func (a *Alerter) validateMessage(msg *Message) error {
 
 	if msg.Contents == nil {
 		return errors.New("Message 'Contents' must be filled out")
+	}
+
+	if msg.Warning == false && msg.Critical {
+		return errors.New("Either 'Warning' or 'Critica' bool bit must be set")
 	}
 
 	return nil

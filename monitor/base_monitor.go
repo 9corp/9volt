@@ -3,6 +3,8 @@ package monitor
 import (
 	"fmt"
 
+	"github.com/9corp/9volt/alerter"
+
 	log "github.com/Sirupsen/logrus"
 )
 
@@ -59,11 +61,12 @@ func (b *Base) handle(monitorErr error) error {
 
 	// No problems, reset counter
 	if monitorErr == nil {
-		// Send critical resolve if critical threshold was exceed
+		// Send critical+warning resolve if critical threshold was exceed
 		// Send warning resolve if warning threshold was exceeded but critical threshold was not exceeded
 		if b.attemptCount > b.RMC.Config.CriticalThreshold {
 			alertMessage := fmt.Sprintf("Check has resolved after %v/%v attempts (critical)", b.attemptCount, b.RMC.Config.CriticalThreshold)
 			b.resolveAlert(CRITICAL, alertMessage)
+			b.resolveAlert(WARNING, alertMessage)
 		} else if b.attemptCount > b.RMC.Config.WarningThreshold {
 			alertMessage := fmt.Sprintf("Check has resolved after %v/%v attempts (warning)", b.attemptCount, b.RMC.Config.WarningThreshold)
 			b.resolveAlert(WARNING, alertMessage)
@@ -80,7 +83,8 @@ func (b *Base) handle(monitorErr error) error {
 		return nil
 	}
 
-	if b.warningAlertSent {
+	// Only return if we haven't reached critical threshold
+	if b.warningAlertSent && b.attemptCount < b.RMC.Config.CriticalThreshold {
 		log.Debugf("Warning alert for %v already sent; skipping alerting", b.RMC.Name)
 		return nil
 	}
@@ -113,14 +117,26 @@ func (b *Base) sendAlert(alertType int, alertMessage string) error {
 
 // Construct a new resolve alert message, send down the message channel
 func (b *Base) resolveAlert(alertType int, resolveMessage string) error {
+	resolve := &alerter.Message{
+		Resolve: true,
+		Source:  b.RMC.Name,
+		Text:    resolveMessage,
+		Count:   b.attemptCount,
+	}
+
 	switch alertType {
 	case CRITICAL:
 		b.criticalAlertSent = false
+		resolve.Critical = true
+		resolve.Key = b.RMC.Config.CriticalAlerters
 	case WARNING:
 		b.warningAlertSent = false
+		resolve.Warning = false
+		resolve.Key = b.RMC.Config.WarningAlerters
 	}
 
-	// Perform the resolve alert send
+	// send the actual message
+	b.RMC.MessageChannel <- resolve
 
 	return nil
 }

@@ -209,6 +209,10 @@ func (m *Monitor) monitorRunning(monitorName string) bool {
 
 // Ensure that the monitoring config is valid
 func (m *Monitor) validateMonitorConfig(monitorConfig *MonitorConfig) error {
+	// CriticalThreshold cannot be 0
+	// WarningThreshold cannot be 0
+	// WarningThreshold must be < CriticalThreshold (TODO: this should be updated with better logic)
+
 	return nil
 }
 
