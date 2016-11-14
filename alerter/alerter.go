@@ -7,7 +7,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/relistan/go-director"
-	"github.com/satori/go.uuid"
+	gouuid "github.com/satori/go.uuid"
 
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/util"
@@ -38,7 +38,9 @@ type Message struct {
 	Contents map[string]string
 	Source   string
 	Resolve  bool
-	UUID     string
+	Warning  bool
+	Critical bool
+	uuid     string // for private use
 }
 
 func New(cfg *config.Config, messageChannel <-chan *Message) *Alerter {
@@ -74,9 +76,9 @@ func (a *Alerter) run() error {
 		msg := <-a.MessageChannel
 
 		// tag message
-		msg.UUID = uuid.NewV4().String()
+		msg.uuid = gouuid.NewV4().String()
 
-		log.Debugf("%v: Received message (%v) from checker '%v' -> '%v'", msg.UUID, a.Identifier, msg.Source, msg.Key)
+		log.Debugf("%v: Received message (%v) from checker '%v' -> '%v'", msg.uuid, a.Identifier, msg.Source, msg.Key)
 
 		go a.handleMessage(msg)
 
@@ -89,7 +91,7 @@ func (a *Alerter) run() error {
 func (a *Alerter) handleMessage(msg *Message) error {
 	// validate message contents
 	if err := a.validateMessage(msg); err != nil {
-		log.Errorf("%v: Unable to validate message (%v): %v", a.Identifier, msg.UUID, err.Error())
+		log.Errorf("%v: Unable to validate message (%v): %v", a.Identifier, msg.uuid, err.Error())
 		return err
 	}
 
@@ -98,7 +100,7 @@ func (a *Alerter) handleMessage(msg *Message) error {
 	// fetch alert configuration
 	jsonAlerterConfig, err := a.Config.DalClient.FetchAlerterConfig(msg.Key)
 	if err != nil {
-		log.Errorf("%v: Unable to fetch alerter config for message %v: %v", a.Identifier, msg.UUID, err.Error())
+		log.Errorf("%v: Unable to fetch alerter config for message %v: %v", a.Identifier, msg.uuid, err.Error())
 		return err
 	}
 
@@ -106,7 +108,7 @@ func (a *Alerter) handleMessage(msg *Message) error {
 	var alerterConfig *AlerterConfig
 
 	if err := json.Unmarshal([]byte(jsonAlerterConfig), alerterConfig); err != nil {
-		log.Errorf("%v: Unable to unmarshal alerter config for message %v: %v", a.Identifier, msg.UUID, err.Error())
+		log.Errorf("%v: Unable to unmarshal alerter config for message %v: %v", a.Identifier, msg.uuid, err.Error())
 		return err
 	}
 
@@ -118,13 +120,13 @@ func (a *Alerter) handleMessage(msg *Message) error {
 	}
 
 	// send the actual alert
-	log.Debugf("%v: Sending %v to alerter %v!", a.Identifier, msg.UUID, alerterConfig.Type)
+	log.Debugf("%v: Sending %v to alerter %v!", a.Identifier, msg.uuid, alerterConfig.Type)
 	if err := a.Alerters[alerterConfig.Type].Send(msg, alerterConfig); err != nil {
-		log.Errorf("%v: Unable to complete message send for %v: %v", a.Identifier, msg.UUID, err.Error())
+		log.Errorf("%v: Unable to complete message send for %v: %v", a.Identifier, msg.uuid, err.Error())
 		return err
 	}
 
-	log.Debugf("%v: Successfully sent %v alert message %v", a.Identifier, alerterConfig.Type, msg.UUID)
+	log.Debugf("%v: Successfully sent %v alert message %v", a.Identifier, alerterConfig.Type, msg.uuid)
 	return nil
 }
 

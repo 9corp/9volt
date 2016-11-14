@@ -19,7 +19,7 @@ func NewPagerduty(cfg *config.Config) *Pagerduty {
 }
 
 func (p *Pagerduty) Send(msg *Message, alerterConfig *AlerterConfig) error {
-	log.Debugf("%v: Sending message %v", p.Identifier, msg.UUID)
+	log.Debugf("%v: Sending message %v", p.Identifier, msg.uuid)
 	return nil
 }
 

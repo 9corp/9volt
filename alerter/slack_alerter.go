@@ -19,7 +19,7 @@ func NewSlack(cfg *config.Config) *Slack {
 }
 
 func (s *Slack) Send(msg *Message, alerterConfig *AlerterConfig) error {
-	log.Debugf("%v: Sending message %v...", s.Identifier, msg.UUID)
+	log.Debugf("%v: Sending message %v...", s.Identifier, msg.uuid)
 	return nil
 }
 
