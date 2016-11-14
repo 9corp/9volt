@@ -60,15 +60,15 @@ type MonitorConfig struct {
 	Tags        []string
 
 	// HTTP specific attributes
-	HTTPURL         string
-	HTTPMethod      string
-	HTTPSSL         bool
-	HTTPStatusCode  int
-	HTTPRequestBody string // Only used if 'Method' is 'GET'
+	HTTPURL         string `json:"URL"`
+	HTTPMethod      string `json:"Method"`
+	HTTPSSL         bool   `json:"SSL"`
+	HTTPStatusCode  int    `json:"StatusCode"`
+	HTTPRequestBody string `json:"RequestBody"` // Only used if 'Method' is 'GET'
 
 	// Exec specific attributes
-	ExecCommand    string
-	ExecReturnCode int
+	ExecCommand    string `json:"Command"`
+	ExecReturnCode int    `json:"ReturnCode"`
 
 	// Alerting related configuration
 	WarningThreshold  int      // how many times a check must fail before a warning alert is emitted
@@ -209,9 +209,20 @@ func (m *Monitor) monitorRunning(monitorName string) bool {
 
 // Ensure that the monitoring config is valid
 func (m *Monitor) validateMonitorConfig(monitorConfig *MonitorConfig) error {
-	// CriticalThreshold cannot be 0
-	// WarningThreshold cannot be 0
-	// WarningThreshold must be < CriticalThreshold (TODO: this should be updated with better logic)
+	// TODO: HTTP* validation
+
+	if monitorConfig.Interval.String() == "0s" {
+		return errors.New("'Interval' must be > 0s")
+	}
+
+	if monitorConfig.CriticalThreshold == 0 {
+		return errors.New("'CriticalThreshold' must be non-zero")
+	}
+
+	// TODO: Logic for this should be changed/fixed at some point
+	if monitorConfig.WarningThreshold > monitorConfig.CriticalThreshold {
+		return errors.New("'WarningThreshold' cannot be larger than 'CriticalThreshold'")
+	}
 
 	return nil
 }

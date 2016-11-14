@@ -30,10 +30,7 @@ func NewHTTPMonitor(rmc *RootMonitorConfig) IMonitor {
 // Perform a statusCode check; optionally, if 'Expect' is not blank, verify that
 // the received response body contains the 'Expect' string.
 func (h *HTTPMonitor) httpCheck() error {
-	fullURL, err := h.constructURL()
-	if err != nil {
-		return fmt.Errorf("Unable to construct URL for httpCheck: %v", err.Error())
-	}
+	fullURL := h.constructURL()
 
 	log.Debugf("%v-%v: Performing http check for '%v'", h.Identify(), h.RMC.GID, fullURL)
 
@@ -66,7 +63,7 @@ func (h *HTTPMonitor) httpCheck() error {
 	return nil
 }
 
-func (h *HTTPMonitor) constructURL() (string, error) {
+func (h *HTTPMonitor) constructURL() string {
 	fullURL := "http://"
 
 	// Use http:// or https://
@@ -89,7 +86,7 @@ func (h *HTTPMonitor) constructURL() (string, error) {
 	// Return the constructed URL
 	fullURL = fullURL + h.RMC.Config.HTTPURL
 
-	return fullURL, nil
+	return fullURL
 }
 
 // Create and perform a new HTTP request with a timeout; return http Response
@@ -99,11 +96,10 @@ func (h *HTTPMonitor) performRequest(method, urlStr, requestBody string) (*http.
 	}
 
 	// Set it to nil by default (in case we don't have a requestBody)
-	var body *strings.Reader
 
-	if requestBody != "" {
-		body = strings.NewReader(requestBody)
-	}
+	// if requestBody != "" {
+	body := strings.NewReader(requestBody)
+	// }
 
 	req, err := http.NewRequest(method, urlStr, body)
 	if err != nil {

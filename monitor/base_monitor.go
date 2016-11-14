@@ -84,17 +84,17 @@ func (b *Base) handle(monitorErr error) error {
 	}
 
 	// Only return if we haven't reached critical threshold
-	if b.warningAlertSent && b.attemptCount < b.RMC.Config.CriticalThreshold {
+	if b.warningAlertSent && b.attemptCount <= b.RMC.Config.CriticalThreshold {
 		log.Debugf("Warning alert for %v already sent; skipping alerting", b.RMC.Name)
 		return nil
 	}
 
 	// Okay, this must be the first time
-	if b.attemptCount > b.RMC.Config.CriticalThreshold {
-		alertMessage := fmt.Sprintf("Check has entered into warning state after %v checks (WarningThreshold: %v)", b.attemptCount, b.RMC.Config.CriticalThreshold)
+	if b.attemptCount >= b.RMC.Config.CriticalThreshold {
+		alertMessage := fmt.Sprintf("Check has entered into critical state after %v checks (CriticalThreshold: %v)", b.attemptCount, b.RMC.Config.CriticalThreshold)
 		b.sendAlert(CRITICAL, alertMessage)
-	} else if b.attemptCount > b.RMC.Config.WarningThreshold {
-		alertMessage := fmt.Sprintf("Check has entered into critical state after %v checks (CriticalThreshold: %v)", b.attemptCount, b.RMC.Config.WarningThreshold)
+	} else if b.attemptCount >= b.RMC.Config.WarningThreshold {
+		alertMessage := fmt.Sprintf("Check has entered into warning state after %v checks (WarningThreshold: %v)", b.attemptCount, b.RMC.Config.WarningThreshold)
 		b.sendAlert(WARNING, alertMessage)
 	}
 
@@ -103,6 +103,8 @@ func (b *Base) handle(monitorErr error) error {
 
 // Construct a new alert message, send down the message channel
 func (b *Base) sendAlert(alertType int, alertMessage string) error {
+	log.Warningf("%v-%v: (%v) %v", b.Identifier, b.RMC.GID, b.RMC.Name, alertMessage)
+
 	switch alertType {
 	case CRITICAL:
 		b.criticalAlertSent = true
@@ -117,6 +119,8 @@ func (b *Base) sendAlert(alertType int, alertMessage string) error {
 
 // Construct a new resolve alert message, send down the message channel
 func (b *Base) resolveAlert(alertType int, resolveMessage string) error {
+	log.Warningf("%v-%v: (%v) %v", b.Identifier, b.RMC.GID, b.RMC.Name, resolveMessage)
+
 	resolve := &alerter.Message{
 		Resolve: true,
 		Source:  b.RMC.Name,
