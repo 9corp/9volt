@@ -73,8 +73,8 @@ type MonitorConfig struct {
 	// Alerting related configuration
 	WarningThreshold  int      // how many times a check must fail before a warning alert is emitted
 	CriticalThreshold int      // how many times a check must fail before a critical alert is emitted
-	WarningAlerters   []string // these alerters will be contacted when a warning threshold is hit
-	CriticalAlerters  []string // these alerters will be contacted when a critical threshold is hit
+	WarningAlerter    []string // these alerters will be contacted when a warning threshold is hit
+	CriticalAlerter   []string // these alerters will be contacted when a critical threshold is hit
 }
 
 type Response struct{}
@@ -222,6 +222,16 @@ func (m *Monitor) validateMonitorConfig(monitorConfig *MonitorConfig) error {
 	// TODO: Logic for this should be changed/fixed at some point
 	if monitorConfig.WarningThreshold > monitorConfig.CriticalThreshold {
 		return errors.New("'WarningThreshold' cannot be larger than 'CriticalThreshold'")
+	}
+
+	// TODO: It should be possible to NOT have a WarningAlerter setting (and just
+	// have a `CriticalAlerter` setting)
+	if len(monitorConfig.WarningAlerter) == 0 {
+		return errors.New("'WarningAlerter' list must contain at least one entry")
+	}
+
+	if len(monitorConfig.CriticalAlerter) == 0 {
+		return errors.New("'CriticalAlerter' list must contain at least one entry")
 	}
 
 	return nil

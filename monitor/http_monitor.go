@@ -95,11 +95,14 @@ func (h *HTTPMonitor) performRequest(method, urlStr, requestBody string) (*http.
 		Timeout: time.Duration(h.RMC.Config.Timeout),
 	}
 
-	// Set it to nil by default (in case we don't have a requestBody)
+	// TODO: Not sure if it's okay to just `body := strings.NewReader(requestBody)`,
+	//       even if the requestBody is empty.
+	var body *strings.Reader
+	body = nil
 
-	// if requestBody != "" {
-	body := strings.NewReader(requestBody)
-	// }
+	if requestBody == "" {
+		body = strings.NewReader(requestBody)
+	}
 
 	req, err := http.NewRequest(method, urlStr, body)
 	if err != nil {

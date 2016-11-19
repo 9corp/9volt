@@ -142,7 +142,7 @@ func (a *Alerter) loadAlerterConfig(alerterKey string, msg *Message) (*AlerterCo
 	// try to unmarshal the data
 	var alerterConfig *AlerterConfig
 
-	if err := json.Unmarshal([]byte(jsonAlerterConfig), alerterConfig); err != nil {
+	if err := json.Unmarshal([]byte(jsonAlerterConfig), &alerterConfig); err != nil {
 		log.Errorf("Unable to unmarshal alerter config for message %v: %v", msg.uuid, err.Error())
 		return nil, err
 	}

@@ -349,7 +349,7 @@ func (d *Dal) FetchAlerterConfig(alertKey string) (string, error) {
 		return "", err
 	}
 
-	return data[alertKey], nil
+	return data["alerter/"+alertKey], nil
 }
 
 // wrapper for etcd client's KeyNotFound error

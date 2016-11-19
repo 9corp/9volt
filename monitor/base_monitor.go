@@ -65,11 +65,11 @@ func (b *Base) handle(monitorErr error) error {
 		// Send warning resolve if warning threshold was exceeded but critical threshold was not exceeded
 		if b.attemptCount > b.RMC.Config.CriticalThreshold {
 			alertMessage := fmt.Sprintf("Check has resolved after %v/%v attempts (critical)", b.attemptCount, b.RMC.Config.CriticalThreshold)
-			b.resolveAlert(CRITICAL, alertMessage)
-			b.resolveAlert(WARNING, alertMessage)
+			b.sendMessage(CRITICAL, alertMessage, true)
+			b.sendMessage(WARNING, alertMessage, true)
 		} else if b.attemptCount > b.RMC.Config.WarningThreshold {
 			alertMessage := fmt.Sprintf("Check has resolved after %v/%v attempts (warning)", b.attemptCount, b.RMC.Config.WarningThreshold)
-			b.resolveAlert(WARNING, alertMessage)
+			b.sendMessage(WARNING, alertMessage, true)
 		}
 
 		b.attemptCount = 0
@@ -92,55 +92,53 @@ func (b *Base) handle(monitorErr error) error {
 	// Okay, this must be the first time
 	if b.attemptCount >= b.RMC.Config.CriticalThreshold {
 		alertMessage := fmt.Sprintf("Check has entered into critical state after %v checks (CriticalThreshold: %v)", b.attemptCount, b.RMC.Config.CriticalThreshold)
-		b.sendAlert(CRITICAL, alertMessage)
+		b.sendMessage(CRITICAL, alertMessage, false)
 	} else if b.attemptCount >= b.RMC.Config.WarningThreshold {
 		alertMessage := fmt.Sprintf("Check has entered into warning state after %v checks (WarningThreshold: %v)", b.attemptCount, b.RMC.Config.WarningThreshold)
-		b.sendAlert(WARNING, alertMessage)
+		b.sendMessage(WARNING, alertMessage, false)
 	}
 
 	return nil
 }
 
 // Construct a new alert message, send down the message channel
-func (b *Base) sendAlert(alertType int, alertMessage string) error {
+func (b *Base) sendMessage(alertType int, alertMessage string, resolve bool) error {
 	log.Warningf("%v-%v: (%v) %v", b.Identifier, b.RMC.GID, b.RMC.Name, alertMessage)
 
-	switch alertType {
-	case CRITICAL:
-		b.criticalAlertSent = true
-	case WARNING:
-		b.warningAlertSent = true
-	}
+	var alertTypeString string
 
-	// Perform the alert send
+	messageType := "alert"
 
-	return nil
-}
-
-// Construct a new resolve alert message, send down the message channel
-func (b *Base) resolveAlert(alertType int, resolveMessage string) error {
-	log.Warningf("%v-%v: (%v) %v", b.Identifier, b.RMC.GID, b.RMC.Name, resolveMessage)
-
-	resolve := &alerter.Message{
-		Resolve: true,
-		Source:  b.RMC.Name,
-		Text:    resolveMessage,
-		Count:   b.attemptCount,
+	msg := &alerter.Message{
+		Text:     alertMessage,
+		Count:    b.attemptCount,
+		Source:   b.Identifier,
+		Contents: map[string]string{},
 	}
 
 	switch alertType {
 	case CRITICAL:
-		b.criticalAlertSent = false
-		resolve.Critical = true
-		resolve.Key = b.RMC.Config.CriticalAlerters
+		msg.Critical = true
+		msg.Key = b.RMC.Config.CriticalAlerter
+		alertTypeString = "critical"
 	case WARNING:
-		b.warningAlertSent = false
-		resolve.Warning = false
-		resolve.Key = b.RMC.Config.WarningAlerters
+		msg.Warning = true
+		msg.Key = b.RMC.Config.WarningAlerter
+		alertTypeString = "warning"
 	}
 
-	// send the actual message
-	b.RMC.MessageChannel <- resolve
+	if resolve {
+		msg.Resolve = true
+		messageType = "resolve"
+	}
+
+	// Send the message
+	b.RMC.MessageChannel <- msg
+
+	log.Warningf("Our alerters in the message: %v", msg.Key)
+
+	log.Debugf("%v-%v: Successfully sent %v message (type: %v) for %v",
+		b.Identifier, b.RMC.GID, messageType, alertTypeString, b.RMC.Name)
 
 	return nil
 }
