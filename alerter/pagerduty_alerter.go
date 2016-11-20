@@ -14,7 +14,7 @@ type Pagerduty struct {
 func NewPagerduty(cfg *config.Config) *Pagerduty {
 	return &Pagerduty{
 		Config:     cfg,
-		Identifier: "slack",
+		Identifier: "pagerduty",
 	}
 }
 

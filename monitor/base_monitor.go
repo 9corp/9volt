@@ -84,16 +84,16 @@ func (b *Base) handle(monitorErr error) error {
 	}
 
 	// Only return if we haven't reached critical threshold
-	if b.warningAlertSent && b.attemptCount <= b.RMC.Config.CriticalThreshold {
+	if b.warningAlertSent && b.attemptCount < b.RMC.Config.CriticalThreshold {
 		log.Debugf("Warning alert for %v already sent; skipping alerting", b.RMC.Name)
 		return nil
 	}
 
 	// Okay, this must be the first time
-	if b.attemptCount >= b.RMC.Config.CriticalThreshold {
+	if b.attemptCount == b.RMC.Config.CriticalThreshold {
 		alertMessage := fmt.Sprintf("Check has entered into critical state after %v checks (CriticalThreshold: %v)", b.attemptCount, b.RMC.Config.CriticalThreshold)
 		b.sendMessage(CRITICAL, alertMessage, false)
-	} else if b.attemptCount >= b.RMC.Config.WarningThreshold {
+	} else if b.attemptCount == b.RMC.Config.WarningThreshold {
 		alertMessage := fmt.Sprintf("Check has entered into warning state after %v checks (WarningThreshold: %v)", b.attemptCount, b.RMC.Config.WarningThreshold)
 		b.sendMessage(WARNING, alertMessage, false)
 	}
@@ -101,7 +101,7 @@ func (b *Base) handle(monitorErr error) error {
 	return nil
 }
 
-// Construct a new alert message, send down the message channel
+// Construct a new alert message, send down the message channel and update alert state
 func (b *Base) sendMessage(alertType int, alertMessage string, resolve bool) error {
 	log.Warningf("%v-%v: (%v) %v", b.Identifier, b.RMC.GID, b.RMC.Name, alertMessage)
 
@@ -109,11 +109,16 @@ func (b *Base) sendMessage(alertType int, alertMessage string, resolve bool) err
 
 	messageType := "alert"
 
+	if resolve {
+		messageType = "resolve"
+	}
+
 	msg := &alerter.Message{
 		Text:     alertMessage,
 		Count:    b.attemptCount,
 		Source:   b.Identifier,
 		Contents: map[string]string{},
+		Resolve:  resolve,
 	}
 
 	switch alertType {
@@ -121,23 +126,22 @@ func (b *Base) sendMessage(alertType int, alertMessage string, resolve bool) err
 		msg.Critical = true
 		msg.Key = b.RMC.Config.CriticalAlerter
 		alertTypeString = "critical"
+
+		// This is .. funky. To avoid having to set state in different places
+		// and potentially requiring additional if/else||switch blocks, we set
+		// the state to the reverse of the `resolve` bool
+		b.criticalAlertSent = !resolve
 	case WARNING:
 		msg.Warning = true
 		msg.Key = b.RMC.Config.WarningAlerter
 		alertTypeString = "warning"
-	}
-
-	if resolve {
-		msg.Resolve = true
-		messageType = "resolve"
+		b.warningAlertSent = !resolve
 	}
 
 	// Send the message
 	b.RMC.MessageChannel <- msg
 
-	log.Warningf("Our alerters in the message: %v", msg.Key)
-
-	log.Debugf("%v-%v: Successfully sent %v message (type: %v) for %v",
+	log.Debugf("%v-%v: Successfully sent '%v' message (type: %v) for %v",
 		b.Identifier, b.RMC.GID, messageType, alertTypeString, b.RMC.Name)
 
 	return nil

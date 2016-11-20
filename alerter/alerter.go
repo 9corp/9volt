@@ -59,12 +59,14 @@ func (a *Alerter) Start() error {
 	log.Infof("%v: Starting alerter components...", a.Identifier)
 
 	// Instantiate our alerters
-	pd := NewPagerduty(a.Config)
-	sl := NewSlack(a.Config)
+	pagerduty := NewPagerduty(a.Config)
+	slack := NewSlack(a.Config)
+	email := NewEmail(a.Config)
 
 	a.Alerters = map[string]IAlerter{
-		pd.Identify(): pd,
-		sl.Identify(): sl,
+		pagerduty.Identify(): pagerduty,
+		slack.Identify():     slack,
+		email.Identify():     email,
 	}
 
 	// Launch our alerter message handler
@@ -171,8 +173,8 @@ func (a *Alerter) validateMessage(msg *Message) error {
 		return errors.New("Message 'Contents' must be filled out")
 	}
 
-	if msg.Warning == false && msg.Critical {
-		return errors.New("Either 'Warning' or 'Critica' bool bit must be set")
+	if msg.Warning == false && msg.Critical == false {
+		return errors.New("Either 'Warning' or 'Critical' bool bit must be set")
 	}
 
 	return nil
