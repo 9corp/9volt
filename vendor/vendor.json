@@ -57,6 +57,12 @@
 			"revisionTime": "2016-05-02T17:56:24Z"
 		},
 		{
+			"checksumSHA1": "BUTvC6/V0sBmyz2ZEqyh+Qmrm10=",
+			"path": "github.com/nlopes/slack",
+			"revision": "b7940f209838f93dc7ab0d823145513c9660f22a",
+			"revisionTime": "2016-08-16T14:54:29Z"
+		},
+		{
 			"checksumSHA1": "UwhLtKi/lHjArxgsqRe6iqSEu3I=",
 			"path": "github.com/onsi/ginkgo",
 			"revision": "5437a97bf824dec14e58d68c56ee36e772670c2e",
@@ -239,6 +245,12 @@
 		{
 			"checksumSHA1": "9jjO5GjLa0XF/nfWihF02RoH4qc=",
 			"path": "golang.org/x/net/context",
+			"revision": "3a1f9ef983bc408afd0a9e63fd9c962ae853e543",
+			"revisionTime": "2016-08-23T20:08:20Z"
+		},
+		{
+			"checksumSHA1": "likOl7O0BJntqagR050kkOBuY4o=",
+			"path": "golang.org/x/net/websocket",
 			"revision": "3a1f9ef983bc408afd0a9e63fd9c962ae853e543",
 			"revisionTime": "2016-08-23T20:08:20Z"
 		},
