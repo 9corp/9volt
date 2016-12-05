@@ -114,11 +114,17 @@ func (b *Base) sendMessage(alertType int, alertMessage string, resolve bool) err
 	}
 
 	msg := &alerter.Message{
-		Text:     alertMessage,
-		Count:    b.attemptCount,
-		Source:   b.Identifier,
-		Contents: map[string]string{},
-		Resolve:  resolve,
+		Text:   alertMessage,
+		Count:  b.attemptCount,
+		Source: b.Identifier,
+
+		// Let's set some additional (potentially) useful info in the message
+		Contents: map[string]string{
+			"WarningThreshold":  fmt.Sprint(b.RMC.Config.WarningThreshold),
+			"CriticalThreshold": fmt.Sprint(b.RMC.Config.CriticalThreshold),
+		},
+
+		Resolve: resolve,
 	}
 
 	switch alertType {

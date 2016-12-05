@@ -35,8 +35,8 @@ createSampleMonitorConfigs() {
 createSampleAlerterConfigs() {
   curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/my-pagerduty -XPUT -d value="{\"type\":\"pagerduty\",\"description\":\"my pagerduty alerter\",\"options\":{\"apikey\":\"1234567890\",\"custom-key\":\"custom data used by the pagerduty alerter\"}}"
   curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/other-pagerduty -XPUT -d value="{\"type\":\"pagerduty\",\"description\":\"other pagerduty alerter\",\"options\":{\"apikey\":\"1234567890\",\"custom-key\":\"custom data used by the pagerduty alerter\"}}" 
-  curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/my-slack -XPUT -d value="{\"type\":\"slack\",\"description\":\"my slack alerter\",\"options\":{\"apikey\":\"slack-api-key-1234\",\"room\":\"custom data used by the slack alerter\"}}"
-  curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/other-slack -XPUT -d value="{\"type\":\"slack\",\"description\":\"other slack alerter\",\"options\":{\"apikey\":\"slack-api-key-1234\",\"room\":\"custom data used by the slack alerter\"}}"
+  curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/my-slack -XPUT -d value="{\"type\":\"slack\",\"description\":\"my slack alerter\",\"options\":{\"token\":\"foo\",\"channel\":\"9volt-testing\",\"username\":\"robibi\",\"iconURL\":\"http://cdn.akamai.steamstatic.com/steamcommunity/public/images/avatars/d2/d25fd479e446f3bef884cbedb5b2b643133b93fc_full.jpg\"}}"
+  curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/other-slack -XPUT -d value="{\"type\":\"slack\",\"description\":\"other slack alerter\",\"options\":{\"token\":\"bar\",\"channel\":\"9volt-testing\"}}"
   curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/my-email -XPUT -d value="{\"type\":\"email\",\"description\":\"my email alerter\",\"options\":{\"email\":\"daniel.selans@gmail.com\"}}"
   curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/other-email -XPUT -d value="{\"type\":\"email\",\"description\":\"other email alerter\",\"options\":{\"email\":\"daniel.selans@gmail.com\"}}"
 }
