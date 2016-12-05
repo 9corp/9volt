@@ -26,3 +26,7 @@ func (p *Pagerduty) Send(msg *Message, alerterConfig *AlerterConfig) error {
 func (p *Pagerduty) Identify() string {
 	return p.Identifier
 }
+
+func (p *Pagerduty) ValidateConfig(alerterConfig *AlerterConfig) error {
+	return nil
+}

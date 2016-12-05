@@ -47,12 +47,11 @@ func (h *HTTPMonitor) httpCheck() error {
 
 	// If Expect is set, verify if returned response contains expected data
 	if h.RMC.Config.Expect != "" {
-		defer resp.Body.Close()
-
 		data, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return fmt.Errorf("Unable to read response body to perform content expectancy check: %v", err.Error())
 		}
+		defer resp.Body.Close()
 
 		if !strings.Contains(string(data), h.RMC.Config.Expect) {
 			return fmt.Errorf("Received response body '%v' does not contain expected content '%v'",

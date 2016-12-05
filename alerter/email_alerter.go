@@ -26,3 +26,7 @@ func (e *Email) Send(msg *Message, alerterConfig *AlerterConfig) error {
 func (e *Email) Identify() string {
 	return e.Identifier
 }
+
+func (e *Email) ValidateConfig(alerterConfig *AlerterConfig) error {
+	return nil
+}

@@ -16,6 +16,7 @@ import (
 type IAlerter interface {
 	Send(*Message, *AlerterConfig) error
 	Identify() string
+	ValidateConfig(*AlerterConfig) error
 }
 
 type AlerterConfig struct {
@@ -107,6 +108,14 @@ func (a *Alerter) handleMessage(msg *Message) error {
 		alerterConfig, err := a.loadAlerterConfig(alerterKey, msg)
 		if err != nil {
 			errorMessage := fmt.Sprintf("Unable to load alerter key for %v: %v", msg.uuid, err.Error())
+			errorList = append(errorList, errorMessage)
+			log.Errorf("%v: %v", a.Identifier, errorMessage)
+			continue
+		}
+
+		// validate the alerter config
+		if err := a.Alerters[alerterConfig.Type].ValidateConfig(alerterConfig); err != nil {
+			errorMessage := fmt.Sprintf("Unable to validate alerter config for %v: %v", msg.uuid, err.Error())
 			errorList = append(errorList, errorMessage)
 			log.Errorf("%v: %v", a.Identifier, errorMessage)
 			continue
