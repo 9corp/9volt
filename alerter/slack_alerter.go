@@ -79,22 +79,6 @@ func (s *Slack) generateParams(msg *Message, alerterConfig *AlerterConfig) *slac
 		Fallback: fmt.Sprintf("%v: %v", strings.ToUpper(messageHeader), msg.Source),
 		Title:    fmt.Sprintf("%v: %v", strings.ToUpper(messageHeader), msg.Source),
 		Text:     msg.Text,
-		Fields: []slack.AttachmentField{
-			slack.AttachmentField{
-				Title: "Thresholds",
-				Value: fmt.Sprintf("Warning: %v Critical: %v", msg.Contents["WarningThreshold"], msg.Contents["CriticalThreshold"]),
-			},
-		},
-	}
-
-	// Prepend additional "attempts" attachment if this is a recovery
-	if msg.Resolve {
-		attemptAttachment := slack.AttachmentField{
-			Title: "Attempts",
-			Value: fmt.Sprint(msg.Count),
-		}
-
-		attachment.Fields = append([]slack.AttachmentField{attemptAttachment}, attachment.Fields...)
 	}
 
 	params := slack.PostMessageParameters{

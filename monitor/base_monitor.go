@@ -115,7 +115,7 @@ func (b *Base) sendMessage(alertType int, alertMessage string, resolve bool) err
 	msg := &alerter.Message{
 		Text:   alertMessage,
 		Count:  b.attemptCount,
-		Source: b.Identifier,
+		Source: fmt.Sprintf("%v check '%v'", b.Identify(), b.RMC.Path),
 
 		// Let's set some additional (potentially) useful info in the message
 		Contents: map[string]string{

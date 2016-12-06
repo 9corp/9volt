@@ -39,7 +39,8 @@ type Monitor struct {
 
 type RootMonitorConfig struct {
 	GID            string // goroutine id
-	Name           string
+	Name           string // monitor config name in member dir
+	Path           string // monitor config location in etcd
 	Config         *MonitorConfig
 	MessageChannel chan *alerter.Message
 	StopChannel    chan bool
@@ -139,7 +140,7 @@ func (m *Monitor) Handle(action int, monitorName, monitorConfigLocation string) 
 
 	// start check with new monitor configuration
 	log.Debugf("%v: Starting new monitor for %v...", m.Identifier, monitorName)
-	if err := m.start(monitorName, monitorConfig); err != nil {
+	if err := m.start(monitorName, monitorConfigLocation, monitorConfig); err != nil {
 		log.Errorf("%v: Unable to start new monitor '%v': %v", m.Identifier, monitorName, err.Error())
 		return fmt.Errorf("Unable to start new monitor %v: %v", monitorName, err.Error())
 	}
@@ -170,7 +171,7 @@ func (m *Monitor) stop(monitorName string) error {
 }
 
 // Perform the actual start of a monitor; update running monitor slice
-func (m *Monitor) start(monitorName string, monitorConfig *MonitorConfig) error {
+func (m *Monitor) start(monitorName, monitorConfigLocation string, monitorConfig *MonitorConfig) error {
 	// Let's be overly safe and ensure this monitor type exists
 	if _, ok := m.SupportedMonitors[monitorConfig.Type]; !ok {
 		return fmt.Errorf("%v: No such monitor type found '%v'", m.Identifier, monitorConfig.Type)
@@ -180,6 +181,7 @@ func (m *Monitor) start(monitorName string, monitorConfig *MonitorConfig) error 
 	newMonitor := m.SupportedMonitors[monitorConfig.Type](
 		&RootMonitorConfig{
 			Name:           monitorName,
+			Path:           monitorConfigLocation,
 			GID:            util.RandomString(GOROUTINE_ID_LENGTH, false),
 			Config:         monitorConfig,
 			MessageChannel: m.MessageChannel,
