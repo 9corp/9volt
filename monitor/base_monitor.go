@@ -64,12 +64,11 @@ func (b *Base) handle(monitorErr error) error {
 		// Send critical+warning resolve if critical threshold was exceed
 		// Send warning resolve if warning threshold was exceeded but critical threshold was not exceeded
 		if b.attemptCount > b.RMC.Config.CriticalThreshold {
-			alertMessage := fmt.Sprintf("Check has resolved after %v/%v attempts (critical)", b.attemptCount, b.RMC.Config.CriticalThreshold)
-			b.sendMessage(CRITICAL, alertMessage, true)
-			b.sendMessage(WARNING, alertMessage, true)
+			// Not digging any of this, but it's better than identical messages
+			b.sendMessage(CRITICAL, fmt.Sprintf("Check has recovered from critical state after %v attempts", b.attemptCount), true)
+			b.sendMessage(WARNING, fmt.Sprintf("Check has recovered from warning state after %v attempts", b.attemptCount), true)
 		} else if b.attemptCount > b.RMC.Config.WarningThreshold {
-			alertMessage := fmt.Sprintf("Check has resolved after %v/%v attempts (warning)", b.attemptCount, b.RMC.Config.WarningThreshold)
-			b.sendMessage(WARNING, alertMessage, true)
+			b.sendMessage(WARNING, fmt.Sprintf("Check has recovered from warning state after %v attempts", b.attemptCount), true)
 		}
 
 		b.attemptCount = 0

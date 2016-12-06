@@ -66,10 +66,10 @@ func (s *Slack) generateParams(msg *Message, alerterConfig *AlerterConfig) *slac
 		messageIconURL = alerterConfig.Options["iconURL"]
 	}
 
-	if msg.Critical {
+	if msg.Critical && !msg.Resolve {
 		messageColor = CRITICAL_COLOR
 		messageHeader = "Critical"
-	} else if msg.Warning {
+	} else if msg.Warning && !msg.Resolve {
 		messageColor = WARNING_COLOR
 		messageHeader = "Warning"
 	}
