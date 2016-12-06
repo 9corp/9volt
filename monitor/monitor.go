@@ -59,6 +59,12 @@ type MonitorConfig struct {
 	Enabled     bool
 	Tags        []string
 
+	// TCP specific attributes
+	TCPSend         string              `json:"Send"`
+	TCPReadTimeout  util.CustomDuration `json:"ReadTimeout"`
+	TCPWriteTimeout util.CustomDuration `json:"WriteTimeout"`
+	TCPReadSize     int                 `json:"ReadSzie"`
+
 	// HTTP specific attributes
 	HTTPURL         string `json:"URL"`
 	HTTPMethod      string `json:"Method"`
@@ -86,6 +92,7 @@ func New(cfg *config.Config, messageChannel chan *alerter.Message) *Monitor {
 		MessageChannel: messageChannel,
 		SupportedMonitors: map[string]func(*RootMonitorConfig) IMonitor{
 			"http": NewHTTPMonitor,
+			"tcp":  NewTCPMonitor,
 		},
 		runningMonitors:    make(map[string]IMonitor, 0),
 		runningMonitorLock: &sync.Mutex{},
