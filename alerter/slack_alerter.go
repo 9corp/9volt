@@ -81,6 +81,14 @@ func (s *Slack) generateParams(msg *Message, alerterConfig *AlerterConfig) *slac
 		Text:     msg.Text,
 	}
 
+	// if not a recovery, attach error details
+	attachment.Fields = []slack.AttachmentField{
+		slack.AttachmentField{
+			Title: "Error Details",
+			Value: msg.Contents["ErrorDetails"],
+		},
+	}
+
 	params := slack.PostMessageParameters{
 		Username:    messageUsername,
 		IconURL:     messageIconURL,
