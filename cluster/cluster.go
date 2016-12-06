@@ -24,6 +24,7 @@
 package cluster
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -32,7 +33,6 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"golang.org/x/net/context"
 
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/dal"
@@ -58,8 +58,8 @@ type ICluster interface {
 	// TODO: Implement go-director for loop control
 	runDirectorMonitor()
 	runDirectorHeartbeat()
-	runMemberMonitor()
 	runMemberHeartbeat()
+	runMemberMonitor()
 
 	getState() (*DirectorJSON, error)
 	handleState(*DirectorJSON) error
@@ -81,6 +81,7 @@ type Cluster struct {
 	Hostname       string
 	StateChan      chan<- bool
 	DistributeChan chan<- bool
+	initFinished   chan bool
 }
 
 type DirectorJSON struct {
@@ -116,6 +117,7 @@ func New(cfg *config.Config, stateChan, distributeChan chan<- bool) (ICluster, e
 		Hostname:       hostname,
 		StateChan:      stateChan,
 		DistributeChan: distributeChan,
+		initFinished:   make(chan bool, 1),
 	}, nil
 }
 
@@ -124,8 +126,15 @@ func (c *Cluster) Start() error {
 
 	go c.runDirectorMonitor()
 	go c.runDirectorHeartbeat()
-	go c.runMemberMonitor()
+
+	// memberHeartbeat creates initial member structure; wait until that's
+	// completed before starting the memberMonitor or otherwise we may run into
+	// a race
 	go c.runMemberHeartbeat()
+
+	<-c.initFinished
+
+	go c.runMemberMonitor()
 
 	return nil
 }
@@ -250,6 +259,8 @@ func (c *Cluster) createInitialMemberStructure(memberDir string, heartbeatTimeou
 	}
 
 	if exists {
+		log.Debugf("%v: MemberDir %v already exists. Trying to delete...", c.Identifier, memberDir)
+
 		if err := c.DalClient.Delete(memberDir, true); err != nil {
 			return fmt.Errorf("Unable to delete pre-existing member dir '%v': %v", memberDir, err.Error())
 		}
@@ -263,8 +274,7 @@ func (c *Cluster) createInitialMemberStructure(memberDir string, heartbeatTimeou
 	// create initial member status
 	memberJSON, err := c.generateMemberJSON()
 	if err != nil {
-		return fmt.Errorf("Unable to generate initial member JSON: %v",
-			c.Config.HeartbeatInterval.String(), err.Error())
+		return fmt.Errorf("Unable to generate initial member JSON: %v", err.Error())
 	}
 
 	if err := c.DalClient.Set(memberDir+"/status", memberJSON, false, 0, ""); err != nil {
@@ -293,6 +303,9 @@ func (c *Cluster) runMemberHeartbeat() {
 		log.Fatalf("%v-memberHeartbeat: Unable to create initial member dir: %v",
 			c.Identifier, err.Error())
 	}
+
+	// init finished
+	c.initFinished <- true
 
 	for {
 		memberJSON, err := c.generateMemberJSON()
@@ -342,7 +355,7 @@ func (c *Cluster) generateMemberJSON() (string, error) {
 
 func (c *Cluster) getState() (*DirectorJSON, error) {
 	// Fetch the current state
-	data, err := c.DalClient.Get(DIRECTOR_KEY, false)
+	data, err := c.DalClient.Get(DIRECTOR_KEY, nil)
 
 	if c.DalClient.IsKeyNotFound(err) {
 		log.Debugf("%v-directorMonitor: No active director found", c.Identifier)

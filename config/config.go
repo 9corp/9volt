@@ -36,7 +36,7 @@ func New(listenAddress, etcdPrefix string, etcdMembers []string, dalClient dal.I
 }
 
 func (c *Config) ValidateDirs() []string {
-	dirs := []string{"cluster", "cluster/members", "monitor", "alert", "host"}
+	dirs := []string{"cluster", "cluster/members", "monitor", "alerter"}
 
 	var errorList []string
 
@@ -75,7 +75,7 @@ func (c *Config) Load() error {
 		return fmt.Errorf("'config' exists but is a dir")
 	}
 
-	values, err := c.DalClient.Get("config", false)
+	values, err := c.DalClient.Get("config", nil)
 	if err != nil {
 		return err
 	}

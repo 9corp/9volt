@@ -9,11 +9,11 @@ import (
 )
 
 type FakeIDal struct {
-	GetStub        func(string, bool) (map[string]string, error)
+	GetStub        func(string, *dal.GetOptions) (map[string]string, error)
 	getMutex       sync.RWMutex
 	getArgsForCall []struct {
 		arg1 string
-		arg2 bool
+		arg2 *dal.GetOptions
 	}
 	getReturns struct {
 		result1 map[string]string
@@ -160,11 +160,11 @@ type FakeIDal struct {
 	invocations map[string][][]interface{}
 }
 
-func (fake *FakeIDal) Get(arg1 string, arg2 bool) (map[string]string, error) {
+func (fake *FakeIDal) Get(arg1 string, arg2 *dal.GetOptions) (map[string]string, error) {
 	fake.getMutex.Lock()
 	fake.getArgsForCall = append(fake.getArgsForCall, struct {
 		arg1 string
-		arg2 bool
+		arg2 *dal.GetOptions
 	}{arg1, arg2})
 	fake.guard("Get")
 	fake.invocations["Get"] = append(fake.invocations["Get"], []interface{}{arg1, arg2})
@@ -182,7 +182,7 @@ func (fake *FakeIDal) GetCallCount() int {
 	return len(fake.getArgsForCall)
 }
 
-func (fake *FakeIDal) GetArgsForCall(i int) (string, bool) {
+func (fake *FakeIDal) GetArgsForCall(i int) (string, *dal.GetOptions) {
 	fake.getMutex.RLock()
 	defer fake.getMutex.RUnlock()
 	return fake.getArgsForCall[i].arg1, fake.getArgsForCall[i].arg2

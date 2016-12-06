@@ -25,6 +25,9 @@ warningMessage() {
 }
 
 setupEtcd() {
+  # Delete any initial configuration
+  curl -s $ETCDHOST/v2/keys/$PREFIX?recursive=true -X DELETE
+
   # Add initial config
   curl -s $ETCDHOST/v2/keys/$PREFIX/config -XPUT -d value="{\"HeartbeatInterval\":\"3s\",\"HeartbeatTimeout\":\"6s\"}"
 
@@ -36,10 +39,10 @@ setupEtcd() {
 }
 
 createSampleMonitorConfigs() {
-  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/monitor_config_1 -XPUT -d value="{\"monitor\" : 1}"
-  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/monitor_config_2 -XPUT -d value="{\"monitor\" : 2}"
-  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/monitor_config_3 -XPUT -d value="{\"monitor\" : 3}"
-  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/monitor_config_4 -XPUT -d value="{\"monitor\" : 4}"
+  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/monitor_config_1 -XPUT -d value="{\"type\":\"http\",\"description\":\"example monitor config 1\",\"timeout\":\"5s\",\"interval\":\"4s\"}"
+  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/monitor_config_2 -XPUT -d value="{\"type\":\"http\",\"description\":\"example monitor config 2\",\"timeout\":\"5s\",\"interval\":\"6s\"}"
+  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/monitor_config_3 -XPUT -d value="{\"type\":\"http\",\"description\":\"example monitor config 3\",\"timeout\":\"5s\",\"interval\":\"8s\"}"
+  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/monitor_config_4 -XPUT -d value="{\"type\":\"http\",\"description\":\"example monitor config 4\",\"timeout\":\"5s\",\"interval\":\"10s\"}"
 }
 
 createSampleAlerterConfigs() {

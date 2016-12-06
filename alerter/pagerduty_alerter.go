@@ -8,21 +8,25 @@ import (
 
 type Pagerduty struct {
 	Config     *config.Config
-	identifier string
+	Identifier string
 }
 
 func NewPagerduty(cfg *config.Config) *Pagerduty {
 	return &Pagerduty{
 		Config:     cfg,
-		identifier: "slack",
+		Identifier: "pagerduty",
 	}
 }
 
 func (p *Pagerduty) Send(msg *Message, alerterConfig *AlerterConfig) error {
-	log.Debugf("%v: Sending message %v", p.identifier, msg.UUID)
+	log.Debugf("%v: Sending message %v", p.Identifier, msg.uuid)
 	return nil
 }
 
-func (p *Pagerduty) Identifier() string {
-	return p.identifier
+func (p *Pagerduty) Identify() string {
+	return p.Identifier
+}
+
+func (p *Pagerduty) ValidateConfig(alerterConfig *AlerterConfig) error {
+	return nil
 }

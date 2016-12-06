@@ -1,7 +1,6 @@
 language: go
 sudo: false
 go:
-  - 1.6.3
   - 1.7.3
   - tip
 env:
@@ -10,7 +9,6 @@ env:
 
 before_install:
  - go get github.com/9corp/9volt
- - go get github.com/tools/godep
  - go get github.com/onsi/ginkgo/ginkgo
  - go get github.com/onsi/gomega
 

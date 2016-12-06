@@ -4,8 +4,15 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
+	"math/rand"
 	"os"
 	"time"
+)
+
+const letterBytes = "abcdefghijklmnopqrstuvwxyz1234567890"
+const (
+	letterIdxBits = 6                    // 6 bits to represent a letter index
+	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
 )
 
 type CustomDuration time.Duration
@@ -45,6 +52,22 @@ func MD5Hash(data string, length int) string {
 	}
 
 	return hash[:length]
+}
+
+// From @stackoverflow; generate an optionally seeded, N length random string
+func RandomString(n int, seed bool) string {
+	if seed {
+		rand.Seed(time.Now().Unix())
+	}
+
+	b := make([]byte, n)
+	for i := 0; i < n; {
+		if idx := int(rand.Int63() & letterIdxMask); idx < len(letterBytes) {
+			b[i] = letterBytes[idx]
+			i++
+		}
+	}
+	return string(b)
 }
 
 func GetMemberID(suffix string) string {
