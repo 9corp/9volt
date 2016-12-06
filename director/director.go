@@ -3,6 +3,7 @@ package director
 import (
 	"context"
 	"fmt"
+	"path"
 	"sync"
 	"time"
 
@@ -254,6 +255,7 @@ func (d *Director) runCheckConfigWatcher(ctx context.Context) {
 
 	watcher := d.DalClient.NewWatcher("monitor/", true)
 
+	// TODO: Needs to be turned into a looper
 	for {
 		// safety valve
 		if !d.amDirector() {
@@ -271,8 +273,13 @@ func (d *Director) runCheckConfigWatcher(ctx context.Context) {
 			continue
 		}
 
+		if d.ignorableWatcherEvent(resp) {
+			log.Debugf("%v-checkConfigWatcher: Received ignorable watcher event for %v", d.Identifier, resp.Node.Key)
+			continue
+		}
+
 		if err := d.handleCheckConfigChange(resp); err != nil {
-			log.Errorf("%v-hostConfigWatcher: Unable to process config change for %v: %v",
+			log.Errorf("%v-checkConfigWatcher: Unable to process config change for %v: %v",
 				d.Identifier, resp.Node.Key, err.Error())
 		}
 	}
@@ -318,7 +325,7 @@ func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
 	}
 
 	if actionErr != nil {
-		return fmt.Errorf("%v-handleCheckConfigChange: Unable to complete check config update: %v", d.Identifier, err.Error())
+		return fmt.Errorf("%v-handleCheckConfigChange: Unable to complete check config update: %v", d.Identifier, actionErr.Error())
 	}
 
 	return nil
@@ -353,6 +360,21 @@ func (d *Director) PickNextMember() string {
 	}
 
 	return leastTaxedMember
+}
+
+// Determine if a specific event can be ignored
+func (d *Director) ignorableWatcherEvent(resp *etcd.Response) bool {
+	if resp == nil {
+		log.Debugf("%v: Received a nil etcd response - bug?", d.Identifier)
+		return true
+	}
+
+	// Ignore `/monitor/`
+	if path.Base(resp.Node.Key) == "monitor" {
+		return true
+	}
+
+	return false
 }
 
 func (d *Director) setState(state bool) {
