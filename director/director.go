@@ -66,6 +66,9 @@ func (d *Director) Start() error {
 	return nil
 }
 
+// This is used for figuring out how many checks are assigned to each member;
+// this information is necessary for determining which member is next in line
+// to be given/assigned a new check.
 func (d *Director) collectCheckStats() {
 	for {
 		// To avoid a potential race here; all members have a count of how many
@@ -79,8 +82,6 @@ func (d *Director) collectCheckStats() {
 		d.CheckStatsMutex.Lock()
 		d.CheckStats = checkStats
 		d.CheckStatsMutex.Unlock()
-
-		log.Debugf("CollectCheckStats: %v", checkStats)
 
 		time.Sleep(COLLECT_CHECK_STATS_INTERVAL)
 	}

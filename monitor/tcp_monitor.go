@@ -51,12 +51,14 @@ func (t *TCPMonitor) updateSettings() {
 		t.ConnTimeout = time.Duration(t.RMC.Config.Timeout)
 	}
 
-	if t.RMC.Config.TCPReadTimeout.String() != "" {
+	if t.RMC.Config.TCPReadTimeout.String() != "0s" {
 		t.ReadTimeout = time.Duration(t.RMC.Config.TCPReadTimeout)
+		log.Warningf("Our read timeout is %s", t.ReadTimeout)
 	}
 
-	if t.RMC.Config.TCPWriteTimeout.String() != "" {
+	if t.RMC.Config.TCPWriteTimeout.String() != "0s" {
 		t.WriteTimeout = time.Duration(t.RMC.Config.TCPWriteTimeout)
+		log.Warningf("Our write timeout is %s", t.ReadTimeout)
 	}
 
 	if t.RMC.Config.TCPReadSize != 0 {
