@@ -64,12 +64,11 @@ func (b *Base) handle(monitorErr error) error {
 		// Send critical+warning resolve if critical threshold was exceed
 		// Send warning resolve if warning threshold was exceeded but critical threshold was not exceeded
 		if b.attemptCount > b.RMC.Config.CriticalThreshold {
-			alertMessage := fmt.Sprintf("Check has resolved after %v/%v attempts (critical)", b.attemptCount, b.RMC.Config.CriticalThreshold)
-			b.sendMessage(CRITICAL, alertMessage, true)
-			b.sendMessage(WARNING, alertMessage, true)
+			// Not digging any of this, but it's better than identical messages
+			b.sendMessage(CRITICAL, fmt.Sprintf("Check has recovered from critical state after %v attempts", b.attemptCount), "", true)
+			b.sendMessage(WARNING, fmt.Sprintf("Check has recovered from warning state after %v attempts", b.attemptCount), "", true)
 		} else if b.attemptCount > b.RMC.Config.WarningThreshold {
-			alertMessage := fmt.Sprintf("Check has resolved after %v/%v attempts (warning)", b.attemptCount, b.RMC.Config.WarningThreshold)
-			b.sendMessage(WARNING, alertMessage, true)
+			b.sendMessage(WARNING, fmt.Sprintf("Check has recovered from warning state after %v attempts", b.attemptCount), "", true)
 		}
 
 		b.attemptCount = 0
@@ -92,17 +91,17 @@ func (b *Base) handle(monitorErr error) error {
 	// Okay, this must be the first time
 	if b.attemptCount == b.RMC.Config.CriticalThreshold {
 		alertMessage := fmt.Sprintf("Check has entered into critical state after %v checks (CriticalThreshold: %v)", b.attemptCount, b.RMC.Config.CriticalThreshold)
-		b.sendMessage(CRITICAL, alertMessage, false)
+		b.sendMessage(CRITICAL, alertMessage, monitorErr.Error(), false)
 	} else if b.attemptCount == b.RMC.Config.WarningThreshold {
 		alertMessage := fmt.Sprintf("Check has entered into warning state after %v checks (WarningThreshold: %v)", b.attemptCount, b.RMC.Config.WarningThreshold)
-		b.sendMessage(WARNING, alertMessage, false)
+		b.sendMessage(WARNING, alertMessage, monitorErr.Error(), false)
 	}
 
 	return nil
 }
 
 // Construct a new alert message, send down the message channel and update alert state
-func (b *Base) sendMessage(alertType int, alertMessage string, resolve bool) error {
+func (b *Base) sendMessage(alertType int, alertMessage, errorDetails string, resolve bool) error {
 	log.Warningf("%v-%v: (%v) %v", b.Identifier, b.RMC.GID, b.RMC.Name, alertMessage)
 
 	var alertTypeString string
@@ -116,12 +115,13 @@ func (b *Base) sendMessage(alertType int, alertMessage string, resolve bool) err
 	msg := &alerter.Message{
 		Text:   alertMessage,
 		Count:  b.attemptCount,
-		Source: b.Identifier,
+		Source: fmt.Sprintf("%v check '%v'", b.Identify(), b.RMC.Path),
 
 		// Let's set some additional (potentially) useful info in the message
 		Contents: map[string]string{
 			"WarningThreshold":  fmt.Sprint(b.RMC.Config.WarningThreshold),
 			"CriticalThreshold": fmt.Sprint(b.RMC.Config.CriticalThreshold),
+			"ErrorDetails":      errorDetails,
 		},
 
 		Resolve: resolve,

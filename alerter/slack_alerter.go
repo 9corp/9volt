@@ -66,10 +66,10 @@ func (s *Slack) generateParams(msg *Message, alerterConfig *AlerterConfig) *slac
 		messageIconURL = alerterConfig.Options["iconURL"]
 	}
 
-	if msg.Critical {
+	if msg.Critical && !msg.Resolve {
 		messageColor = CRITICAL_COLOR
 		messageHeader = "Critical"
-	} else if msg.Warning {
+	} else if msg.Warning && !msg.Resolve {
 		messageColor = WARNING_COLOR
 		messageHeader = "Warning"
 	}
@@ -79,22 +79,14 @@ func (s *Slack) generateParams(msg *Message, alerterConfig *AlerterConfig) *slac
 		Fallback: fmt.Sprintf("%v: %v", strings.ToUpper(messageHeader), msg.Source),
 		Title:    fmt.Sprintf("%v: %v", strings.ToUpper(messageHeader), msg.Source),
 		Text:     msg.Text,
-		Fields: []slack.AttachmentField{
-			slack.AttachmentField{
-				Title: "Thresholds",
-				Value: fmt.Sprintf("Warning: %v Critical: %v", msg.Contents["WarningThreshold"], msg.Contents["CriticalThreshold"]),
-			},
-		},
 	}
 
-	// Prepend additional "attempts" attachment if this is a recovery
-	if msg.Resolve {
-		attemptAttachment := slack.AttachmentField{
-			Title: "Attempts",
-			Value: fmt.Sprint(msg.Count),
-		}
-
-		attachment.Fields = append([]slack.AttachmentField{attemptAttachment}, attachment.Fields...)
+	// if not a recovery, attach error details
+	attachment.Fields = []slack.AttachmentField{
+		slack.AttachmentField{
+			Title: "Error Details",
+			Value: msg.Contents["ErrorDetails"],
+		},
 	}
 
 	params := slack.PostMessageParameters{
