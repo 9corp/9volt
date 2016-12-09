@@ -19,6 +19,7 @@ alerter:
 
 # Example configuration for monitors
 # Note: monitor and alerter configurations can be contained within the same file
+
 monitor:
   my-monitor:
     type: tcp
