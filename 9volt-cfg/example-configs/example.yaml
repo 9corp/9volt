@@ -1,0 +1,41 @@
+# Example configuration for multiple alerters
+alerter:
+  my-alerter:
+    type: "slack"
+    description: "my slack alerter"
+    options:
+      token: "foo"
+      channel: "9volt-testing"
+      username: "robibi"
+      icon_url: "http://cdn.akamai.steamstatic.com/steamcommunity/public/images/avatars/d2/d25fd479e446f3bef884cbedb5b2b643133b93fc_full.jpg"
+  my-other-alerter:
+    type: "slack"
+    description: "my other slack alerter"
+    options:
+      token: "foobar"
+      channel: "9volt-testing"
+      username: "robibi2"
+      icon_url: "http://cdn.akamai.steamstatic.com/steamcommunity/public/images/avatars/d2/d25fd479e446f3bef884cbedb5b2b643133b93fc_full.jpg"
+
+# Example configuration for monitors
+# Note: monitor and alerter configurations can be contained within the same file
+monitor:
+  my-monitor:
+    type: tcp
+    description: "remote tcp check, no thrills"
+    host: cloudsy.com
+    timeout: 5s
+    interval: 10s
+    enabled: true
+    port: 12345
+    tags:
+      - team-core
+      - golang
+    warning-threshold: 1
+    critical-threshold: 3
+    warning-alerter:
+      - other-email
+      - other-slack
+    critical-alerter:
+      - other-slack
+      - other-pagerduty
