@@ -5,7 +5,7 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/9corp/9volt/9volt-cfg/config"
-	"github.com/9corp/9volt/9volt-cfg/dal"
+	// "github.com/9corp/9volt/9volt-cfg/dal"
 )
 
 var (
@@ -33,10 +33,10 @@ func init() {
 }
 
 func main() {
-	etcdClient, err := dal.New(*hostsFlag, *replaceFlag)
-	if err != nil {
-		log.Fatalf("Unable to create initial etcd client: %v", err.Error())
-	}
+	// etcdClient, err := dal.New(*hostsFlag, *replaceFlag)
+	// if err != nil {
+	// 	log.Fatalf("Unable to create initial etcd client: %v", err.Error())
+	// }
 
 	// verify if given dirArg is actually a dir
 	cfg, err := config.New(*dirArg)
@@ -58,24 +58,27 @@ func main() {
 		log.Fatalf("Unable to complete config file parsing: %v", err.Error())
 	}
 
-	log.Info("Validating 9volt configs")
-
-	// validate configs
-	if err := cfg.Validate(configs); err != nil {
-		log.Fatalf("Unable to complete config file validation: %v", err.Error())
+	for k, v := range configs.AlerterConfigs {
+		log.Infof("Found %v alerter config", k)
+		log.Infof("Contents: %v", string(v))
 	}
 
-	log.Infof("Pushing 9volt configs to etcd hosts: %v", *hostsFlag)
-
-	// push to etcd
-	info, err := etcdClient.Push(configs)
-	if err != nil {
-		log.Fatalf("Unable to push configs to etcd: %v", err.Error())
+	for k, v := range configs.MonitorConfigs {
+		log.Infof("Found %v monitor config", k)
+		log.Infof("Contents: %v", string(v))
 	}
 
-	log.Infof(":party: Successfully pushed: %v monitor config(s); %v alerter config(s)", info.Monitor, info.Alerter)
+	// log.Infof("Pushing 9volt configs to etcd hosts: %v", *hostsFlag)
 
-	if *replaceFlag {
-		log.Infof("Skipped replacing: %v monitor config(s); %v alerter config(s)", info.SkippedMonitor, info.SkippedAlerter)
-	}
+	// // push to etcd
+	// info, err := etcdClient.Push(configs)
+	// if err != nil {
+	// 	log.Fatalf("Unable to push configs to etcd: %v", err.Error())
+	// }
+
+	// log.Infof(":party: Successfully pushed: %v monitor config(s); %v alerter config(s)", info.Monitor, info.Alerter)
+
+	// if *replaceFlag {
+	// 	log.Infof("Skipped replacing: %v monitor config(s); %v alerter config(s)", info.SkippedMonitor, info.SkippedAlerter)
+	// }
 }

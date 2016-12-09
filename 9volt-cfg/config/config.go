@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -8,12 +9,19 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
-	"gopkg.in/yaml.v2"
+	"github.com/ghodss/yaml"
 )
 
 type Config struct {
 	Dir string
 }
+
+type FullConfigs struct {
+	AlerterConfigs map[string][]byte // alerter name : json blob
+	MonitorConfigs map[string][]byte // monitor name : json blob
+}
+
+type YAMLFileBlob map[string]map[string]interface{}
 
 func New(dir string) (*Config, error) {
 	// Verify if the dir exists (or is a dir)
@@ -63,8 +71,98 @@ func (c *Config) Fetch() ([]string, error) {
 	return files, nil
 }
 
-func (c *Config) Parse(files []string) ([]string, error) {
-	return []string{}, nil
+func (c *Config) Parse(files []string) (*FullConfigs, error) {
+	fullConfigs := &FullConfigs{
+		AlerterConfigs: make(map[string][]byte, 0),
+		MonitorConfigs: make(map[string][]byte, 0),
+	}
+
+	for _, file := range files {
+		// read the file
+		data, err := ioutil.ReadFile(file)
+		if err != nil {
+			log.Warningf("Unable to read file %v: %v", file, err.Error())
+			continue
+		}
+
+		configTypes, yamlData, err := c.containsConfigs(data)
+		if err != nil {
+			log.Warningf("Unable to determine if '%v' contains configs: %v", err.Error())
+			continue
+		}
+
+		// Roll through monitor and/or alerter configs
+		for _, configType := range configTypes {
+			// validate the config first
+			if err := c.validate(configType, yamlData[configType]); err != nil {
+				log.Warningf("Unable to validate %v configs in %v: %v", configType, file, err.Error())
+				continue
+			}
+
+			// convert the configs
+			jsonConfigs, err := c.convertToJSON(yamlData[configType])
+			if err != nil {
+				log.Warningf("Unable to convert %v configs in %v to JSON: %v", configType, file, err.Error())
+				continue
+			}
+
+			// save the configs
+			for k, v := range jsonConfigs {
+				switch configType {
+				case "alerter":
+					fullConfigs.AlerterConfigs[k] = v
+				case "monitor":
+					fullConfigs.MonitorConfigs[k] = v
+				default:
+					log.Errorf("Unexpected behavior while saving configs from %v", file)
+				}
+			}
+		}
+	}
+
+	return fullConfigs, nil
+}
+
+func (c *Config) convertToJSON(data map[string]interface{}) (map[string][]byte, error) {
+	converted := make(map[string][]byte, 0)
+
+	for name, yamlBlob := range data {
+		jsonBlob, err := json.Marshal(yamlBlob)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to marshal '%v' YAML portion to JSON: %v", name, err.Error())
+		}
+
+		converted[name] = jsonBlob
+	}
+
+	return converted, nil
+}
+
+// Validate given type config
+func (c *Config) validate(configType string, data map[string]interface{}) error {
+	// TODO: perform validation according to the type of configType we got
+	return nil
+}
+
+func (c *Config) containsConfigs(data []byte) ([]string, YAMLFileBlob, error) {
+	// try to unmarshal entire file and verify if it contains 'alerter' or 'monitor'
+	var yamlData YAMLFileBlob
+
+	if err := yaml.Unmarshal(data, &yamlData); err != nil {
+		return nil, nil, err
+	}
+
+	configTypes := []string{}
+
+	if _, ok := yamlData["alerter"]; ok {
+		configTypes = append(configTypes, "alerter")
+	}
+
+	if _, ok := yamlData["monitor"]; ok {
+		configTypes = append(configTypes, "monitor")
+	}
+
+	return configTypes, yamlData, nil
 }
 
 func (c *Config) Validate(configs []string) error {
