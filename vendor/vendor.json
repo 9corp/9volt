@@ -27,6 +27,12 @@
 			"revisionTime": "2015-10-22T06:55:26Z"
 		},
 		{
+			"checksumSHA1": "r1CX8/M/ipvntOfH0rT9jOQ6fdM=",
+			"path": "github.com/cloudfoundry-incubator/candiedyaml",
+			"revision": "99c3df83b51532e3615f851d8c2dbb638f5313bf",
+			"revisionTime": "2016-04-29T08:01:25Z"
+		},
+		{
 			"checksumSHA1": "Fa/Hw0ByZgcIDU5iG+Jt0MdeYYg=",
 			"path": "github.com/coreos/etcd/client",
 			"revision": "7014f6861d2bcb68919a0c2b28f19dc93429b617",
@@ -43,6 +49,12 @@
 			"path": "github.com/coreos/etcd/pkg/types",
 			"revision": "7014f6861d2bcb68919a0c2b28f19dc93429b617",
 			"revisionTime": "2016-05-17T04:45:44Z"
+		},
+		{
+			"checksumSHA1": "l2w6jertyAzSdcdKIXnHm02X8Jk=",
+			"path": "github.com/ghodss/yaml",
+			"revision": "aa0c862057666179de291b67d9f093d12b5a8473",
+			"revisionTime": "2016-06-04T00:29:25Z"
 		},
 		{
 			"checksumSHA1": "iIUYZyoanCQQTUaWsu8b+iOSPt4=",
