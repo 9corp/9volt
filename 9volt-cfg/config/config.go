@@ -23,6 +23,7 @@ type FullConfigs struct {
 
 type YAMLFileBlob map[string]map[string]interface{}
 
+// Instantiate a new Config client; ensure the given directory exists (and is a directory)
 func New(dir string) (*Config, error) {
 	// Verify if the dir exists (or is a dir)
 	if err := validateDir(dir); err != nil {
@@ -34,6 +35,9 @@ func New(dir string) (*Config, error) {
 	}, nil
 }
 
+// Recursively walk through 'dir', find any .yaml files and verify that they are
+// in fact files containing valid YAML. If they do not contain valid YAML, skip
+// file and display warning.
 func (c *Config) Fetch() ([]string, error) {
 	files := make([]string, 0)
 	err := filepath.Walk(c.Dir, func(path string, info os.FileInfo, err error) error {
@@ -71,6 +75,12 @@ func (c *Config) Fetch() ([]string, error) {
 	return files, nil
 }
 
+// Roll through the list of YAML files, parsing each for all 'alerter' and 'monitor'
+// sections; parse (and validate) each section, convert it from YAML -> JSON
+// and construct a response with MonitorConfigs and AlerterConfigs.
+//
+// Structure for MonitorConfigs and AlerterConfigs is a map where the key is the
+// keyname for the config and the vaue is the JSON blob as a byte slice.
 func (c *Config) Parse(files []string) (*FullConfigs, error) {
 	fullConfigs := &FullConfigs{
 		AlerterConfigs: make(map[string][]byte, 0),
@@ -110,8 +120,18 @@ func (c *Config) Parse(files []string) (*FullConfigs, error) {
 			for k, v := range jsonConfigs {
 				switch configType {
 				case "alerter":
+					if _, ok := fullConfigs.AlerterConfigs[k]; ok {
+						log.Warningf("Skipping dupe entry for alerter config '%v' detected in '%v'!", k, file)
+						continue
+					}
+
 					fullConfigs.AlerterConfigs[k] = v
 				case "monitor":
+					if _, ok := fullConfigs.MonitorConfigs[k]; ok {
+						log.Warningf("Skipping dupe entry for alerter config '%v' detected in '%v'!", k, file)
+						continue
+					}
+
 					fullConfigs.MonitorConfigs[k] = v
 				default:
 					log.Errorf("Unexpected behavior while saving configs from %v", file)
@@ -123,6 +143,7 @@ func (c *Config) Parse(files []string) (*FullConfigs, error) {
 	return fullConfigs, nil
 }
 
+// Convert YAML blob -> JSON *after* validation
 func (c *Config) convertToJSON(data map[string]interface{}) (map[string][]byte, error) {
 	converted := make(map[string][]byte, 0)
 
@@ -139,6 +160,7 @@ func (c *Config) convertToJSON(data map[string]interface{}) (map[string][]byte, 
 }
 
 // Validate given type config
+// data == configKey : yaml data; monitor or alerter type determined by 'configType'
 func (c *Config) validate(configType string, data map[string]interface{}) error {
 	// TODO: perform validation according to the type of configType we got
 	return nil
@@ -163,10 +185,6 @@ func (c *Config) containsConfigs(data []byte) ([]string, YAMLFileBlob, error) {
 	}
 
 	return configTypes, yamlData, nil
-}
-
-func (c *Config) Validate(configs []string) error {
-	return nil
 }
 
 func validateDir(dir string) error {

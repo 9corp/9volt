@@ -1,11 +1,13 @@
 package main
 
 import (
+	"fmt"
+
 	log "github.com/Sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/9corp/9volt/9volt-cfg/config"
-	// "github.com/9corp/9volt/9volt-cfg/dal"
+	"github.com/9corp/9volt/9volt-cfg/dal"
 )
 
 var (
@@ -13,7 +15,8 @@ var (
 	prefixFlag  = kingpin.Flag("prefix", "Prefix that 9volt's configuration is stored under in etcd").Short('p').Default("9volt").String()
 	hostsFlag   = kingpin.Flag("etcd-hosts", "List of etcd hosts").Short('e').Required().Strings()
 	replaceFlag = kingpin.Flag("replace", "Do NOT verify if parsed config already exists in etcd (ie. replace everything)").Short('r').Bool()
-	debugFlag   = kingpin.Flag("debug", "Enable debug mode").Short('d').Bool()
+	dryrunFlag  = kingpin.Flag("dryrun", "Do NOT push any changes, just show me what you'd do").Short('d').Bool()
+	debugFlag   = kingpin.Flag("debug", "Enable debug mode").Bool()
 
 	version string
 )
@@ -33,10 +36,10 @@ func init() {
 }
 
 func main() {
-	// etcdClient, err := dal.New(*hostsFlag, *replaceFlag)
-	// if err != nil {
-	// 	log.Fatalf("Unable to create initial etcd client: %v", err.Error())
-	// }
+	etcdClient, err := dal.New(*hostsFlag, *prefixFlag, *replaceFlag, *dryrunFlag)
+	if err != nil {
+		log.Fatalf("Unable to create initial etcd client: %v", err.Error())
+	}
 
 	// verify if given dirArg is actually a dir
 	cfg, err := config.New(*dirArg)
@@ -58,27 +61,29 @@ func main() {
 		log.Fatalf("Unable to complete config file parsing: %v", err.Error())
 	}
 
-	for k, v := range configs.AlerterConfigs {
-		log.Infof("Found %v alerter config", k)
-		log.Infof("Contents: %v", string(v))
+	log.Infof("Found %v alerter configs and %v monitor configs", len(configs.AlerterConfigs), len(configs.MonitorConfigs))
+	log.Infof("Pushing 9volt configs to etcd hosts: %v", *hostsFlag)
+
+	// push to etcd
+	stats, errorList := etcdClient.Push(configs)
+	if len(errorList) != 0 {
+		log.Errorf("Encountered %v errors: %v", len(errorList), errorList)
 	}
 
-	for k, v := range configs.MonitorConfigs {
-		log.Infof("Found %v monitor config", k)
-		log.Infof("Contents: %v", string(v))
+	pushedMessage := fmt.Sprintf("pushed %v monitor config(s) and %v alerter config(s)", stats.MonitorAdded, stats.AlerterAdded)
+	skippedMessage := fmt.Sprintf("skipped replacing %v monitor config(s) and %v alerter config(s)", stats.MonitorSkipped, stats.AlerterSkipped)
+
+	if *dryrunFlag {
+		pushedMessage = "DRYRUN: Would have " + pushedMessage
+		skippedMessage = "DRYRUN: Would have " + skippedMessage
+	} else {
+		pushedMessage = ":party: Successfully " + pushedMessage
+		skippedMessage = "Successfully " + skippedMessage
 	}
 
-	// log.Infof("Pushing 9volt configs to etcd hosts: %v", *hostsFlag)
+	log.Info(pushedMessage)
 
-	// // push to etcd
-	// info, err := etcdClient.Push(configs)
-	// if err != nil {
-	// 	log.Fatalf("Unable to push configs to etcd: %v", err.Error())
-	// }
-
-	// log.Infof(":party: Successfully pushed: %v monitor config(s); %v alerter config(s)", info.Monitor, info.Alerter)
-
-	// if *replaceFlag {
-	// 	log.Infof("Skipped replacing: %v monitor config(s); %v alerter config(s)", info.SkippedMonitor, info.SkippedAlerter)
-	// }
+	if !*replaceFlag {
+		log.Info(skippedMessage)
+	}
 }

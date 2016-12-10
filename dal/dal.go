@@ -46,7 +46,7 @@ type Dal struct {
 	Prefix  string
 }
 
-func New(prefix string, members []string) (IDal, error) {
+func New(prefix string, members []string) (*Dal, error) {
 	etcdClient, err := client.New(client.Config{
 		Endpoints: members,
 		Transport: client.DefaultTransport,
