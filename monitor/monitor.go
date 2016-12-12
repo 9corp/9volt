@@ -207,7 +207,7 @@ func (m *Monitor) monitorRunning(monitorName string) bool {
 	m.runningMonitorLock.Lock()
 	defer m.runningMonitorLock.Unlock()
 
-	for k, _ := range m.runningMonitors {
+	for k := range m.runningMonitors {
 		if k == monitorName {
 			return true
 		}

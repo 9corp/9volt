@@ -83,7 +83,7 @@ func (s *Slack) generateParams(msg *Message, alerterConfig *AlerterConfig) *slac
 
 	// if not a recovery, attach error details
 	attachment.Fields = []slack.AttachmentField{
-		slack.AttachmentField{
+		{
 			Title: "Error Details",
 			Value: msg.Contents["ErrorDetails"],
 		},

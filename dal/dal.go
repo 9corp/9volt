@@ -300,7 +300,7 @@ func (d *Dal) GetClusterMembers() ([]string, error) {
 
 	members := make([]string, 0)
 
-	for k, _ := range data {
+	for k := range data {
 		members = append(members, path.Base(k))
 	}
 
@@ -335,7 +335,7 @@ func (d *Dal) GetCheckKeys() ([]string, error) {
 
 	checkKeys := make([]string, 0)
 
-	for k, _ := range data {
+	for k := range data {
 		checkKeys = append(checkKeys, k)
 	}
 
