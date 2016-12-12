@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"reflect"
 
 	log "github.com/Sirupsen/logrus"
@@ -19,6 +20,7 @@ type Dal struct {
 	Prefix  string
 	Replace bool
 	Dryrun  bool
+	Nosync  bool
 }
 
 type PushStats struct {
@@ -26,9 +28,11 @@ type PushStats struct {
 	AlerterAdded   int
 	MonitorSkipped int
 	AlerterSkipped int
+	MonitorRemoved int
+	AlerterRemoved int
 }
 
-func New(members []string, prefix string, replace, dryrun bool) (*Dal, error) {
+func New(members []string, prefix string, replace, dryrun, nosync bool) (*Dal, error) {
 	etcdClient, err := client.New(client.Config{
 		Endpoints: members,
 		Transport: client.DefaultTransport,
@@ -45,6 +49,7 @@ func New(members []string, prefix string, replace, dryrun bool) (*Dal, error) {
 		Prefix:  prefix,
 		Replace: replace,
 		Dryrun:  dryrun,
+		Nosync:  nosync,
 	}, nil
 }
 
@@ -63,12 +68,116 @@ func (d *Dal) Push(fullConfigs *config.FullConfigs) (*PushStats, []string) {
 		log.Errorf("Unable to complete alerter config push: %v", err.Error())
 	}
 
-	return &PushStats{
+	pushStats := &PushStats{
 		MonitorAdded:   mAdded,
 		AlerterAdded:   aAdded,
 		MonitorSkipped: mSkipped,
 		AlerterSkipped: aSkipped,
-	}, errorList
+	}
+
+	// If syncing is enabled (default), remove any configs from etcd that do not
+	// have a corresponding fullConfigs entry
+	if !d.Nosync {
+		mRemoved, aRemoved, err := d.sync(fullConfigs)
+
+		if err != nil {
+			log.Errorf("Unable to complete sync: %v", err.Error())
+		} else {
+			pushStats.MonitorRemoved = mRemoved
+			pushStats.AlerterRemoved = aRemoved
+		}
+	}
+
+	return pushStats, errorList
+}
+
+// Remove any configs from etcd that are not defined in fullConfigs
+func (d *Dal) sync(fullConfigs *config.FullConfigs) (int, int, error) {
+	count := map[string]int{"monitor": 0, "alerter": 0}
+
+	etcdKeys, err := d.getEtcdKeys()
+	if err != nil {
+		return 0, 0, fmt.Errorf("Unable to fetch all keys from etcd: %v", err.Error())
+	}
+
+	// get all of our keys
+	configKeys := make(map[string][]string, 0)
+
+	configKeys["alerter"] = d.getMapKeys(fullConfigs.AlerterConfigs)
+	configKeys["monitor"] = d.getMapKeys(fullConfigs.MonitorConfigs)
+
+	for etcdConfigType, etcdKeyNames := range etcdKeys {
+		// let's roll through the keys in etcd
+		for _, etcdKeyName := range etcdKeyNames {
+			if !d.stringSliceContains(configKeys[etcdConfigType], etcdKeyName) {
+
+				if !d.Nosync {
+					removeKey := fmt.Sprintf("%v/%v", etcdConfigType, etcdKeyName)
+					log.Debugf("Sync: Removing orphaned '%v' config from etcd", removeKey)
+
+					if err := d.remove(removeKey); err != nil {
+						log.Errorf("Unable to remove orphaned config '%v': %v", removeKey, err.Error())
+						continue
+					}
+				}
+
+				count[etcdConfigType]++
+
+			}
+		}
+	}
+
+	return count["monitor"], count["alerter"], nil
+}
+
+// Fetch all alerter and monitor keys, return as map containing config type and
+// slice of keys
+func (d *Dal) getEtcdKeys() (map[string][]string, error) {
+	keyMap := map[string][]string{
+		"alerter": make([]string, 0),
+		"monitor": make([]string, 0),
+	}
+
+	for k, _ := range keyMap {
+		fullPath := "/" + d.Prefix + "/" + k + "/"
+
+		resp, err := d.KeysAPI.Get(context.Background(), fullPath, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		if !resp.Node.Dir {
+			return nil, fmt.Errorf("Etcd problem: %v is not a dir!", fullPath)
+		}
+
+		for _, etcdKey := range resp.Node.Nodes {
+			keyMap[k] = append(keyMap[k], filepath.Base(etcdKey.Key))
+		}
+	}
+
+	return keyMap, nil
+}
+
+// Helper for determining if a string slice contains given string
+func (d *Dal) stringSliceContains(stringSlice []string, data string) bool {
+	for _, v := range stringSlice {
+		if v == data {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Helper for fetching keys in a map
+func (d *Dal) getMapKeys(inputMap map[string][]byte) []string {
+	keys := make([]string, len(inputMap))
+
+	for k, _ := range inputMap {
+		keys = append(keys, k)
+	}
+
+	return keys
 }
 
 // Wrapper for comparing existing value in etcd + (potentially) pushing value to etcd.
@@ -116,6 +225,19 @@ func (d *Dal) pushConfig(fullPath string, data []byte) error {
 		string(data),
 		&client.SetOptions{
 			PrevExist: client.PrevIgnore,
+		},
+	)
+
+	return err
+}
+
+// Remove a given key from etcd
+func (d *Dal) remove(key string) error {
+	_, err := d.KeysAPI.Delete(
+		context.Background(),
+		d.Prefix+"/"+key,
+		&client.DeleteOptions{
+			Recursive: false,
 		},
 	)
 
