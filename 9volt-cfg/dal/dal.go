@@ -138,7 +138,7 @@ func (d *Dal) getEtcdKeys() (map[string][]string, error) {
 		"monitor": make([]string, 0),
 	}
 
-	for k, _ := range keyMap {
+	for k := range keyMap {
 		fullPath := "/" + d.Prefix + "/" + k + "/"
 
 		resp, err := d.KeysAPI.Get(context.Background(), fullPath, nil)
@@ -173,7 +173,7 @@ func (d *Dal) stringSliceContains(stringSlice []string, data string) bool {
 func (d *Dal) getMapKeys(inputMap map[string][]byte) []string {
 	keys := make([]string, len(inputMap))
 
-	for k, _ := range inputMap {
+	for k := range inputMap {
 		keys = append(keys, k)
 	}
 
