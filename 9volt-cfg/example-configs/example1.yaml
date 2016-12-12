@@ -74,22 +74,22 @@ monitor:
       - secondary-slack
       - primary-pagerduty
 
-  basic-http-check:
-    type: http
-    description: "basic http status code check"
-    host: cloudsy.com
-    timeout: 5s
-    interval: 10s
-    enabled: true
-    port: 80
-    status-code: 200
-    tags:
-      - team-core
-      - golang
-    warning-threshold: 1
-    critical-threshold: 3
-    warning-alerter:
-      - primary-slack
-    critical-alerter:
-      - primary-slack
-      - primary-pagerduty
+  # basic-http-check:
+  #   type: http
+  #   description: "basic http status code check"
+  #   host: cloudsy.com
+  #   timeout: 5s
+  #   interval: 10s
+  #   enabled: true
+  #   port: 80
+  #   status-code: 200
+  #   tags:
+  #     - team-core
+  #     - golang
+  #   warning-threshold: 1
+  #   critical-threshold: 3
+  #   warning-alerter:
+  #     - primary-slack
+  #   critical-alerter:
+  #     - primary-slack
+  #     - primary-pagerduty

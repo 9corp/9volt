@@ -15,6 +15,7 @@ var (
 	prefixFlag  = kingpin.Flag("prefix", "Prefix that 9volt's configuration is stored under in etcd").Short('p').Default("9volt").String()
 	hostsFlag   = kingpin.Flag("etcd-hosts", "List of etcd hosts").Short('e').Required().Strings()
 	replaceFlag = kingpin.Flag("replace", "Do NOT verify if parsed config already exists in etcd (ie. replace everything)").Short('r').Bool()
+	nosyncFlag  = kingpin.Flag("nosync", "Do NOT remove any entries in etcd that do not have a corresponding local config").Short('n').Bool()
 	dryrunFlag  = kingpin.Flag("dryrun", "Do NOT push any changes, just show me what you'd do").Short('d').Bool()
 	debugFlag   = kingpin.Flag("debug", "Enable debug mode").Bool()
 
@@ -33,10 +34,16 @@ func init() {
 	if *debugFlag {
 		log.SetLevel(log.DebugLevel)
 	}
+
+	if *nosyncFlag {
+		log.Info("Syncing is disabled")
+	} else {
+		log.Info("Syncing is enabled")
+	}
 }
 
 func main() {
-	etcdClient, err := dal.New(*hostsFlag, *prefixFlag, *replaceFlag, *dryrunFlag)
+	etcdClient, err := dal.New(*hostsFlag, *prefixFlag, *replaceFlag, *dryrunFlag, *nosyncFlag)
 	if err != nil {
 		log.Fatalf("Unable to create initial etcd client: %v", err.Error())
 	}
@@ -72,18 +79,25 @@ func main() {
 
 	pushedMessage := fmt.Sprintf("pushed %v monitor config(s) and %v alerter config(s)", stats.MonitorAdded, stats.AlerterAdded)
 	skippedMessage := fmt.Sprintf("skipped replacing %v monitor config(s) and %v alerter config(s)", stats.MonitorSkipped, stats.AlerterSkipped)
+	removedMessage := fmt.Sprintf("removed %v monitor config(s) and %v alerter config(s)", stats.MonitorRemoved, stats.AlerterRemoved)
 
 	if *dryrunFlag {
 		pushedMessage = "DRYRUN: Would have " + pushedMessage
 		skippedMessage = "DRYRUN: Would have " + skippedMessage
+		removedMessage = "DRYRUN: Would have " + removedMessage
 	} else {
 		pushedMessage = ":party: Successfully " + pushedMessage
 		skippedMessage = "Successfully " + skippedMessage
+		removedMessage = "Successfully " + removedMessage
 	}
 
 	log.Info(pushedMessage)
 
 	if !*replaceFlag {
 		log.Info(skippedMessage)
+	}
+
+	if !*nosyncFlag {
+		log.Info(removedMessage)
 	}
 }
