@@ -62,8 +62,8 @@ func (s *Slack) generateParams(msg *Message, alerterConfig *AlerterConfig) *slac
 	}
 
 	// If present, use custom icon url
-	if _, ok := alerterConfig.Options["iconURL"]; ok {
-		messageIconURL = alerterConfig.Options["iconURL"]
+	if _, ok := alerterConfig.Options["icon-url"]; ok {
+		messageIconURL = alerterConfig.Options["icon-url"]
 	}
 
 	if msg.Critical && !msg.Resolve {

@@ -39,17 +39,19 @@ setupEtcd() {
 }
 
 createSampleMonitorConfigs() {
-  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/monitor_config_1 -XPUT -d value="{\"type\":\"http\",\"description\":\"example monitor config 1\",\"timeout\":\"5s\",\"interval\":\"4s\"}"
-  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/monitor_config_2 -XPUT -d value="{\"type\":\"http\",\"description\":\"example monitor config 2\",\"timeout\":\"5s\",\"interval\":\"6s\"}"
-  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/monitor_config_3 -XPUT -d value="{\"type\":\"http\",\"description\":\"example monitor config 3\",\"timeout\":\"5s\",\"interval\":\"8s\"}"
-  curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/monitor_config_4 -XPUT -d value="{\"type\":\"http\",\"description\":\"example monitor config 4\",\"timeout\":\"5s\",\"interval\":\"10s\"}"
+  echo "WARNING: Use 9volt-cfg to populate initial monitor configs"
+  # curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/monitor_config_1 -XPUT -d value="{\"type\":\"http\",\"description\":\"example monitor config 1\",\"timeout\":\"5s\",\"interval\":\"4s\"}"
+  # curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/monitor_config_2 -XPUT -d value="{\"type\":\"http\",\"description\":\"example monitor config 2\",\"timeout\":\"5s\",\"interval\":\"6s\"}"
+  # curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/monitor_config_3 -XPUT -d value="{\"type\":\"http\",\"description\":\"example monitor config 3\",\"timeout\":\"5s\",\"interval\":\"8s\"}"
+  # curl -s $ETCDHOST/v2/keys/$PREFIX/monitor/monitor_config_4 -XPUT -d value="{\"type\":\"http\",\"description\":\"example monitor config 4\",\"timeout\":\"5s\",\"interval\":\"10s\"}"
 }
 
 createSampleAlerterConfigs() {
-  curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/pd_config_1 -XPUT -d value="{\"type\":\"pagerduty\",\"description\":\"foobar1-pd\",\"options\":{\"apikey\":\"api-key-1\",\"custom-key\":\"custom-data-1\"}}"
-  curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/pd_config_2 -XPUT -d value="{\"type\":\"pagerduty\",\"description\":\"foobar2-pd\",\"options\":{\"apikey\":\"api-key-2\",\"custom-key\":\"custom-data-2\"}}"
-  curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/sl_config_1 -XPUT -d value="{\"type\":\"slack\",\"description\":\"foobar1-sl\",\"options\":{\"apikey\":\"api-key-1\",\"custom-key\":\"custom-data-1\"}}"
-  curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/sl_config_2 -XPUT -d value="{\"type\":\"slack\",\"description\":\"foobar2-sl\",\"options\":{\"apikey\":\"api-key-2\",\"custom-key\":\"custom-data-2\"}}" 
+  echo "WARNING: Use 9volt-cfg to populate initial alerter configs"
+  # curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/pd_config_1 -XPUT -d value="{\"type\":\"pagerduty\",\"description\":\"foobar1-pd\",\"options\":{\"apikey\":\"api-key-1\",\"custom-key\":\"custom-data-1\"}}"
+  # curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/pd_config_2 -XPUT -d value="{\"type\":\"pagerduty\",\"description\":\"foobar2-pd\",\"options\":{\"apikey\":\"api-key-2\",\"custom-key\":\"custom-data-2\"}}"
+  # curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/sl_config_1 -XPUT -d value="{\"type\":\"slack\",\"description\":\"foobar1-sl\",\"options\":{\"apikey\":\"api-key-1\",\"custom-key\":\"custom-data-1\"}}"
+  # curl -s $ETCDHOST/v2/keys/$PREFIX/alerter/sl_config_2 -XPUT -d value="{\"type\":\"slack\",\"description\":\"foobar2-sl\",\"options\":{\"apikey\":\"api-key-2\",\"custom-key\":\"custom-data-2\"}}" 
 }
 
 warningMessage

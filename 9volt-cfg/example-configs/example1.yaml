@@ -1,7 +1,9 @@
 # Example monitor and alerter configuration
 #
 # Note: While monitor and alerter configurations can be in the same file, there
-#       must only be *one* top level 'alerter' and 'monitor' definition.
+#       must only be *one* top level 'alerter' and 'monitor' definition. You can
+#       however have as many .yaml files as you like, using whatever directory
+#       structure.
 #
 
 alerter:
@@ -12,16 +14,16 @@ alerter:
       token: foo
       channel: 9volt-testing
       username: robibi1
-      iconURL: http://cdn.akamai.steamstatic.com/steamcommunity/public/images/avatars/d2/d25fd479e446f3bef884cbedb5b2b643133b93fc_full.jpg
+      icon-url: http://cdn.akamai.steamstatic.com/steamcommunity/public/images/avatars/d2/d25fd479e446f3bef884cbedb5b2b643133b93fc_full.jpg
 
   secondary-slack:
     type: slack
     description: "secondary slack alerter"
     options:
-      token: foobar
+      token: bar
       channel: 9volt-testing
       username: robibi2
-      iconURL: http://cdn.akamai.steamstatic.com/steamcommunity/public/images/avatars/d2/d25fd479e446f3bef884cbedb5b2b643133b93fc_full.jpg
+      icon-url: http://cdn.akamai.steamstatic.com/steamcommunity/public/images/avatars/d2/d25fd479e446f3bef884cbedb5b2b643133b93fc_full.jpg
 
   primary-pagerduty:
     type: pagerduty
@@ -30,7 +32,7 @@ alerter:
       token: foobar
       channel: 9volt-testing
       username: robibi2
-      iconURL: http://cdn.akamai.steamstatic.com/steamcommunity/public/images/avatars/d2/d25fd479e446f3bef884cbedb5b2b643133b93fc_full.jpg
+      icon-url: http://cdn.akamai.steamstatic.com/steamcommunity/public/images/avatars/d2/d25fd479e446f3bef884cbedb5b2b643133b93fc_full.jpg
 
 monitor:
   ssh-tcp-check:
@@ -72,4 +74,22 @@ monitor:
       - secondary-slack
       - primary-pagerduty
 
-
+  basic-http-check:
+    type: http
+    description: "basic http status code check"
+    host: cloudsy.com
+    timeout: 5s
+    interval: 10s
+    enabled: true
+    port: 80
+    status-code: 200
+    tags:
+      - team-core
+      - golang
+    warning-threshold: 1
+    critical-threshold: 3
+    warning-alerter:
+      - primary-slack
+    critical-alerter:
+      - primary-slack
+      - primary-pagerduty
