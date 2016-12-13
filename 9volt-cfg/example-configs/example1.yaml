@@ -41,7 +41,6 @@ monitor:
     host: cloudsy.com
     timeout: 5s
     interval: 10s
-    enabled: true
     port: 12345
     tags:
       - team-core
@@ -60,7 +59,7 @@ monitor:
     host: cloudsy.com
     timeout: 5s
     interval: 10s
-    enabled: true
+    disable: true
     expect: OpenSSH
     port: 22
     tags:
