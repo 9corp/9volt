@@ -138,6 +138,12 @@ func (m *Monitor) Handle(action int, monitorName, monitorConfigLocation string) 
 		}
 	}
 
+	// If check is disabled, do not start it back up
+	if monitorConfig.Disable {
+		log.Debugf("%v: '%v' is disabled. No further action will be taken.", m.Identifier, monitorName)
+		return nil
+	}
+
 	// start check with new monitor configuration
 	log.Debugf("%v: Starting new monitor for %v...", m.Identifier, monitorName)
 	if err := m.start(monitorName, monitorConfigLocation, monitorConfig); err != nil {
