@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path"
 	"sync"
 	"time"
 
@@ -40,7 +41,7 @@ type Monitor struct {
 type RootMonitorConfig struct {
 	GID            string // goroutine id
 	Name           string // monitor config name in member dir
-	Path           string // monitor config location in etcd
+	ConfigName     string // monitor config name in monitor dir
 	Config         *MonitorConfig
 	MessageChannel chan *alerter.Message
 	StopChannel    chan bool
@@ -187,7 +188,7 @@ func (m *Monitor) start(monitorName, monitorConfigLocation string, monitorConfig
 	newMonitor := m.SupportedMonitors[monitorConfig.Type](
 		&RootMonitorConfig{
 			Name:           monitorName,
-			Path:           monitorConfigLocation,
+			ConfigName:     path.Base(monitorConfigLocation),
 			GID:            util.RandomString(GOROUTINE_ID_LENGTH, false),
 			Config:         monitorConfig,
 			MessageChannel: m.MessageChannel,

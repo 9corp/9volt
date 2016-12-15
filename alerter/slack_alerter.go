@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	RECOVERED_COLOR = "#36a64f" // green
-	WARNING_COLOR   = "#ff9400" // orange
-	CRITICAL_COLOR  = "#ff0000" // red
+	RESOLVE_COLOR  = "#36a64f" // green
+	WARNING_COLOR  = "#ff9400" // orange
+	CRITICAL_COLOR = "#ff0000" // red
 
 	DEFAULT_SLACK_USERNAME = "9volt-bot"
 )
@@ -52,9 +52,8 @@ func (s *Slack) Send(msg *Message, alerterConfig *AlerterConfig) error {
 // Generate slack (post) message parameters (configure what the message looks like, etc.)
 func (s *Slack) generateParams(msg *Message, alerterConfig *AlerterConfig) *slack.PostMessageParameters {
 	messageUsername := DEFAULT_SLACK_USERNAME
-	messageColor := RECOVERED_COLOR
+	messageColor := RESOLVE_COLOR
 	messageIconURL := ""
-	messageHeader := "Recovered"
 
 	// If present, use custom username
 	if _, ok := alerterConfig.Options["username"]; ok {
@@ -66,18 +65,16 @@ func (s *Slack) generateParams(msg *Message, alerterConfig *AlerterConfig) *slac
 		messageIconURL = alerterConfig.Options["icon-url"]
 	}
 
-	if msg.Critical && !msg.Resolve {
+	if msg.Type == "critical" {
 		messageColor = CRITICAL_COLOR
-		messageHeader = "Critical"
-	} else if msg.Warning && !msg.Resolve {
+	} else if msg.Type == "warning" {
 		messageColor = WARNING_COLOR
-		messageHeader = "Warning"
 	}
 
 	attachment := slack.Attachment{
 		Color:    messageColor,
-		Fallback: fmt.Sprintf("%v: %v", strings.ToUpper(messageHeader), msg.Source),
-		Title:    fmt.Sprintf("%v: %v", strings.ToUpper(messageHeader), msg.Source),
+		Fallback: msg.Title,
+		Title:    msg.Title,
 		Text:     msg.Text,
 	}
 

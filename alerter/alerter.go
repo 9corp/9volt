@@ -35,13 +35,12 @@ type Alerter struct {
 }
 
 type Message struct {
+	Type     string            // "resolve", "warning", "critical"
 	Key      []string          // Keys coming from the monitor config for Critical or WarningAlerters
-	Text     string            // Message that describes the alert
+	Title    string            // Short description of the alert
+	Text     string            // In-depth description of the alert state
 	Source   string            // Origin of the alert
 	Count    int               // How many check attempts were made
-	Resolve  bool              // Allows alerters to react differently to up/down messages
-	Warning  bool              // Either 'Warning' or 'Critical' must be set
-	Critical bool              // Either 'Warning' or 'Critical' must be set
 	Contents map[string]string // Set checker-specific data (ensuring alerters know how to use the data)
 	uuid     string            // For private use within the alerter
 }
@@ -182,8 +181,10 @@ func (a *Alerter) validateMessage(msg *Message) error {
 		return errors.New("Message 'Contents' must be filled out")
 	}
 
-	if msg.Warning == false && msg.Critical == false {
-		return errors.New("Either 'Warning' or 'Critical' bool bit must be set")
+	validTypes := []string{"resolve", "critical", "warning"}
+
+	if !util.StringSliceContains(validTypes, msg.Type) {
+		return fmt.Errorf("Message 'Type' must contain one of %v", validTypes)
 	}
 
 	return nil

@@ -74,3 +74,13 @@ func GetMemberID(suffix string) string {
 	hostname, _ := os.Hostname()
 	return MD5Hash(hostname+":"+suffix, 8)
 }
+
+func StringSliceContains(stringSlice []string, data string) bool {
+	for _, v := range stringSlice {
+		if v == data {
+			return true
+		}
+	}
+
+	return false
+}
