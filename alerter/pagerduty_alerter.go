@@ -48,7 +48,7 @@ func (p *Pagerduty) Send(msg *Message, alerterConfig *AlerterConfig) error {
 func (p *Pagerduty) generateEvent(msg *Message, alertConfig *AlerterConfig) *pagerduty.Event {
 	eventType := EVENT_TYPE_RESOLVE
 
-	if !msg.Resolve {
+	if msg.Type != "resolve" {
 		eventType = EVENT_TYPE_TRIGGER
 	}
 
@@ -56,9 +56,12 @@ func (p *Pagerduty) generateEvent(msg *Message, alertConfig *AlerterConfig) *pag
 		ServiceKey:  alertConfig.Options["token"],
 		Type:        eventType,
 		IncidentKey: msg.Source,
-		Description: msg.Text,
+		Description: msg.Title,
 		Client:      "9volt",
-		Details:     msg.Contents,
+		Details: map[string]string{
+			"error details":    msg.Contents["ErrorDetails"],
+			"detailed message": msg.Text,
+		},
 		// ClientURL:   "https://url-to-9volt-ui?",
 	}
 
