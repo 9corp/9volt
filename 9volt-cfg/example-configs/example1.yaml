@@ -27,12 +27,9 @@ alerter:
 
   primary-pagerduty:
     type: pagerduty
-    description: "secondary pagerduty alerter"
+    description: "primary pagerduty alerter"
     options:
-      token: foobar
-      channel: 9volt-testing
-      username: robibi2
-      icon-url: http://cdn.akamai.steamstatic.com/steamcommunity/public/images/avatars/d2/d25fd479e446f3bef884cbedb5b2b643133b93fc_full.jpg
+      token: f9cd9c32289f43ee87c031f707a8c387
 
 monitor:
   ssh-tcp-check:
@@ -48,30 +45,29 @@ monitor:
     warning-threshold: 1
     critical-threshold: 3
     warning-alerter:
-      - primary-slack
+      - primary-pagerduty
     critical-alerter:
-      - primary-slack
       - primary-pagerduty
 
-  ssh-expect-ssh-check:
-    type: tcp
-    description: "remote tcp check with expect"
-    host: cloudsy.com
-    timeout: 5s
-    interval: 10s
-    disable: true
-    expect: OpenSSH
-    port: 22
-    tags:
-      - team-core
-      - golang
-    warning-threshold: 1
-    critical-threshold: 3
-    warning-alerter:
-      - secondary-slack
-    critical-alerter:
-      - secondary-slack
-      - primary-pagerduty
+  # ssh-expect-ssh-check:
+  #   type: tcp
+  #   description: "remote tcp check with expect"
+  #   host: cloudsy.com
+  #   timeout: 5s
+  #   interval: 10s
+  #   disable: true
+  #   expect: OpenSSH
+  #   port: 22
+  #   tags:
+  #     - team-core
+  #     - golang
+  #   warning-threshold: 1
+  #   critical-threshold: 3
+  #   warning-alerter:
+  #     - secondary-slack
+  #   critical-alerter:
+  #     - secondary-slack
+  #     - primary-pagerduty
 
   # basic-http-check:
   #   type: http
