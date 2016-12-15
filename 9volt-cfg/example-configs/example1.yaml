@@ -29,7 +29,7 @@ alerter:
     type: pagerduty
     description: "primary pagerduty alerter"
     options:
-      token: f9cd9c32289f43ee87c031f707a8c387
+      token: foo
 
 monitor:
   ssh-tcp-check:
