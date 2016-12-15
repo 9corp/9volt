@@ -41,17 +41,15 @@ func New(dir string) (*Config, error) {
 func (c *Config) Fetch() ([]string, error) {
 	files := make([]string, 0)
 	err := filepath.Walk(c.Dir, func(path string, info os.FileInfo, err error) error {
-		fullPath := fmt.Sprintf("%v/%v", c.Dir, path)
-
 		if !strings.HasSuffix(path, ".yaml") {
-			log.Debugf("Skipping file %v", fullPath)
+			log.Debugf("Skipping file %v", path)
 			return nil
 		}
 
 		// read file
-		data, err := ioutil.ReadFile(fullPath)
+		data, err := ioutil.ReadFile(path)
 		if err != nil {
-			log.Warningf("Skipping unreadable file %v: %v", fullPath, err.Error())
+			log.Warningf("Skipping unreadable file %v: %v", path, err.Error())
 			return nil
 		}
 
@@ -59,11 +57,11 @@ func (c *Config) Fetch() ([]string, error) {
 
 		// try to unmarshal it to see if it's yaml or not
 		if err := yaml.Unmarshal(data, &test); err != nil {
-			log.Warningf("Skipping non-YAML file %v: %v", fullPath, err.Error())
+			log.Warningf("Skipping non-YAML file %v: %v", path, err.Error())
 			return nil
 		}
 
-		files = append(files, fullPath)
+		files = append(files, path)
 
 		return nil
 	})
