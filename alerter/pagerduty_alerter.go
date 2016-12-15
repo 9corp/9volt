@@ -48,6 +48,10 @@ func (p *Pagerduty) Send(msg *Message, alerterConfig *AlerterConfig) error {
 func (p *Pagerduty) generateEvent(msg *Message, alertConfig *AlerterConfig) *pagerduty.Event {
 	eventType := EVENT_TYPE_RESOLVE
 
+	if !msg.Resolve {
+		eventType = EVENT_TYPE_TRIGGER
+	}
+
 	event := &pagerduty.Event{
 		ServiceKey:  alertConfig.Options["token"],
 		Type:        eventType,
