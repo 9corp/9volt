@@ -21,12 +21,14 @@ const (
 	STOP
 
 	GOROUTINE_ID_LENGTH = 8
+	MAX_PORT            = 65536
 )
 
 type IMonitor interface {
 	Run() error
 	Stop()
 	Identify() string
+	Validate() error
 }
 
 type Monitor struct {
@@ -199,6 +201,12 @@ func (m *Monitor) start(monitorName, monitorConfigLocation string, monitorConfig
 		},
 	)
 
+	// Do check-specific validation
+	if err := newMonitor.Validate(); err != nil {
+		return fmt.Errorf("%v: '%v' failed '%v' monitor config validation: %v",
+			m.Identifier, path.Base(monitorConfigLocation), monitorConfig.Type, err.Error())
+	}
+
 	m.runningMonitorLock.Lock()
 	defer m.runningMonitorLock.Unlock()
 
@@ -225,31 +233,33 @@ func (m *Monitor) monitorRunning(monitorName string) bool {
 	return false
 }
 
-// Ensure that the monitoring config is valid
+// Top level mnitor config validation
 func (m *Monitor) validateMonitorConfig(monitorConfig *MonitorConfig) error {
-	// TODO: HTTP* validation
-
 	if monitorConfig.Interval.String() == "0s" {
-		return errors.New("'Interval' must be > 0s")
+		return errors.New("'interval' must be > 0s")
 	}
 
 	if monitorConfig.CriticalThreshold == 0 {
-		return errors.New("'CriticalThreshold' must be non-zero")
+		return errors.New("'critical-threshold' must be non-zero")
 	}
 
 	// TODO: Logic for this should be changed/fixed at some point
 	if monitorConfig.WarningThreshold > monitorConfig.CriticalThreshold {
-		return errors.New("'WarningThreshold' cannot be larger than 'CriticalThreshold'")
+		return errors.New("'warning-threshold' cannot be larger than 'CriticalThreshold'")
 	}
 
 	// TODO: It should be possible to NOT have a WarningAlerter setting (and just
 	// have a `CriticalAlerter` setting)
 	if len(monitorConfig.WarningAlerter) == 0 {
-		return errors.New("'WarningAlerter' list must contain at least one entry")
+		return errors.New("'warning-alerter' list must contain at least one entry")
 	}
 
 	if len(monitorConfig.CriticalAlerter) == 0 {
-		return errors.New("'CriticalAlerter' list must contain at least one entry")
+		return errors.New("'critical-alerter' list must contain at least one entry")
+	}
+
+	if monitorConfig.Port > MAX_PORT {
+		return fmt.Errorf("'port' must be between 0 and %v", MAX_PORT)
 	}
 
 	return nil

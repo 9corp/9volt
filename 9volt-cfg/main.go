@@ -13,11 +13,11 @@ import (
 var (
 	dirArg      = kingpin.Arg("dir", "Directory to search for 9volt YAML files").Required().String()
 	prefixFlag  = kingpin.Flag("prefix", "Prefix that 9volt's configuration is stored under in etcd").Short('p').Default("9volt").String()
-	hostsFlag   = kingpin.Flag("etcd-hosts", "List of etcd hosts").Short('e').Required().Strings()
+	hostsFlag   = kingpin.Flag("etcd-hosts", "List of etcd hosts").Short('e').Default("http://localhost:2379").Strings()
 	replaceFlag = kingpin.Flag("replace", "Do NOT verify if parsed config already exists in etcd (ie. replace everything)").Short('r').Bool()
 	nosyncFlag  = kingpin.Flag("nosync", "Do NOT remove any entries in etcd that do not have a corresponding local config").Short('n').Bool()
-	dryrunFlag  = kingpin.Flag("dryrun", "Do NOT push any changes, just show me what you'd do").Short('d').Bool()
-	debugFlag   = kingpin.Flag("debug", "Enable debug mode").Bool()
+	dryrunFlag  = kingpin.Flag("dryrun", "Do NOT push any changes, just show me what you'd do").Bool()
+	debugFlag   = kingpin.Flag("debug", "Enable debug mode").Short('d').Bool()
 
 	version string
 )
