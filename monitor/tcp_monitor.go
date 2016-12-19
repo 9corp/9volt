@@ -40,6 +40,10 @@ func NewTCPMonitor(rmc *RootMonitorConfig) IMonitor {
 	return t
 }
 
+func (t *TCPMonitor) Validate() error {
+	return nil
+}
+
 // Update timeout and read size related settings
 func (t *TCPMonitor) updateSettings() {
 	t.ConnTimeout = DEFAULT_CONN_TIMEOUT

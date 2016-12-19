@@ -92,6 +92,20 @@ func (e *ExecMonitor) execCheck() error {
 	return nil
 }
 
+func (e *ExecMonitor) Validate() error {
+	log.Debugf("%v: Performing monitor config validation for %v", e.Identifier, e.RMC.ConfigName)
+
+	if e.RMC.Config.ExecCommand == "" {
+		return errors.New("'command' cannot be blank")
+	}
+
+	if e.Timeout > time.Duration(e.RMC.Config.Interval) {
+		return errors.New("'interval' (%v) cannot exceed 'timeout' (%v)", e.RMC.Config.Interval.String(), e.Timeout.String())
+	}
+
+	return nil
+}
+
 // Helper for displaying full cmd
 func (e *ExecMonitor) getFullCmd() string {
 	fullCmd := e.RMC.Config.ExecCommand

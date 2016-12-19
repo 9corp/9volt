@@ -37,7 +37,6 @@ monitor:
     description: exec check test
     timeout: 5s
     interval: 10s
-    command: exit_script.sh
     return-code: 2
     expect: non-zero return code1
     warning-threshold: 1

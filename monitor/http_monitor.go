@@ -27,6 +27,10 @@ func NewHTTPMonitor(rmc *RootMonitorConfig) IMonitor {
 	return h
 }
 
+func (h *HTTPMonitor) Validate() error {
+	return nil
+}
+
 // Perform a statusCode check; optionally, if 'Expect' is not blank, verify that
 // the received response body contains the 'Expect' string.
 func (h *HTTPMonitor) httpCheck() error {
