@@ -97,7 +97,7 @@ func (e *ExecMonitor) getFullCmd() string {
 	fullCmd := e.RMC.Config.ExecCommand
 
 	for _, v := range e.RMC.Config.ExecArgs {
-		fullCmd := fullCmd + " " + v
+		fullCmd = fullCmd + " " + v
 	}
 
 	return fullCmd
