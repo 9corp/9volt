@@ -48,13 +48,13 @@ func (t *TCPMonitor) Validate() error {
 	}
 
 	if t.ReadTimeout.String() != "0s" {
-		if t.RMC.Config.TCPReadTimeout > time.Duration(t.RMC.Config.Interval) {
+		if t.ReadTimeout > time.Duration(t.RMC.Config.Interval) {
 			return fmt.Errorf("'read-timeout' (%v) cannot exceed 'interval' (%v)", t.ReadTimeout.String(), t.RMC.Config.Interval.String())
 		}
 	}
 
 	if t.WriteTimeout.String() != "0s" {
-		if t.RMC.Config.TCPReadTimeout > time.Duration(t.RMC.Config.Interval) {
+		if t.WriteTimeout > time.Duration(t.RMC.Config.Interval) {
 			return fmt.Errorf("'write-timeout' (%v) cannot exceed 'interval' (%v)", t.WriteTimeout.String(), t.RMC.Config.Interval.String())
 		}
 	}

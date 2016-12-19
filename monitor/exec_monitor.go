@@ -32,7 +32,7 @@ func NewExecMonitor(rmc *RootMonitorConfig) IMonitor {
 	}
 
 	// Set our cmd timeout
-	if e.RMC.Config.Timeout.String() == "" {
+	if e.RMC.Config.Timeout.String() == "0s" {
 		e.Timeout = DEFAULT_CMD_TIMEOUT
 	} else {
 		e.Timeout = time.Duration(e.RMC.Config.Timeout)
@@ -42,6 +42,20 @@ func NewExecMonitor(rmc *RootMonitorConfig) IMonitor {
 	e.MonitorFunc = e.execCheck
 
 	return e
+}
+
+func (e *ExecMonitor) Validate() error {
+	log.Debugf("%v: Performing monitor config validation for %v", e.Identifier, e.RMC.ConfigName)
+
+	if e.RMC.Config.ExecCommand == "" {
+		return errors.New("'command' cannot be blank")
+	}
+
+	if e.Timeout > time.Duration(e.RMC.Config.Interval) {
+		return fmt.Errorf("'timeout' (%v) cannot exceed 'interval' (%v)", e.Timeout.String(), e.RMC.Config.Interval.String())
+	}
+
+	return nil
 }
 
 func (e *ExecMonitor) execCheck() error {
@@ -88,20 +102,6 @@ func (e *ExecMonitor) execCheck() error {
 	if !strings.Contains(string(output), e.RMC.Config.Expect) {
 		return fmt.Errorf("Command '%v' output does not contain expected output. Expected: %v Output: %v",
 			e.FullCmd, e.RMC.Config.Expect, strings.Replace(string(output), "\n", "\\n", -1))
-	}
-
-	return nil
-}
-
-func (e *ExecMonitor) Validate() error {
-	log.Debugf("%v: Performing monitor config validation for %v", e.Identifier, e.RMC.ConfigName)
-
-	if e.RMC.Config.ExecCommand == "" {
-		return errors.New("'command' cannot be blank")
-	}
-
-	if e.Timeout > time.Duration(e.RMC.Config.Interval) {
-		return fmt.Errorf("'timeout' (%v) cannot exceed 'interval' (%v)", e.Timeout.String(), e.RMC.Config.Interval.String())
 	}
 
 	return nil

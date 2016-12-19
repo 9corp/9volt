@@ -10,8 +10,14 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
+const (
+	DEFAULT_HTTP_TIMEOUT = time.Duration(3) * time.Second
+)
+
 type HTTPMonitor struct {
 	Base
+
+	Timeout time.Duration
 }
 
 func NewHTTPMonitor(rmc *RootMonitorConfig) IMonitor {
@@ -22,12 +28,24 @@ func NewHTTPMonitor(rmc *RootMonitorConfig) IMonitor {
 		},
 	}
 
+	if rmc.Config.Timeout.String() == "0s" {
+		h.Timeout = DEFAULT_HTTP_TIMEOUT
+	} else {
+		h.Timeout = time.Duration(rmc.Config.Timeout)
+	}
+
 	h.MonitorFunc = h.httpCheck
 
 	return h
 }
 
 func (h *HTTPMonitor) Validate() error {
+	log.Debugf("%v: Performing monitor config validation for %v", h.Identifier, h.RMC.ConfigName)
+
+	if h.Timeout > time.Duration(h.RMC.Config.Interval) {
+		return fmt.Errorf("'timeout' (%v) cannot exceed 'interval' (%v)", h.Timeout.String(), h.RMC.Config.Interval.String())
+	}
+
 	return nil
 }
 
@@ -95,7 +113,7 @@ func (h *HTTPMonitor) constructURL() string {
 // Create and perform a new HTTP request with a timeout; return http Response
 func (h *HTTPMonitor) performRequest(method, urlStr, requestBody string) (*http.Response, error) {
 	client := &http.Client{
-		Timeout: time.Duration(h.RMC.Config.Timeout),
+		Timeout: h.Timeout,
 	}
 
 	// TODO: Not sure if it's okay to just `body := strings.NewReader(requestBody)`,
