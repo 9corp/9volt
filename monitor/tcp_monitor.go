@@ -43,27 +43,27 @@ func NewTCPMonitor(rmc *RootMonitorConfig) IMonitor {
 func (t *TCPMonitor) Validate() error {
 	log.Debugf("%v: Performing monitor config validation for %v", t.Identifier, t.RMC.ConfigName)
 
-	if t.ConnTimeout > time.Duration(t.RMC.Config.Interval) {
-		return fmt.Errorf("'timeout' (%v) cannot exceed 'interval' (%v)", t.ConnTimeout.String(), t.RMC.Config.Interval.String())
+	if t.ConnTimeout >= time.Duration(t.RMC.Config.Interval) {
+		return fmt.Errorf("'timeout' (%v) cannot equal or exceed 'interval' (%v)", t.ConnTimeout.String(), t.RMC.Config.Interval.String())
 	}
 
 	if t.ReadTimeout.String() != "0s" {
-		if t.ReadTimeout > time.Duration(t.RMC.Config.Interval) {
-			return fmt.Errorf("'read-timeout' (%v) cannot exceed 'interval' (%v)", t.ReadTimeout.String(), t.RMC.Config.Interval.String())
+		if t.ReadTimeout >= time.Duration(t.RMC.Config.Interval) {
+			return fmt.Errorf("'read-timeout' (%v) cannot equal or exceed 'interval' (%v)", t.ReadTimeout.String(), t.RMC.Config.Interval.String())
 		}
 	}
 
 	if t.WriteTimeout.String() != "0s" {
-		if t.WriteTimeout > time.Duration(t.RMC.Config.Interval) {
-			return fmt.Errorf("'write-timeout' (%v) cannot exceed 'interval' (%v)", t.WriteTimeout.String(), t.RMC.Config.Interval.String())
+		if t.WriteTimeout >= time.Duration(t.RMC.Config.Interval) {
+			return fmt.Errorf("'write-timeout' (%v) cannot equal or exceed 'interval' (%v)", t.WriteTimeout.String(), t.RMC.Config.Interval.String())
 		}
 	}
 
 	// Check that the combination of timeouts does not exceed interval
 	totalTimeoutTime := t.ConnTimeout + t.ReadTimeout + t.WriteTimeout
 
-	if totalTimeoutTime > time.Duration(t.RMC.Config.Interval) {
-		return fmt.Errorf("Total timeout duration (%v) cannot exceed 'interval' (%v)", totalTimeoutTime.String(), t.RMC.Config.Interval.String())
+	if totalTimeoutTime >= time.Duration(t.RMC.Config.Interval) {
+		return fmt.Errorf("Total timeout duration (%v) cannot equal or exceed 'interval' (%v)", totalTimeoutTime.String(), t.RMC.Config.Interval.String())
 	}
 
 	return nil

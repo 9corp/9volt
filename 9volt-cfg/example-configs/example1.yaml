@@ -35,10 +35,14 @@ monitor:
   exec-check:
     type: exec
     description: exec check test
-    timeout: 5s
+    timeout: 10s
+    command: echo
+    args:
+      - hello
+      - world
     interval: 10s
-    return-code: 2
-    expect: non-zero return code1
+    return-code: 0
+    expect: world
     warning-threshold: 1
     critical-threshold: 3
     warning-alerter:

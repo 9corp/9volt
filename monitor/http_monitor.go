@@ -42,8 +42,8 @@ func NewHTTPMonitor(rmc *RootMonitorConfig) IMonitor {
 func (h *HTTPMonitor) Validate() error {
 	log.Debugf("%v: Performing monitor config validation for %v", h.Identifier, h.RMC.ConfigName)
 
-	if h.Timeout > time.Duration(h.RMC.Config.Interval) {
-		return fmt.Errorf("'timeout' (%v) cannot exceed 'interval' (%v)", h.Timeout.String(), h.RMC.Config.Interval.String())
+	if h.Timeout >= time.Duration(h.RMC.Config.Interval) {
+		return fmt.Errorf("'timeout' (%v) cannot equal or exceed 'interval' (%v)", h.Timeout.String(), h.RMC.Config.Interval.String())
 	}
 
 	return nil

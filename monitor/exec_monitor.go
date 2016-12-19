@@ -51,8 +51,8 @@ func (e *ExecMonitor) Validate() error {
 		return errors.New("'command' cannot be blank")
 	}
 
-	if e.Timeout > time.Duration(e.RMC.Config.Interval) {
-		return fmt.Errorf("'timeout' (%v) cannot exceed 'interval' (%v)", e.Timeout.String(), e.RMC.Config.Interval.String())
+	if e.Timeout >= time.Duration(e.RMC.Config.Interval) {
+		return fmt.Errorf("'timeout' (%v) cannot equal or exceed 'interval' (%v)", e.Timeout.String(), e.RMC.Config.Interval.String())
 	}
 
 	return nil
