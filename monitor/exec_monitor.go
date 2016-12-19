@@ -19,6 +19,7 @@ type ExecMonitor struct {
 	Base
 
 	Timeout time.Duration
+	FullCmd string
 }
 
 func NewExecMonitor(rmc *RootMonitorConfig) IMonitor {
@@ -36,6 +37,7 @@ func NewExecMonitor(rmc *RootMonitorConfig) IMonitor {
 		e.Timeout = time.Duration(e.RMC.Config.Timeout)
 	}
 
+	e.FullCmd = e.getFullCmd()
 	e.MonitorFunc = e.execCheck
 
 	return e
@@ -47,39 +49,56 @@ func (e *ExecMonitor) execCheck() error {
 	ctx, cancel := context.WithTimeout(context.Background(), e.Timeout)
 	defer cancel()
 
-	// define, and rnu command
+	// TODO: This could use a refactor at some point
 	output, err := exec.CommandContext(ctx, e.RMC.Config.ExecCommand, e.RMC.Config.ExecArgs...).CombinedOutput()
 	if err != nil {
-		// did the timeout?
-		if err == context.DeadlineExceeded {
-			return fmt.Errorf("Command execution hit timeout (%v)", e.RMC.Config.Timeout)
+		// Did we timeout?
+		if err.Error() == "signal: killed" {
+			return fmt.Errorf("Command '%v' exceeded run timeout (%v)", e.FullCmd, e.RMC.Config.Timeout.String())
 		}
 
-		// It's possible that we are OK with a non-zero return code, so only bail
-		// if our return code != expected return code in config
+		// Did we exit non-zero?
 		if exiterr, ok := err.(*exec.ExitError); ok {
 			// what return code did we get?
 			if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
 				if status.ExitStatus() != e.RMC.Config.ExecReturnCode {
-					return fmt.Errorf("Command exited with '%v', expected '%v'. Output: %v",
-						status.ExitStatus(), e.RMC.Config.ExecReturnCode, string(output))
+					return fmt.Errorf("Command '%v' exited with '%v', expected '%v'. Output: %v",
+						e.FullCmd, status.ExitStatus(), e.RMC.Config.ExecReturnCode,
+						strings.Replace(string(output), "\n", "\\n", -1))
 				}
 			} else {
-				return fmt.Errorf("Unable to fetch return code status from command")
+				return fmt.Errorf("Unable to fetch return code for command '%v'. Full error: %v", e.FullCmd, err.Error())
 			}
+		} else {
+			// Something else went bad
+			return fmt.Errorf("Unexpected error during command '%v' execution: %v", e.FullCmd, err.Error())
+		}
+	} else {
+		// Got a 0 return code; let's verify that we're okay with 0
+		if e.RMC.Config.ExecReturnCode != 0 {
+			return fmt.Errorf("Command '%v' exited with a '0' return code, expected '%v'", e.FullCmd, e.RMC.Config.ExecReturnCode)
 		}
 	}
-
-	log.Warningf("EXEC: Err contents: %v Output: %v", err, string(output))
 
 	if e.RMC.Config.Expect == "" {
 		return nil
 	}
 
 	if !strings.Contains(string(output), e.RMC.Config.Expect) {
-		return fmt.Errorf("Command output does not contain expected output. Expected: %v Output: %v",
-			e.RMC.Config.Expect, string(output))
+		return fmt.Errorf("Command '%v' output does not contain expected output. Expected: %v Output: %v",
+			e.FullCmd, e.RMC.Config.Expect, strings.Replace(string(output), "\n", "\\n", -1))
 	}
 
 	return nil
+}
+
+// Helper for displaying full cmd
+func (e *ExecMonitor) getFullCmd() string {
+	fullCmd := e.RMC.Config.ExecCommand
+
+	for _, v := range e.RMC.Config.ExecArgs {
+		fullCmd := fullCmd + " " + v
+	}
+
+	return fullCmd
 }
