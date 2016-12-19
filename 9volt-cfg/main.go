@@ -16,8 +16,8 @@ var (
 	hostsFlag   = kingpin.Flag("etcd-hosts", "List of etcd hosts").Short('e').Required().Strings()
 	replaceFlag = kingpin.Flag("replace", "Do NOT verify if parsed config already exists in etcd (ie. replace everything)").Short('r').Bool()
 	nosyncFlag  = kingpin.Flag("nosync", "Do NOT remove any entries in etcd that do not have a corresponding local config").Short('n').Bool()
-	dryrunFlag  = kingpin.Flag("dryrun", "Do NOT push any changes, just show me what you'd do").Short('d').Bool()
-	debugFlag   = kingpin.Flag("debug", "Enable debug mode").Bool()
+	dryrunFlag  = kingpin.Flag("dryrun", "Do NOT push any changes, just show me what you'd do").Bool()
+	debugFlag   = kingpin.Flag("debug", "Enable debug mode").Short('d').Bool()
 
 	version string
 )
