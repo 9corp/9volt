@@ -41,7 +41,7 @@ monitor:
     args:
       - hello
       - world
-    expect: world
+    expect: meow
     warning-threshold: 1
     critical-threshold: 3
     warning-alerter:

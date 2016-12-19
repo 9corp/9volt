@@ -70,6 +70,8 @@ func (e *ExecMonitor) execCheck() error {
 		}
 	}
 
+	log.Warningf("EXEC: Err contents: %v Output: %v", err, string(output))
+
 	if e.RMC.Config.Expect == "" {
 		return nil
 	}

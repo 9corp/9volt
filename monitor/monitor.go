@@ -96,6 +96,7 @@ func New(cfg *config.Config, messageChannel chan *alerter.Message) *Monitor {
 		SupportedMonitors: map[string]func(*RootMonitorConfig) IMonitor{
 			"http": NewHTTPMonitor,
 			"tcp":  NewTCPMonitor,
+			"exec": NewExecMonitor,
 		},
 		runningMonitors:    make(map[string]IMonitor, 0),
 		runningMonitorLock: &sync.Mutex{},
