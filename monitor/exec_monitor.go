@@ -2,6 +2,7 @@ package monitor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -100,7 +101,7 @@ func (e *ExecMonitor) Validate() error {
 	}
 
 	if e.Timeout > time.Duration(e.RMC.Config.Interval) {
-		return errors.New("'interval' (%v) cannot exceed 'timeout' (%v)", e.RMC.Config.Interval.String(), e.Timeout.String())
+		return fmt.Errorf("'timeout' (%v) cannot exceed 'interval' (%v)", e.Timeout.String(), e.RMC.Config.Interval.String())
 	}
 
 	return nil

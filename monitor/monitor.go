@@ -21,6 +21,7 @@ const (
 	STOP
 
 	GOROUTINE_ID_LENGTH = 8
+	MAX_PORT            = 65536
 )
 
 type IMonitor interface {
@@ -235,26 +236,30 @@ func (m *Monitor) monitorRunning(monitorName string) bool {
 // Top level mnitor config validation
 func (m *Monitor) validateMonitorConfig(monitorConfig *MonitorConfig) error {
 	if monitorConfig.Interval.String() == "0s" {
-		return errors.New("'Interval' must be > 0s")
+		return errors.New("'interval' must be > 0s")
 	}
 
 	if monitorConfig.CriticalThreshold == 0 {
-		return errors.New("'CriticalThreshold' must be non-zero")
+		return errors.New("'critical-threshold' must be non-zero")
 	}
 
 	// TODO: Logic for this should be changed/fixed at some point
 	if monitorConfig.WarningThreshold > monitorConfig.CriticalThreshold {
-		return errors.New("'WarningThreshold' cannot be larger than 'CriticalThreshold'")
+		return errors.New("'warning-threshold' cannot be larger than 'CriticalThreshold'")
 	}
 
 	// TODO: It should be possible to NOT have a WarningAlerter setting (and just
 	// have a `CriticalAlerter` setting)
 	if len(monitorConfig.WarningAlerter) == 0 {
-		return errors.New("'WarningAlerter' list must contain at least one entry")
+		return errors.New("'warning-alerter' list must contain at least one entry")
 	}
 
 	if len(monitorConfig.CriticalAlerter) == 0 {
-		return errors.New("'CriticalAlerter' list must contain at least one entry")
+		return errors.New("'critical-alerter' list must contain at least one entry")
+	}
+
+	if monitorConfig.Port > MAX_PORT {
+		return fmt.Errorf("'port' must be between 0 and %v", MAX_PORT)
 	}
 
 	return nil
