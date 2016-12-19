@@ -32,22 +32,39 @@ alerter:
       token: foo
 
 monitor:
-  ssh-tcp-check:
-    type: tcp
-    description: "remote tcp check, no thrills"
-    host: cloudsy.com
+  exec-check:
+    type: exec
+    description: exec check test
     timeout: 5s
     interval: 10s
-    port: 12345
-    tags:
-      - team-core
-      - golang
+    command: "echo"
+    args:
+      - hello
+      - world
+    expect: world
     warning-threshold: 1
     critical-threshold: 3
     warning-alerter:
-      - primary-pagerduty
+      - primary-slack
     critical-alerter:
       - primary-pagerduty
+
+  # ssh-tcp-check:
+  #   type: tcp
+  #   description: "remote tcp check, no thrills"
+  #   host: cloudsy.com
+  #   timeout: 5s
+  #   interval: 10s
+  #   port: 12345
+  #   tags:
+  #     - team-core
+  #     - golang
+  #   warning-threshold: 1
+  #   critical-threshold: 3
+  #   warning-alerter:
+  #     - primary-pagerduty
+  #   critical-alerter:
+  #     - primary-pagerduty
 
   # ssh-expect-ssh-check:
   #   type: tcp

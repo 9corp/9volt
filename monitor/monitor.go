@@ -75,8 +75,9 @@ type MonitorConfig struct {
 	HTTPRequestBody string `json:"request-body"` // Only used if 'Method' is 'GET'
 
 	// Exec specific attributes
-	ExecCommand    string `json:"command"`
-	ExecReturnCode int    `json:"return-code"`
+	ExecCommand    string   `json:"command"`
+	ExecArgs       []string `json:"args"`
+	ExecReturnCode int      `json:"return-code"`
 
 	// Alerting related configuration
 	WarningThreshold  int      `json:"warning-threshold"`  // how many times a check must fail before a warning alert is emitted
