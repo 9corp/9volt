@@ -16,7 +16,5 @@
     + **[When NOT director]** cluster members monitor this key to ensure director is alive and well
 - /9volt/monitor (dir)
     + contains monitoring config blobs
-- /9volt/host (dir)
-    + contains host config blobs
 - /9volt/alert (dir)
     + contains alert config blobs
