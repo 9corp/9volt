@@ -1,6 +1,9 @@
-# Dev
+_Note_ As of Dec 2016, this is out of date.
+
+# Development Guidelines
+
 - Assuming dev work is happening on OS X
-- Use go version 1.6+
+- Use go version 1.7+
 - Run `bootstrap.sh`
     + This will install: `homebrew`, `golang`, `etcd` and various go packages
 - If you see a "All looks well!", start `9volt` by doing the following:
@@ -8,6 +11,7 @@
 - You should be good to go!
 
 ## Random musings
+
 - Use `gofmt`
 - Use the built-in race detector (`go run -race`)
 - `foo.Start()` for things that will not block and return control to the caller
