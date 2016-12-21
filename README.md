@@ -15,9 +15,19 @@ While there are a bunch of solutions for monitoring and alerting using time seri
 - Incredibly easy to scale to hundreds of thousands of checks
 - Uses `etcd` for all configuration
 - Real-time configuration pick-up (update etcd - `9volt` immediately picks up the change)
+- Interval based monitoring (ie. run check XYZ every 1s or 1y or 1d or even 1ms)
+- Natively supported monitors:
+    - TCP
+    - HTTP
+    - Exec
+- Natively supported alerters:
+    - Slack
+    - Pagerduty
+    - Email
 - RESTful API for querying current monitoring state and loaded configuration
 - Comes bundled with a web app for a quick visual view of the cluster:
     + `./9volt-web -s 9volt-server-1.example.com, 9volt-server-2.example.com`
+- Comes bundled with a binary tool to push parse YAML based configs and push them to etcd
 
 ### Usage
 - Install/setup `etcd`
@@ -27,7 +37,7 @@ While there are a bunch of solutions for monitoring and alerting using time seri
 - Optional: add `9volt` to be managed by `supervisord`, `upstart` or some other process manager
 
 ### H/A and scaling
-Making `9volt` H/A is incredibly simple. Launch another `9volt` service on a separate host and point it to the same `etcd` hosts as the main `9volt` service.
+Scaling `9volt` is incredibly simple. Launch another `9volt` service on a separate host and point it to the same `etcd` hosts as the main `9volt` service.
 
 Checks will be automatically divided between the two+ `9volt` instances.
 
@@ -44,12 +54,8 @@ TODO
 - 1 x 9volt instance (2+ cores, 4GB RAM each)
 - 1 x 3-node etcd cluster (2+ cores, 2GB RAM each)
 
+### Docs
+Read through the [docs dir](docs/).
+
 ### Suggestions/ideas
-- Variable TTL's for member dirs
-- Automatically monitor cluster nodes
-    + Possibly watch etcd cluster members?
-    + Each node monitors the rest of the nodes
-- Slow/trickle check distribution
-    + Do not "blast" out check configs across the cluster
-
-
+Got a suggestion/idea? Something that is preventing you from using `9volt` over another monitoring system because of a missing feature? Submit an issue and we'll see what we can do!
