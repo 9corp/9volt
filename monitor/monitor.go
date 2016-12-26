@@ -58,39 +58,39 @@ type RootMonitorConfig struct {
 // TODO: This should probably be split up between each individual check type
 type MonitorConfig struct {
 	// Generic attributes that fit more than one monitor type
-	Type        string              `json:"type"`        // 'tcp', 'http', 'ssh', 'exec', 'icmp', 'dns'
-	Description string              `json:"description"` // optional
-	Host        string              `json:"host"`        // required for all checks except 'exec'
-	Interval    util.CustomDuration `json:"interval"`
-	Timeout     util.CustomDuration `json:"timeout"`
-	Port        int                 `json:"port"`   // works for all checks except 'icmp' and 'exec'
-	Expect      string              `json:"expect"` // works for 'tcp', 'ssh', 'http', 'exec' checks except 'icmp'
-	Disable     bool                `json:"disable"`
-	Tags        []string            `json:"tags"`
+	Type        string              `json:"type"`                  // 'tcp', 'http', 'ssh', 'exec', 'icmp', 'dns'
+	Description string              `json:"description,omitempty"` // optional
+	Host        string              `json:"host,omitempty"`        // required for all checks except 'exec'
+	Interval    util.CustomDuration `json:"interval,omitempty"`
+	Timeout     util.CustomDuration `json:"timeout,omitempty"`
+	Port        int                 `json:"port,omitempty"`   // works for all checks except 'icmp' and 'exec'
+	Expect      string              `json:"expect,omitempty"` // works for 'tcp', 'ssh', 'http', 'exec' checks except 'icmp'
+	Disable     bool                `json:"disable,omitempty"`
+	Tags        []string            `json:"tags,omitempty"`
 
 	// TCP specific attributes
-	TCPSend         string              `json:"send"`
-	TCPReadTimeout  util.CustomDuration `json:"read-timeout"`
-	TCPWriteTimeout util.CustomDuration `json:"write-timeout"`
-	TCPReadSize     int                 `json:"read-size"`
+	TCPSend         string              `json:"send,omitempty"`
+	TCPReadTimeout  util.CustomDuration `json:"read-timeout,omitempty"`
+	TCPWriteTimeout util.CustomDuration `json:"write-timeout,omitempty"`
+	TCPReadSize     int                 `json:"read-size,omitempty"`
 
 	// HTTP specific attributes
-	HTTPURL         string `json:"url"`
-	HTTPMethod      string `json:"method"`
-	HTTPSSL         bool   `json:"ssl"`
-	HTTPStatusCode  int    `json:"status-code"`
-	HTTPRequestBody string `json:"request-body"` // Only used if 'Method' is 'GET'
+	HTTPURL         string `json:"url,omitempty"`
+	HTTPMethod      string `json:"method,omitempty"`
+	HTTPSSL         bool   `json:"ssl,omitempty"`
+	HTTPStatusCode  int    `json:"status-code,omitempty"`
+	HTTPRequestBody string `json:"request-body,omitempty"` // Only used if 'Method' is 'GET'
 
 	// Exec specific attributes
-	ExecCommand    string   `json:"command"`
-	ExecArgs       []string `json:"args"`
-	ExecReturnCode int      `json:"return-code"`
+	ExecCommand    string   `json:"command,omitempty"`
+	ExecArgs       []string `json:"args,omitempty"`
+	ExecReturnCode int      `json:"return-code,omitempty"`
 
 	// Alerting related configuration
-	WarningThreshold  int      `json:"warning-threshold"`  // how many times a check must fail before a warning alert is emitted
-	CriticalThreshold int      `json:"critical-threshold"` // how many times a check must fail before a critical alert is emitted
-	WarningAlerter    []string `json:"warning-alerter"`    // these alerters will be contacted when a warning threshold is hit
-	CriticalAlerter   []string `json:"critical-alerter"`   // these alerters will be contacted when a critical threshold is hit
+	WarningThreshold  int      `json:"warning-threshold,omitempty"`  // how many times a check must fail before a warning alert is emitted
+	CriticalThreshold int      `json:"critical-threshold,omitempty"` // how many times a check must fail before a critical alert is emitted
+	WarningAlerter    []string `json:"warning-alerter,omitempty"`    // these alerters will be contacted when a warning threshold is hit
+	CriticalAlerter   []string `json:"critical-alerter,omitempty"`   // these alerters will be contacted when a critical threshold is hit
 }
 
 type Response struct{}

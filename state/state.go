@@ -4,6 +4,7 @@ package state
 
 import (
 	"encoding/json"
+	"sync"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -13,19 +14,21 @@ import (
 )
 
 type Message struct {
-	Check   string
-	Owner   string
-	Status  string
-	Count   int
-	Message string
-	Date    time.Time
-	Config  json.RawMessage
+	Check   string          `json:"check"`
+	Owner   string          `json:"owner"`
+	Status  string          `json:"status"`
+	Count   int             `json:"count"`
+	Message string          `json:"message"`
+	Date    time.Time       `json:"date"`
+	Config  json.RawMessage `json:"config"`
 }
 
 type State struct {
 	Config       *config.Config
 	StateChannel chan *Message
 	Identifier   string
+	Mutex        *sync.Mutex
+	Data         map[string]*Message
 
 	ReaderLooper director.Looper
 	DumperLooper director.Looper
@@ -36,6 +39,8 @@ func New(cfg *config.Config, stateChannel chan *Message) *State {
 		Config:       cfg,
 		StateChannel: stateChannel,
 		Identifier:   "state",
+		Mutex:        &sync.Mutex{},
+		Data:         make(map[string]*Message, 0),
 
 		ReaderLooper: director.NewFreeLooper(director.FOREVER, make(chan error)),
 		DumperLooper: director.NewTimedLooper(director.FOREVER, time.Duration(cfg.StateDumpInterval), make(chan error)),
@@ -55,6 +60,11 @@ func (s *State) Start() error {
 func (s *State) runReader() error {
 	s.ReaderLooper.Loop(func() error {
 		msg := <-s.StateChannel
+
+		// Safely write the message to the data map
+		s.Mutex.Lock()
+		s.Data[msg.Check] = msg
+		s.Mutex.Unlock()
 
 		log.Debugf("%v: Received state message for '%v'", s.Identifier, msg.Check)
 
