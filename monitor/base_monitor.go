@@ -1,10 +1,14 @@
 package monitor
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/9corp/9volt/alerter"
+	"github.com/9corp/9volt/state"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -57,6 +61,9 @@ Mainloop:
 
 // Handle triggering/resolving alerts based on check results
 func (b *Base) handle(monitorErr error) error {
+	// Update state every run
+	defer b.updateState(monitorErr)
+
 	// Increase attempt count
 	b.attemptCount++
 
@@ -95,7 +102,6 @@ func (b *Base) handle(monitorErr error) error {
 	// Okay, this must be the first time
 	if b.attemptCount == b.RMC.Config.CriticalThreshold {
 		// TCP check 'some-check' failure! Host: some-host.com Port: N/A
-
 		alertMessage := fmt.Sprintf("Check has entered into critical state after %v checks", b.attemptCount)
 		b.sendMessage(CRITICAL, titleMessage, alertMessage, monitorErr.Error(), false)
 	} else if b.attemptCount == b.RMC.Config.WarningThreshold {
@@ -148,6 +154,46 @@ func (b *Base) sendMessage(alertType int, titleMessage, alertMessage, errorDetai
 
 	log.Debugf("%v-%v: Successfully sent '%v' message for %v (%v)",
 		b.Identifier, b.RMC.GID, msg.Type, b.RMC.ConfigName, b.RMC.Name)
+
+	return nil
+}
+
+// Construct a state message and send it down the state channel
+//
+// `updateState()` is intended to be ran *every* time `handle()` is ran; raw config
+// is included for convenience.
+func (b *Base) updateState(monitorErr error) error {
+	jsonConfig, err := json.Marshal(b.RMC.Config)
+	if err != nil {
+		errorMessage := fmt.Sprintf("Unable to marshal monitor config to JSON: %v", err.Error())
+		jsonConfig = []byte(fmt.Sprintf(`{"error": "%v"}`, errorMessage))
+		log.Error(errorMessage)
+	}
+
+	status := "ok"
+
+	if b.warningAlertSent {
+		status = "warning"
+	} else if b.criticalAlertSent {
+		status = "critical"
+	}
+
+	// If no error is set, set it to N/A for display purposes
+	if monitorErr == nil {
+		monitorErr = errors.New("N/A")
+	}
+
+	b.RMC.StateChannel <- &state.Message{
+		Check:   b.RMC.ConfigName,
+		Owner:   b.RMC.MemberID,
+		Status:  status,
+		Count:   b.attemptCount,
+		Message: monitorErr.Error(),
+		Date:    time.Now(),
+		Config:  jsonConfig,
+	}
+
+	log.Debugf("%v: Successfully sent state message for '%v' to state reader", b.Identifier, b.RMC.ConfigName)
 
 	return nil
 }

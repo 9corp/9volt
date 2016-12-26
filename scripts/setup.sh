@@ -29,7 +29,7 @@ setupEtcd() {
   curl -s $ETCDHOST/v2/keys/$PREFIX?recursive=true -X DELETE
 
   # Add initial config
-  curl -s $ETCDHOST/v2/keys/$PREFIX/config -XPUT -d value="{\"HeartbeatInterval\":\"3s\",\"HeartbeatTimeout\":\"6s\"}"
+  curl -s $ETCDHOST/v2/keys/$PREFIX/config -XPUT -d value="{\"HeartbeatInterval\":\"3s\",\"HeartbeatTimeout\":\"6s\",\"StateDumpInterval\":\"10s\"}"
 
   # Create initial dirs
   curl -s $ETCDHOST/v2/keys/$PREFIX/alerter -XPUT -d dir=true

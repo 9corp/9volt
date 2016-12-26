@@ -14,6 +14,7 @@ import (
 	"github.com/9corp/9volt/dal"
 	"github.com/9corp/9volt/director"
 	"github.com/9corp/9volt/manager"
+	"github.com/9corp/9volt/state"
 	"github.com/9corp/9volt/util"
 )
 
@@ -63,12 +64,13 @@ func main() {
 	}
 
 	// Create necessary channels
-	stateChannel := make(chan bool)
+	clusterStateChannel := make(chan bool)
 	distributeChannel := make(chan bool)
 	messageChannel := make(chan *alerter.Message)
+	monitorStateChannel := make(chan *state.Message)
 
 	// Start cluster engine
-	cluster, err := cluster.New(cfg, stateChannel, distributeChannel)
+	cluster, err := cluster.New(cfg, clusterStateChannel, distributeChannel)
 	if err != nil {
 		log.Fatalf("Unable to instantiate cluster engine: %v", err.Error())
 	}
@@ -78,7 +80,7 @@ func main() {
 	}
 
 	// start director (check distributor)
-	director, err := director.New(cfg, stateChannel, distributeChannel)
+	director, err := director.New(cfg, clusterStateChannel, distributeChannel)
 	if err != nil {
 		log.Fatalf("Unable to instantiate director: %v", err.Error())
 	}
@@ -88,7 +90,7 @@ func main() {
 	}
 
 	// start manager
-	manager, err := manager.New(cfg, messageChannel)
+	manager, err := manager.New(cfg, messageChannel, monitorStateChannel)
 	if err != nil {
 		log.Fatalf("Unable to instantiate manager: %v", err.Error())
 	}
@@ -104,6 +106,13 @@ func main() {
 		log.Fatalf("Unable to complete alerter initialization: %v", err.Error())
 	}
 
+	// start the state dumper
+	state := state.New(cfg, monitorStateChannel)
+
+	if err := state.Start(); err != nil {
+		log.Fatalf("Unable to complete state initialization: %v", err.Error())
+	}
+
 	// start api server
 	apiServer := api.New(cfg, version)
 	go apiServer.Run()
@@ -115,13 +124,13 @@ func main() {
 	// P - PENDING
 	// ? - UNSURE
 	//
-	// [ D ] api       --  main API entry point
+	// [ P ] api       --  main API entry point
 	// [ D ] director  --  performs check distribution
-	// [ P ] manager   --  manages check lifetime [ DAN ]
+	// [ D ] manager   --  manages check lifetime
 	// [ D ] cluster   --  performs leader election; heartbeat
 	// [ ? ] fetcher   --  fetch statistics from outside sources
 	//                     (needs additional discussion)
-	// [ P ] alerter   --  send alerts to various destinations
+	// [ D ] alerter   --  send alerts to various destinations
 	// [ P ] state     --  periodically dump state to etcd [ JESSE ]
 	// [ D ] config    --  configuration validation and loading
 	//

@@ -15,6 +15,7 @@ import (
 	"github.com/9corp/9volt/alerter"
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/monitor"
+	"github.com/9corp/9volt/state"
 	"github.com/9corp/9volt/util"
 )
 
@@ -26,13 +27,13 @@ type Manager struct {
 	Monitor    *monitor.Monitor
 }
 
-func New(cfg *config.Config, messageChannel chan *alerter.Message) (*Manager, error) {
+func New(cfg *config.Config, messageChannel chan *alerter.Message, stateChannel chan *state.Message) (*Manager, error) {
 	return &Manager{
 		Identifier: "manager",
 		MemberID:   util.GetMemberID(cfg.ListenAddress),
 		Config:     cfg,
 		Looper:     director.NewFreeLooper(director.FOREVER, make(chan error)),
-		Monitor:    monitor.New(cfg, messageChannel),
+		Monitor:    monitor.New(cfg, messageChannel, stateChannel),
 	}, nil
 }
 

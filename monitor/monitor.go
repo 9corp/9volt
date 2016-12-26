@@ -13,6 +13,7 @@ import (
 	"github.com/9corp/9volt/alerter"
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/dal"
+	"github.com/9corp/9volt/state"
 	"github.com/9corp/9volt/util"
 )
 
@@ -37,15 +38,19 @@ type Monitor struct {
 	runningMonitorLock *sync.Mutex
 	runningMonitors    map[string]IMonitor
 	MessageChannel     chan *alerter.Message
+	StateChannel       chan *state.Message
 	SupportedMonitors  map[string]func(*RootMonitorConfig) IMonitor // monitor name : NewXMonitor
+	MemberID           string
 }
 
 type RootMonitorConfig struct {
 	GID            string // goroutine id
 	Name           string // monitor config name in member dir
 	ConfigName     string // monitor config name in monitor dir
+	MemberID       string
 	Config         *MonitorConfig
 	MessageChannel chan *alerter.Message
+	StateChannel   chan *state.Message
 	StopChannel    chan bool
 	Ticker         *time.Ticker
 }
@@ -90,11 +95,13 @@ type MonitorConfig struct {
 
 type Response struct{}
 
-func New(cfg *config.Config, messageChannel chan *alerter.Message) *Monitor {
+func New(cfg *config.Config, messageChannel chan *alerter.Message, stateChannel chan *state.Message) *Monitor {
 	return &Monitor{
 		Identifier:     "monitor",
 		Config:         cfg,
 		MessageChannel: messageChannel,
+		StateChannel:   stateChannel,
+		MemberID:       util.GetMemberID(cfg.ListenAddress),
 		SupportedMonitors: map[string]func(*RootMonitorConfig) IMonitor{
 			"http": NewHTTPMonitor,
 			"tcp":  NewTCPMonitor,
@@ -195,7 +202,9 @@ func (m *Monitor) start(monitorName, monitorConfigLocation string, monitorConfig
 			ConfigName:     path.Base(monitorConfigLocation),
 			GID:            util.RandomString(GOROUTINE_ID_LENGTH, false),
 			Config:         monitorConfig,
+			MemberID:       m.MemberID,
 			MessageChannel: m.MessageChannel,
+			StateChannel:   m.StateChannel,
 			StopChannel:    make(chan bool, 1),
 			Ticker:         time.NewTicker(time.Duration(monitorConfig.Interval)),
 		},
