@@ -4,6 +4,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/InVisionApp/rye"
 	log "github.com/Sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
 
@@ -113,8 +114,11 @@ func main() {
 		log.Fatalf("Unable to complete state initialization: %v", err.Error())
 	}
 
+	// create a new middleware handler
+	mwHandler := rye.NewMWHandler(rye.Config{})
+
 	// start api server
-	apiServer := api.New(cfg, version)
+	apiServer := api.New(cfg, mwHandler, version)
 	go apiServer.Run()
 
 	// Naming convention; intended module purpose
