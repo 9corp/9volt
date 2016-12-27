@@ -19,6 +19,7 @@ type Config struct {
 }
 
 type serverConfig struct {
+	StateDumpInterval util.CustomDuration
 	HeartbeatInterval util.CustomDuration
 	HeartbeatTimeout  util.CustomDuration
 }
@@ -114,6 +115,10 @@ func (c *Config) validate(sc *serverConfig) error {
 
 	if sc.HeartbeatTimeout == 0 {
 		return fmt.Errorf("'HeartbeatTimeout' cannot be 0")
+	}
+
+	if sc.StateDumpInterval == 0 {
+		return fmt.Errorf("'StateDumpInterval' cannot be 0")
 	}
 
 	return nil
