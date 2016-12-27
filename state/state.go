@@ -13,6 +13,10 @@ import (
 	"github.com/9corp/9volt/config"
 )
 
+const (
+	STATE_PREFIX = "state"
+)
+
 type Message struct {
 	Check   string          `json:"check"`
 	Owner   string          `json:"owner"`
@@ -78,6 +82,31 @@ func (s *State) runReader() error {
 func (s *State) runDumper() error {
 	s.DumperLooper.Loop(func() error {
 		log.Debugf("%v: Dumping state to etcd every %v", s.Identifier, s.Config.StateDumpInterval.String())
+
+		s.Mutex.Lock()
+		defer s.Mutex.Unlock()
+
+		if len(s.Data) == 0 {
+			log.Debugf("%v: State is empty, nothing to do", s.Identifier)
+			return nil
+		}
+
+		for k, v := range s.Data {
+			fullKey := STATE_PREFIX + "/" + k
+
+			messageBlob, err := json.Marshal(v)
+			if err != nil {
+				log.Errorf("%v: Unable to marshal state message for key %v: %v", s.Identifier, k, err)
+				continue
+			}
+
+			if err := s.Config.DalClient.Set(fullKey, string(messageBlob), false, 0, ""); err != nil {
+				log.Errorf("%v: Unable to dump state for key %v: %v", s.Identifier, k, err)
+				continue
+			}
+
+			delete(s.Data, k)
+		}
 
 		return nil
 	})
