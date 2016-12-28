@@ -3,6 +3,12 @@
 	"ignore": "test",
 	"package": [
 		{
+			"checksumSHA1": "VAhnoYns5+nMj3JIvCgt/4e282o=",
+			"path": "github.com/InVisionApp/rye",
+			"revision": "fa5dc681811bf7ae69eecc7f212b15aa9a5b1022",
+			"revisionTime": "2016-12-08T14:51:35Z"
+		},
+		{
 			"checksumSHA1": "O9o5S7D0E1PaN5ARQ72xLfOrIa0=",
 			"path": "github.com/PagerDuty/go-pagerduty",
 			"revision": "f4d5289481b2c05f2b23f81a64dff86aca960962",
@@ -33,6 +39,12 @@
 			"revisionTime": "2015-10-22T06:55:26Z"
 		},
 		{
+			"checksumSHA1": "iHUNCL1pFrH1LSBXIQyhPqRTyeI=",
+			"path": "github.com/cactus/go-statsd-client/statsd",
+			"revision": "91c326c3f7bd20f0226d3d1c289dd9f8ce28d33d",
+			"revisionTime": "2016-05-30T18:57:10Z"
+		},
+		{
 			"checksumSHA1": "r1CX8/M/ipvntOfH0rT9jOQ6fdM=",
 			"path": "github.com/cloudfoundry-incubator/candiedyaml",
 			"revision": "99c3df83b51532e3615f851d8c2dbb638f5313bf",
@@ -55,6 +67,12 @@
 			"path": "github.com/coreos/etcd/pkg/types",
 			"revision": "7014f6861d2bcb68919a0c2b28f19dc93429b617",
 			"revisionTime": "2016-05-17T04:45:44Z"
+		},
+		{
+			"checksumSHA1": "2Fy1Y6Z3lRRX1891WF/+HT4XS2I=",
+			"path": "github.com/dgrijalva/jwt-go",
+			"revision": "9ed569b5d1ac936e6494082958d63a6aa4fff99a",
+			"revisionTime": "2016-11-01T19:39:35Z"
 		},
 		{
 			"checksumSHA1": "l2w6jertyAzSdcdKIXnHm02X8Jk=",
