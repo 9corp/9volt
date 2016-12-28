@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/InVisionApp/rye"
+	// log "github.com/Sirupsen/logrus"
 
 	"github.com/9corp/9volt/dal"
 )
@@ -37,6 +39,16 @@ func (a *Api) StateHandler(rw http.ResponseWriter, r *http.Request) *rye.Respons
 }
 
 func (a *Api) StateWithTagsHandler(rw http.ResponseWriter, r *http.Request) *rye.Response {
-	fmt.Fprintf(rw, "state with tags handler")
+	vals := r.URL.Query()
+	if _, ok := vals["tags"]; !ok {
+		rye.WriteJSONStatus(rw, "error", "No tags found", http.StatusBadRequest)
+		return nil
+	}
+
+	tags := strings.Split(vals["tags"][0], ",")
+
+	fmt.Fprintf(rw, "Our tags: %v", tags)
+	fmt.Fprintf(rw, "Tag length: %v", len(tags))
+
 	return nil
 }
