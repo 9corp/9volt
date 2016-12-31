@@ -81,13 +81,13 @@ func (s *State) runReader() error {
 // Periodically dump state to etcd
 func (s *State) runDumper() error {
 	s.DumperLooper.Loop(func() error {
-		log.Debugf("%v: Dumping state to etcd every %v", s.Identifier, s.Config.StateDumpInterval.String())
+		// log.Debugf("%v: Dumping state to etcd every %v", s.Identifier, s.Config.StateDumpInterval.String())
 
 		s.Mutex.Lock()
 		defer s.Mutex.Unlock()
 
 		if len(s.Data) == 0 {
-			log.Debugf("%v: State is empty, nothing to do", s.Identifier)
+			// log.Debugf("%v: State is empty, nothing to do", s.Identifier)
 			return nil
 		}
 

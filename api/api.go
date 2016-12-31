@@ -1,10 +1,9 @@
 package api
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/http"
 
+	"github.com/InVisionApp/rye"
 	log "github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 
@@ -17,6 +16,7 @@ type Api struct {
 	Version    string
 	MemberID   string
 	Identifier string
+	MWHandler  *rye.MWHandler
 }
 
 type JSONStatus struct {
@@ -24,39 +24,14 @@ type JSONStatus struct {
 	Message string
 }
 
-func New(cfg *config.Config, version string) *Api {
-	a := &Api{}
-	a.Config = cfg
-	a.Version = version
-	a.MemberID = util.GetMemberID(cfg.ListenAddress)
-	a.Identifier = "api"
-
-	return a
-}
-
-func (a *Api) HomeHandler(rw http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(rw, "Refer to README.md for 9volt API usage")
-}
-
-func (a *Api) StatusHandler(rw http.ResponseWriter, r *http.Request) {
-	jsonStatus := &JSONStatus{
-		Status:  "OK",
-		Message: fmt.Sprintf("Our member ID: %v", a.MemberID),
+func New(cfg *config.Config, mwHandler *rye.MWHandler, version string) *Api {
+	return &Api{
+		Config:     cfg,
+		Version:    version,
+		MemberID:   util.GetMemberID(cfg.ListenAddress),
+		Identifier: "api",
+		MWHandler:  mwHandler,
 	}
-
-	data, err := json.Marshal(jsonStatus)
-	if err != nil {
-		rw.WriteHeader(400)
-		rw.Write([]byte(fmt.Sprintf("Unable to generate status JSON: %v", err.Error())))
-		return
-	}
-
-	rw.WriteHeader(200)
-	rw.Write(data)
-}
-
-func (a *Api) VersionHandler(rw http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(rw, "9volt %v", a.Version)
 }
 
 func (a *Api) Run() {
@@ -64,14 +39,45 @@ func (a *Api) Run() {
 
 	routes := mux.NewRouter().StrictSlash(true)
 
-	routes.HandleFunc("/", a.HomeHandler).
-		Methods("GET")
+	routes.Handle("/", a.MWHandler.Handle([]rye.Handler{
+		a.HomeHandler,
+	})).Methods("GET")
 
-	routes.HandleFunc("/version", a.VersionHandler).
-		Methods("GET")
+	// Common handlers
+	routes.Handle("/version", a.MWHandler.Handle([]rye.Handler{
+		a.VersionHandler,
+	})).Methods("GET")
 
-	routes.HandleFunc("/status/check", a.StatusHandler).
-		Methods("GET")
+	routes.Handle("/status/check", a.MWHandler.Handle([]rye.Handler{
+		a.StatusHandler,
+	})).Methods("GET")
+
+	// State handlers (route order matters!)
+	routes.Handle("/api/v1/state", a.MWHandler.Handle([]rye.Handler{
+		a.StateWithTagsHandler,
+	})).Methods("GET").Queries("tags", "")
+
+	routes.Handle("/api/v1/state", a.MWHandler.Handle([]rye.Handler{
+		a.StateHandler,
+	})).Methods("GET")
+
+	// Cluster handlers
+	routes.Handle("/api/v1/cluster", a.MWHandler.Handle([]rye.Handler{
+		a.ClusterHandler,
+	})).Methods("GET")
+
+	// Monitor handlers (route order matters!)
+	routes.Handle("/api/v1/monitor", a.MWHandler.Handle([]rye.Handler{
+		a.MonitorHandler,
+	})).Methods("GET")
+
+	routes.Handle("/api/v1/monitor/{check}", a.MWHandler.Handle([]rye.Handler{
+		a.MonitorDisableHandler,
+	})).Methods("GET").Queries("disable", "")
+
+	routes.Handle("/api/v1/monitor/{check}", a.MWHandler.Handle([]rye.Handler{
+		a.MonitorCheckHandler,
+	})).Methods("GET")
 
 	http.ListenAndServe(a.Config.ListenAddress, routes)
 }

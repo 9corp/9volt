@@ -3,6 +3,12 @@
 	"ignore": "test",
 	"package": [
 		{
+			"checksumSHA1": "VAhnoYns5+nMj3JIvCgt/4e282o=",
+			"path": "github.com/InVisionApp/rye",
+			"revision": "fa5dc681811bf7ae69eecc7f212b15aa9a5b1022",
+			"revisionTime": "2016-12-08T14:51:35Z"
+		},
+		{
 			"checksumSHA1": "O9o5S7D0E1PaN5ARQ72xLfOrIa0=",
 			"path": "github.com/PagerDuty/go-pagerduty",
 			"revision": "f4d5289481b2c05f2b23f81a64dff86aca960962",
@@ -33,6 +39,12 @@
 			"revisionTime": "2015-10-22T06:55:26Z"
 		},
 		{
+			"checksumSHA1": "iHUNCL1pFrH1LSBXIQyhPqRTyeI=",
+			"path": "github.com/cactus/go-statsd-client/statsd",
+			"revision": "91c326c3f7bd20f0226d3d1c289dd9f8ce28d33d",
+			"revisionTime": "2016-05-30T18:57:10Z"
+		},
+		{
 			"checksumSHA1": "r1CX8/M/ipvntOfH0rT9jOQ6fdM=",
 			"path": "github.com/cloudfoundry-incubator/candiedyaml",
 			"revision": "99c3df83b51532e3615f851d8c2dbb638f5313bf",
@@ -57,6 +69,12 @@
 			"revisionTime": "2016-05-17T04:45:44Z"
 		},
 		{
+			"checksumSHA1": "2Fy1Y6Z3lRRX1891WF/+HT4XS2I=",
+			"path": "github.com/dgrijalva/jwt-go",
+			"revision": "9ed569b5d1ac936e6494082958d63a6aa4fff99a",
+			"revisionTime": "2016-11-01T19:39:35Z"
+		},
+		{
 			"checksumSHA1": "l2w6jertyAzSdcdKIXnHm02X8Jk=",
 			"path": "github.com/ghodss/yaml",
 			"revision": "aa0c862057666179de291b67d9f093d12b5a8473",
@@ -75,10 +93,10 @@
 			"revisionTime": "2016-04-22T13:42:37Z"
 		},
 		{
-			"checksumSHA1": "/WoZGh9L9hFOcrU9d7rAeFPDy1U=",
+			"checksumSHA1": "urMd7A9QPAJYY0GZJL9qBhlUmD8=",
 			"path": "github.com/gorilla/mux",
-			"revision": "9c19ed558d5df4da88e2ade9c8940d742aef0e7e",
-			"revisionTime": "2016-05-02T17:56:24Z"
+			"revision": "757bef944d0f21880861c2dd9c871ca543023cba",
+			"revisionTime": "2016-09-20T23:08:13Z"
 		},
 		{
 			"checksumSHA1": "BUTvC6/V0sBmyz2ZEqyh+Qmrm10=",

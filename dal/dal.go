@@ -29,6 +29,10 @@ type IDal interface {
 	FetchAllMemberRefs() (map[string]string, error)
 	FetchCheckStats() (map[string]int, error)
 	FetchAlerterConfig(string) (string, error)
+	FetchState() ([]byte, error)
+	FetchStateWithTags([]string) ([]byte, error)
+	UpdateCheckState(bool, string) error
+	GetClusterStats() (*ClusterStats, error)
 }
 
 type GetOptions struct {
@@ -44,6 +48,13 @@ type Dal struct {
 	KeysAPI client.KeysAPI
 	Members []string
 	Prefix  string
+}
+
+// Helper struct for findings tags in a state config blob
+type simpleState struct {
+	Config struct {
+		Tags []string `json:"tags"`
+	} `json:"config"`
 }
 
 func New(prefix string, members []string) (*Dal, error) {

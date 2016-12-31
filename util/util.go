@@ -84,3 +84,16 @@ func StringSliceContains(stringSlice []string, data string) bool {
 
 	return false
 }
+
+// Return true if ANY element in s1 appears in s2, otherwise return false
+func StringSliceInStringSlice(s1, s2 []string) bool {
+	for _, v1 := range s1 {
+		for _, v2 := range s2 {
+			if v1 == v2 {
+				return true
+			}
+		}
+	}
+
+	return false
+}

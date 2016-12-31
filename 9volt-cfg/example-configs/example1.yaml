@@ -50,13 +50,15 @@ monitor:
     interval: 10s
     return-code: 1
     expect: world
-    disable: true
     warning-threshold: 1
     critical-threshold: 3
     warning-alerter:
       - primary-slack
     critical-alerter:
       - primary-email
+    tags:
+      - dbservers
+      - mysql
 
   # ssh-tcp-check:
   #   type: tcp
