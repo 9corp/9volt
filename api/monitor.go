@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/InVisionApp/rye"
 	"github.com/coreos/etcd/client"
@@ -49,7 +50,34 @@ func (a *Api) MonitorHandler(rw http.ResponseWriter, r *http.Request) *rye.Respo
 }
 
 func (a *Api) MonitorDisableHandler(rw http.ResponseWriter, r *http.Request) *rye.Response {
-	fmt.Fprint(rw, "monitor disable handler")
+	checkName := mux.Vars(r)["check"]
+
+	if checkName == "" {
+		return &rye.Response{
+			Err:        errors.New("Check name not found. Bug?"),
+			StatusCode: http.StatusInternalServerError,
+		}
+	}
+
+	disableAction, err := a.monitorDisableQueryCheck(r)
+	if err != nil {
+		return &rye.Response{
+			Err:        err,
+			StatusCode: http.StatusBadRequest,
+		}
+	}
+
+	if err := a.Config.DalClient.UpdateCheckState(disableAction, checkName); err != nil {
+		return &rye.Response{
+			Err: fmt.Errorf("Unable to update disable state to '%v' for check '%v': %v",
+				disableAction, checkName, err.Error()),
+			StatusCode: http.StatusInternalServerError,
+		}
+	}
+
+	rye.WriteJSONStatus(rw, "ok", fmt.Sprintf("Successfully updated disable check state to '%v' for check '%v'",
+		disableAction, checkName), http.StatusOK)
+
 	return nil
 }
 
@@ -93,4 +121,18 @@ func (a *Api) MonitorCheckHandler(rw http.ResponseWriter, r *http.Request) *rye.
 	rye.WriteJSONResponse(rw, http.StatusOK, jsonData)
 
 	return nil
+}
+
+func (a *Api) monitorDisableQueryCheck(r *http.Request) (bool, error) {
+	vals := r.URL.Query()
+	if _, ok := vals["disable"]; !ok {
+		return false, errors.New("No 'disable' found in query params (bug?)")
+	}
+
+	state, err := strconv.ParseBool(vals["disable"][0])
+	if err != nil {
+		return false, fmt.Errorf("Invalid bool value '%v'", vals["disable"][0])
+	}
+
+	return state, nil
 }

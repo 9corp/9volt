@@ -31,6 +31,7 @@ type IDal interface {
 	FetchAlerterConfig(string) (string, error)
 	FetchState() ([]byte, error)
 	FetchStateWithTags([]string) ([]byte, error)
+	UpdateCheckState(bool, string) error
 }
 
 type GetOptions struct {

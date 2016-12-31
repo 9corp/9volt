@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/InVisionApp/rye"
-	// log "github.com/Sirupsen/logrus"
 )
 
 func (a *Api) StateHandler(rw http.ResponseWriter, r *http.Request) *rye.Response {
