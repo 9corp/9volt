@@ -157,6 +157,38 @@ type FakeIDal struct {
 		result1 string
 		result2 error
 	}
+	FetchStateStub        func() ([]byte, error)
+	fetchStateMutex       sync.RWMutex
+	fetchStateArgsForCall []struct{}
+	fetchStateReturns     struct {
+		result1 []byte
+		result2 error
+	}
+	FetchStateWithTagsStub        func([]string) ([]byte, error)
+	fetchStateWithTagsMutex       sync.RWMutex
+	fetchStateWithTagsArgsForCall []struct {
+		arg1 []string
+	}
+	fetchStateWithTagsReturns struct {
+		result1 []byte
+		result2 error
+	}
+	UpdateCheckStateStub        func(bool, string) error
+	updateCheckStateMutex       sync.RWMutex
+	updateCheckStateArgsForCall []struct {
+		arg1 bool
+		arg2 string
+	}
+	updateCheckStateReturns struct {
+		result1 error
+	}
+	GetClusterStatsStub        func() (*dal.ClusterStats, error)
+	getClusterStatsMutex       sync.RWMutex
+	getClusterStatsArgsForCall []struct{}
+	getClusterStatsReturns     struct {
+		result1 *dal.ClusterStats
+		result2 error
+	}
 	invocations map[string][][]interface{}
 }
 
@@ -722,6 +754,135 @@ func (fake *FakeIDal) FetchAlerterConfigReturns(result1 string, result2 error) {
 	fake.FetchAlerterConfigStub = nil
 	fake.fetchAlerterConfigReturns = struct {
 		result1 string
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeIDal) FetchState() ([]byte, error) {
+	fake.fetchStateMutex.Lock()
+	fake.fetchStateArgsForCall = append(fake.fetchStateArgsForCall, struct{}{})
+	fake.guard("FetchState")
+	fake.invocations["FetchState"] = append(fake.invocations["FetchState"], []interface{}{})
+	fake.fetchStateMutex.Unlock()
+	if fake.FetchStateStub != nil {
+		return fake.FetchStateStub()
+	} else {
+		return fake.fetchStateReturns.result1, fake.fetchStateReturns.result2
+	}
+}
+
+func (fake *FakeIDal) FetchStateCallCount() int {
+	fake.fetchStateMutex.RLock()
+	defer fake.fetchStateMutex.RUnlock()
+	return len(fake.fetchStateArgsForCall)
+}
+
+func (fake *FakeIDal) FetchStateReturns(result1 []byte, result2 error) {
+	fake.FetchStateStub = nil
+	fake.fetchStateReturns = struct {
+		result1 []byte
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeIDal) FetchStateWithTags(arg1 []string) ([]byte, error) {
+	var arg1Copy []string
+	if arg1 != nil {
+		arg1Copy = make([]string, len(arg1))
+		copy(arg1Copy, arg1)
+	}
+	fake.fetchStateWithTagsMutex.Lock()
+	fake.fetchStateWithTagsArgsForCall = append(fake.fetchStateWithTagsArgsForCall, struct {
+		arg1 []string
+	}{arg1Copy})
+	fake.guard("FetchStateWithTags")
+	fake.invocations["FetchStateWithTags"] = append(fake.invocations["FetchStateWithTags"], []interface{}{arg1Copy})
+	fake.fetchStateWithTagsMutex.Unlock()
+	if fake.FetchStateWithTagsStub != nil {
+		return fake.FetchStateWithTagsStub(arg1)
+	} else {
+		return fake.fetchStateWithTagsReturns.result1, fake.fetchStateWithTagsReturns.result2
+	}
+}
+
+func (fake *FakeIDal) FetchStateWithTagsCallCount() int {
+	fake.fetchStateWithTagsMutex.RLock()
+	defer fake.fetchStateWithTagsMutex.RUnlock()
+	return len(fake.fetchStateWithTagsArgsForCall)
+}
+
+func (fake *FakeIDal) FetchStateWithTagsArgsForCall(i int) []string {
+	fake.fetchStateWithTagsMutex.RLock()
+	defer fake.fetchStateWithTagsMutex.RUnlock()
+	return fake.fetchStateWithTagsArgsForCall[i].arg1
+}
+
+func (fake *FakeIDal) FetchStateWithTagsReturns(result1 []byte, result2 error) {
+	fake.FetchStateWithTagsStub = nil
+	fake.fetchStateWithTagsReturns = struct {
+		result1 []byte
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeIDal) UpdateCheckState(arg1 bool, arg2 string) error {
+	fake.updateCheckStateMutex.Lock()
+	fake.updateCheckStateArgsForCall = append(fake.updateCheckStateArgsForCall, struct {
+		arg1 bool
+		arg2 string
+	}{arg1, arg2})
+	fake.guard("UpdateCheckState")
+	fake.invocations["UpdateCheckState"] = append(fake.invocations["UpdateCheckState"], []interface{}{arg1, arg2})
+	fake.updateCheckStateMutex.Unlock()
+	if fake.UpdateCheckStateStub != nil {
+		return fake.UpdateCheckStateStub(arg1, arg2)
+	} else {
+		return fake.updateCheckStateReturns.result1
+	}
+}
+
+func (fake *FakeIDal) UpdateCheckStateCallCount() int {
+	fake.updateCheckStateMutex.RLock()
+	defer fake.updateCheckStateMutex.RUnlock()
+	return len(fake.updateCheckStateArgsForCall)
+}
+
+func (fake *FakeIDal) UpdateCheckStateArgsForCall(i int) (bool, string) {
+	fake.updateCheckStateMutex.RLock()
+	defer fake.updateCheckStateMutex.RUnlock()
+	return fake.updateCheckStateArgsForCall[i].arg1, fake.updateCheckStateArgsForCall[i].arg2
+}
+
+func (fake *FakeIDal) UpdateCheckStateReturns(result1 error) {
+	fake.UpdateCheckStateStub = nil
+	fake.updateCheckStateReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeIDal) GetClusterStats() (*dal.ClusterStats, error) {
+	fake.getClusterStatsMutex.Lock()
+	fake.getClusterStatsArgsForCall = append(fake.getClusterStatsArgsForCall, struct{}{})
+	fake.guard("GetClusterStats")
+	fake.invocations["GetClusterStats"] = append(fake.invocations["GetClusterStats"], []interface{}{})
+	fake.getClusterStatsMutex.Unlock()
+	if fake.GetClusterStatsStub != nil {
+		return fake.GetClusterStatsStub()
+	} else {
+		return fake.getClusterStatsReturns.result1, fake.getClusterStatsReturns.result2
+	}
+}
+
+func (fake *FakeIDal) GetClusterStatsCallCount() int {
+	fake.getClusterStatsMutex.RLock()
+	defer fake.getClusterStatsMutex.RUnlock()
+	return len(fake.getClusterStatsArgsForCall)
+}
+
+func (fake *FakeIDal) GetClusterStatsReturns(result1 *dal.ClusterStats, result2 error) {
+	fake.GetClusterStatsStub = nil
+	fake.getClusterStatsReturns = struct {
+		result1 *dal.ClusterStats
 		result2 error
 	}{result1, result2}
 }
