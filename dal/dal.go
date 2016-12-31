@@ -32,6 +32,7 @@ type IDal interface {
 	FetchState() ([]byte, error)
 	FetchStateWithTags([]string) ([]byte, error)
 	UpdateCheckState(bool, string) error
+	GetClusterStats() (*ClusterStats, error)
 }
 
 type GetOptions struct {
