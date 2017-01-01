@@ -14,6 +14,7 @@ import (
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/dal"
 	"github.com/9corp/9volt/director"
+	"github.com/9corp/9volt/event"
 	"github.com/9corp/9volt/manager"
 	"github.com/9corp/9volt/state"
 	"github.com/9corp/9volt/util"
@@ -52,8 +53,12 @@ func main() {
 		log.Fatalf("Unable to start initial etcd client: %v", err.Error())
 	}
 
+	// Create an initial event queue
+	eventQueue := event.NewQueue()
+	eqClient := eventQueue.NewClient()
+
 	// Load our configuration
-	cfg := config.New(*listenAddress, *etcdPrefix, *etcdMembers, dalClient)
+	cfg := config.New(*listenAddress, *etcdPrefix, *etcdMembers, dalClient, eqClient)
 
 	if err := cfg.Load(); err != nil {
 		log.Fatalf("Unable to load configuration from etcd: %v", err.Error())
@@ -112,6 +117,11 @@ func main() {
 
 	if err := state.Start(); err != nil {
 		log.Fatalf("Unable to complete state initialization: %v", err.Error())
+	}
+
+	// Start the event queue
+	if err := eventQueue.Start(); err != nil {
+		log.Fatalf("Unable to complete event queue initialization: %v", err.Error())
 	}
 
 	// create a new middleware handler
