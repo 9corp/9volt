@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/relistan/go-director"
@@ -95,7 +96,8 @@ func (a *Alerter) run() error {
 func (a *Alerter) handleMessage(msg *Message) error {
 	// validate message contents
 	if err := a.validateMessage(msg); err != nil {
-		log.Errorf("%v: Unable to validate message (%v): %v", a.Identifier, msg.uuid, err.Error())
+		a.Config.EQClient.AddWithErrorLog("error",
+			fmt.Sprintf("%v: Unable to validate message %v: %v", a.Identifier, msg.uuid, err.Error()))
 		return err
 	}
 
@@ -131,8 +133,9 @@ func (a *Alerter) handleMessage(msg *Message) error {
 	}
 
 	if len(errorList) != 0 {
-		log.Warningf("%v: Ran into %v errors during alert send for %v (alerters: %v)",
-			a.Identifier, len(errorList), msg.Source, msg.Key)
+		a.Config.EQClient.AddWithErrorLog("error",
+			fmt.Sprintf("%v: Ran into %v errors during alert send for %v (alerters: %v); error list: %v",
+				a.Identifier, len(errorList), msg.Source, msg.Key, strings.Join(errorList, "; ")))
 	} else {
 		log.Debugf("%v: Successfully sent %v alert messages for %v (alerters: %v)",
 			a.Identifier, len(msg.Key), msg.uuid, msg.Key)

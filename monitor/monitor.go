@@ -128,15 +128,17 @@ func (m *Monitor) Handle(action int, monitorName, monitorConfigLocation string) 
 	// fetch fresh configuration from etcd
 	monitorConfig, err := m.fetchMonitorConfig(monitorConfigLocation)
 	if err != nil {
-		log.Errorf("%v: Unable to fetch monitor configuration for '%v' (%v): %v",
-			m.Identifier, monitorName, monitorConfigLocation, err.Error())
+		m.Config.EQClient.AddWithErrorLog("error",
+			fmt.Sprintf("%v: Unable to fetch monitor configuration for '%v' (%v): %v",
+				m.Identifier, monitorName, monitorConfigLocation, err.Error()))
 		return err
 	}
 
 	// validate monitor configuration
 	if err := m.validateMonitorConfig(monitorConfig); err != nil {
-		log.Errorf("%v: Unable to validate monitor config for '%v' (%v): %v",
-			m.Identifier, monitorName, monitorConfigLocation, err.Error())
+		m.Config.EQClient.AddWithErrorLog("error",
+			fmt.Sprintf("%v: Unable to validate monitor config for '%v' (%v): %v",
+				m.Identifier, monitorName, monitorConfigLocation, err.Error()))
 		return fmt.Errorf("Unable to validate monitor configuration for %v: %v", monitorName, err.Error())
 	}
 
@@ -145,7 +147,8 @@ func (m *Monitor) Handle(action int, monitorName, monitorConfigLocation string) 
 		log.Debugf("%v: Monitor '%v' already running. Stopping it first...", m.Identifier, monitorName)
 
 		if err := m.stop(monitorName); err != nil {
-			log.Errorf("%v: Unable to stop running monitor '%v': %v", m.Identifier, monitorName, err.Error())
+			m.Config.EQClient.AddWithErrorLog("error",
+				fmt.Sprintf("%v: Unable to stop running monitor '%v': %v", m.Identifier, monitorName, err.Error()))
 			return fmt.Errorf("Unable to stop running monitor %v: %v", monitorName, err.Error())
 		}
 	}
@@ -159,7 +162,8 @@ func (m *Monitor) Handle(action int, monitorName, monitorConfigLocation string) 
 	// start check with new monitor configuration
 	log.Debugf("%v: Starting new monitor for %v...", m.Identifier, monitorName)
 	if err := m.start(monitorName, monitorConfigLocation, monitorConfig); err != nil {
-		log.Errorf("%v: Unable to start new monitor '%v': %v", m.Identifier, monitorName, err.Error())
+		m.Config.EQClient.AddWithErrorLog("error",
+			fmt.Sprintf("%v: Unable to start new monitor '%v': %v", m.Identifier, monitorName, err.Error()))
 		return fmt.Errorf("Unable to start new monitor %v: %v", monitorName, err.Error())
 	}
 

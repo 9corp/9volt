@@ -110,3 +110,13 @@ func (c *Client) Add(key, value string) error {
 			key, value)
 	}
 }
+
+func (c *Client) AddWithErrorLog(key, value string) error {
+	log.Error(value)
+
+	if err := c.Add(key, value); err != nil {
+		return err
+	}
+
+	return nil
+}
