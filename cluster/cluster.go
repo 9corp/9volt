@@ -36,7 +36,6 @@ import (
 
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/dal"
-	"github.com/9corp/9volt/util"
 )
 
 const (
@@ -112,7 +111,7 @@ func New(cfg *config.Config, stateChan, distributeChan chan<- bool) (ICluster, e
 		Identifier:     "cluster",
 		DirectorState:  false,
 		DirectorLock:   new(sync.Mutex),
-		MemberID:       util.GetMemberID(cfg.ListenAddress),
+		MemberID:       cfg.MemberID,
 		DalClient:      dalClient,
 		Hostname:       hostname,
 		StateChan:      stateChan,

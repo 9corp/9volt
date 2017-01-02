@@ -75,6 +75,8 @@ func (a *Api) MonitorDisableHandler(rw http.ResponseWriter, r *http.Request) *ry
 		}
 	}
 
+	a.Config.EQClient.Add("api", fmt.Sprintf("Check '%v' has been set to '%v'", checkName, disableAction))
+
 	rye.WriteJSONStatus(rw, "ok", fmt.Sprintf("Successfully updated disable check state to '%v' for check '%v'",
 		disableAction, checkName), http.StatusOK)
 

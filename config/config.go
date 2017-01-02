@@ -12,6 +12,7 @@ import (
 )
 
 type Config struct {
+	MemberID      string
 	ListenAddress string
 	EtcdPrefix    string
 	EtcdMembers   []string
@@ -28,13 +29,14 @@ type serverConfig struct {
 }
 
 // Pass in the dal client in order to facilitate better/easier testing story
-func New(listenAddress, etcdPrefix string, etcdMembers []string, dalClient dal.IDal, eqClient *event.Client) *Config {
+func New(memberID, listenAddress, etcdPrefix string, etcdMembers []string, dalClient dal.IDal, eqClient *event.Client) *Config {
 	cfg := &Config{
 		ListenAddress: listenAddress,
 		EtcdPrefix:    etcdPrefix,
 		EtcdMembers:   etcdMembers,
 		DalClient:     dalClient,
 		EQClient:      eqClient,
+		MemberID:      memberID,
 	}
 
 	return cfg

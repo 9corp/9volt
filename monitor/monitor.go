@@ -101,7 +101,7 @@ func New(cfg *config.Config, messageChannel chan *alerter.Message, stateChannel 
 		Config:         cfg,
 		MessageChannel: messageChannel,
 		StateChannel:   stateChannel,
-		MemberID:       util.GetMemberID(cfg.ListenAddress),
+		MemberID:       cfg.MemberID,
 		SupportedMonitors: map[string]func(*RootMonitorConfig) IMonitor{
 			"http": NewHTTPMonitor,
 			"tcp":  NewTCPMonitor,

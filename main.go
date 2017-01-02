@@ -47,6 +47,8 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
+	memberID := util.GetMemberID(*listenAddress)
+
 	// Create an initial dal client
 	dalClient, err := dal.New(*etcdPrefix, *etcdMembers)
 	if err != nil {
@@ -54,11 +56,11 @@ func main() {
 	}
 
 	// Create an initial event queue
-	eventQueue := event.NewQueue()
+	eventQueue := event.NewQueue(memberID, dalClient)
 	eqClient := eventQueue.NewClient()
 
 	// Load our configuration
-	cfg := config.New(*listenAddress, *etcdPrefix, *etcdMembers, dalClient, eqClient)
+	cfg := config.New(memberID, *listenAddress, *etcdPrefix, *etcdMembers, dalClient, eqClient)
 
 	if err := cfg.Load(); err != nil {
 		log.Fatalf("Unable to load configuration from etcd: %v", err.Error())
@@ -150,7 +152,7 @@ func main() {
 	//
 
 	log.Infof("9volt has started! API address: %v MemberID: %v", "http://"+
-		*listenAddress, util.GetMemberID(*listenAddress))
+		*listenAddress, memberID)
 
 	wg.Wait()
 }

@@ -12,7 +12,6 @@ import (
 
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/dal"
-	"github.com/9corp/9volt/util"
 )
 
 const (
@@ -45,8 +44,8 @@ func New(cfg *config.Config, stateChan <-chan bool, distributeChan <-chan bool) 
 
 	return &Director{
 		Identifier:      "director",
-		MemberID:        util.GetMemberID(cfg.ListenAddress),
 		Config:          cfg,
+		MemberID:        cfg.MemberID,
 		StateChan:       stateChan,
 		DistributeChan:  distributeChan,
 		StateLock:       &sync.Mutex{},
