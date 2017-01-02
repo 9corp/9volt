@@ -145,15 +145,17 @@ func (c *Cluster) runDirectorMonitor() {
 	for {
 		directorJSON, err := c.getState()
 		if err != nil {
-			log.Errorf("%v-directorMonitor: Unable to fetch director state: %v",
-				c.Identifier, err.Error())
+			c.Config.EQClient.AddWithErrorLog("error",
+				fmt.Sprintf("%v-directorMonitor: Unable to fetch director state: %v",
+					c.Identifier, err.Error()))
+
 			time.Sleep(time.Duration(c.Config.HeartbeatInterval))
 			continue
 		}
 
 		if err := c.handleState(directorJSON); err != nil {
-			log.Errorf("%v-directorMonitor: Unable to handle state: %v",
-				c.Identifier, err.Error())
+			c.Config.EQClient.AddWithErrorLog("error",
+				fmt.Sprintf("%v-directorMonitor: Unable to handle state: %v", c.Identifier, err.Error()))
 		}
 
 		time.Sleep(time.Duration(c.Config.HeartbeatInterval))
@@ -173,7 +175,7 @@ func (c *Cluster) runDirectorHeartbeat() {
 
 		// update */director with current state data
 		if err := c.sendDirectorHeartbeat(); err != nil {
-			log.Errorf("%v-directorHeartbeat: %v", c.Identifier, err.Error())
+			c.Config.EQClient.AddWithErrorLog("error", fmt.Sprintf("%v-directorHeartbeat: %v", c.Identifier, err.Error()))
 		} else {
 			log.Debugf("%v-directorHeartbeat: Successfully sent periodic heartbeat (MemberID: %v)",
 				c.Identifier, c.MemberID)
@@ -219,8 +221,8 @@ func (c *Cluster) runMemberMonitor() {
 		// or leaves
 		resp, err := watcher.Next(context.Background())
 		if err != nil {
-			log.Errorf("%v-memberMonitor: Unexpected watcher error: %v",
-				c.Identifier, err.Error())
+			c.Config.EQClient.AddWithErrorLog("error",
+				fmt.Sprintf("%v-memberMonitor: Unexpected watcher error: %v", c.Identifier, err.Error()))
 			continue
 		}
 
@@ -303,14 +305,15 @@ func (c *Cluster) runMemberHeartbeat() {
 			c.Identifier, err.Error())
 	}
 
-	// init finished
+	// Avoid data structure creation/existence race
 	c.initFinished <- true
 
 	for {
 		memberJSON, err := c.generateMemberJSON()
 		if err != nil {
-			log.Errorf("%v-memberHeartbeat: Unable to generate member JSON (retrying in %v): %v",
-				c.Identifier, c.Config.HeartbeatInterval.String(), err.Error())
+			c.Config.EQClient.AddWithErrorLog("error",
+				fmt.Sprintf("%v-memberHeartbeat: Unable to generate member JSON (retrying in %v): %v",
+					c.Identifier, c.Config.HeartbeatInterval.String(), err.Error()))
 			time.Sleep(time.Duration(c.Config.HeartbeatInterval))
 			continue
 		}
@@ -318,8 +321,9 @@ func (c *Cluster) runMemberHeartbeat() {
 		// set status key
 		go func(memberDir, memberJSON string) {
 			if err := c.DalClient.Set(memberDir+"/status", memberJSON, false, 0, "true"); err != nil {
-				log.Errorf("%v-memberHeartbeat: Unable to save member JSON status (retrying in %v): %v",
-					c.Identifier, c.Config.HeartbeatInterval.String(), err.Error())
+				c.Config.EQClient.AddWithErrorLog("error",
+					fmt.Sprintf("%v-memberHeartbeat: Unable to save member JSON status (retrying in %v): %v",
+						c.Identifier, c.Config.HeartbeatInterval.String(), err.Error()))
 			}
 		}(memberDir, memberJSON)
 
@@ -327,8 +331,9 @@ func (c *Cluster) runMemberHeartbeat() {
 		go func(memberDir string, ttl int) {
 			if err := c.DalClient.Refresh(memberDir, heartbeatTimeoutInt); err != nil {
 				// Not sure if this should cause a member dropout
-				log.Errorf("%v-memberHeartbeat: Unable to refresh member dir '%v' (retrying in %v): %v",
-					c.Identifier, memberDir, c.Config.HeartbeatInterval.String(), err.Error())
+				c.Config.EQClient.AddWithErrorLog("error",
+					fmt.Sprintf("%v-memberHeartbeat: Unable to refresh member dir '%v' (retrying in %v): %v",
+						c.Identifier, memberDir, c.Config.HeartbeatInterval.String(), err.Error()))
 			}
 		}(memberDir, heartbeatTimeoutInt)
 

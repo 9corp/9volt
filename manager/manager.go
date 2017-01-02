@@ -52,7 +52,8 @@ func (m *Manager) run() error {
 	m.Looper.Loop(func() error {
 		resp, err := watcher.Next(context.Background())
 		if err != nil {
-			log.Errorf("%v: Unexpected watcher error: %v", m.Identifier, err.Error())
+			m.Config.EQClient.AddWithErrorLog("error",
+				fmt.Sprintf("%v: Unexpected watcher error: %v", m.Identifier, err.Error()))
 			return err
 		}
 
@@ -71,8 +72,8 @@ func (m *Manager) run() error {
 		case "delete":
 			go m.Monitor.Handle(monitor.STOP, path.Base(resp.Node.Key), resp.Node.Value)
 		default:
-			log.Errorf("%v: Received an unrecognized action '%v' - skipping",
-				m.Identifier, resp.Action)
+			m.Config.EQClient.AddWithErrorLog("error",
+				fmt.Sprintf("%v: Received an unrecognized action '%v' - skipping", m.Identifier, resp.Action))
 			return fmt.Errorf("Unrecognized action '%v' on key %v", resp.Action, resp.Node.Key)
 		}
 

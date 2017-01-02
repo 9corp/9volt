@@ -75,7 +75,10 @@ func (d *Director) collectCheckStats() {
 		// This will *probably* be switched to utilize `state` later on.
 		checkStats, err := d.DalClient.FetchCheckStats()
 		if err != nil {
-			log.Errorf("%v-collectCheckStats: Unable to fetch check stats: %v", d.Identifier, err.Error())
+			d.Config.EQClient.AddWithErrorLog("error",
+				fmt.Sprintf("%v-collectCheckStats: Unable to fetch check stats: %v", d.Identifier, err.Error()))
+			time.Sleep(COLLECT_CHECK_STATS_INTERVAL)
+			continue
 		}
 
 		d.CheckStatsMutex.Lock()
@@ -98,7 +101,8 @@ func (d *Director) runDistributeListener() {
 		}
 
 		if err := d.distributeChecks(); err != nil {
-			log.Errorf("%v-distributeListener: Unable to distribute checks: %v", d.Identifier, err.Error())
+			d.Config.EQClient.AddWithErrorLog("error",
+				fmt.Sprintf("%v-distributeListener: Unable to distribute checks: %v", d.Identifier, err.Error()))
 		}
 	}
 }
@@ -208,7 +212,8 @@ func (d *Director) runStateListener() {
 
 			// distribute checks in case we just took over as director (or first start)
 			if err := d.distributeChecks(); err != nil {
-				log.Errorf("%v-stateListener: Unable to (re)distribute checks: %v", d.Identifier, err.Error())
+				d.Config.EQClient.AddWithErrorLog("error",
+					fmt.Sprintf("%v-stateListener: Unable to (re)distribute checks: %v", d.Identifier, err.Error()))
 			}
 		} else {
 			log.Infof("%v-stateListener: Shutting down etcd watchers", d.Identifier)

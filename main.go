@@ -55,7 +55,7 @@ func main() {
 		log.Fatalf("Unable to start initial etcd client: %v", err.Error())
 	}
 
-	// Create an initial event queue
+	// Create and start event queue
 	eventQueue := event.NewQueue(memberID, dalClient)
 	eqClient := eventQueue.NewClient()
 
@@ -132,24 +132,6 @@ func main() {
 	// start api server
 	apiServer := api.New(cfg, mwHandler, version)
 	go apiServer.Run()
-
-	// Naming convention; intended module purpose
-	//
-	// D - DONE
-	// S - SKIP
-	// P - PENDING
-	// ? - UNSURE
-	//
-	// [ P ] api       --  main API entry point
-	// [ D ] director  --  performs check distribution
-	// [ D ] manager   --  manages check lifetime
-	// [ D ] cluster   --  performs leader election; heartbeat
-	// [ ? ] fetcher   --  fetch statistics from outside sources
-	//                     (needs additional discussion)
-	// [ D ] alerter   --  send alerts to various destinations
-	// [ P ] state     --  periodically dump state to etcd [ JESSE ]
-	// [ D ] config    --  configuration validation and loading
-	//
 
 	log.Infof("9volt has started! API address: %v MemberID: %v", "http://"+
 		*listenAddress, memberID)

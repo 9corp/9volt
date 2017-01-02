@@ -4,6 +4,7 @@ package state
 
 import (
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -96,12 +97,14 @@ func (s *State) runDumper() error {
 
 			messageBlob, err := json.Marshal(v)
 			if err != nil {
-				log.Errorf("%v: Unable to marshal state message for key %v: %v", s.Identifier, k, err)
+				s.Config.EQClient.AddWithErrorLog("error",
+					fmt.Sprintf("%v: Unable to marshal state message for key %v: %v", s.Identifier, k, err))
 				continue
 			}
 
 			if err := s.Config.DalClient.Set(fullKey, string(messageBlob), false, 0, ""); err != nil {
-				log.Errorf("%v: Unable to dump state for key %v: %v", s.Identifier, k, err)
+				s.Config.EQClient.AddWithErrorLog("error",
+					fmt.Sprintf("%v: Unable to dump state for key %v: %v", s.Identifier, k, err))
 				continue
 			}
 
