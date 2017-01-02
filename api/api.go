@@ -78,5 +78,14 @@ func (a *Api) Run() {
 		a.MonitorCheckHandler,
 	})).Methods("GET")
 
+	// Events handlers
+	routes.Handle("/api/v1/event", a.MWHandler.Handle([]rye.Handler{
+		a.EventWithTypeHandler,
+	})).Methods("GET").Queries("type", "")
+
+	routes.Handle("/api/v1/event", a.MWHandler.Handle([]rye.Handler{
+		a.EventHandler,
+	})).Methods("GET")
+
 	http.ListenAndServe(a.Config.ListenAddress, routes)
 }
