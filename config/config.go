@@ -7,14 +7,18 @@ import (
 	// log "github.com/Sirupsen/logrus"
 
 	"github.com/9corp/9volt/dal"
+	"github.com/9corp/9volt/event"
 	"github.com/9corp/9volt/util"
 )
 
 type Config struct {
+	MemberID      string
 	ListenAddress string
 	EtcdPrefix    string
 	EtcdMembers   []string
 	DalClient     dal.IDal
+	EQClient      *event.Client
+
 	serverConfig
 }
 
@@ -25,12 +29,14 @@ type serverConfig struct {
 }
 
 // Pass in the dal client in order to facilitate better/easier testing story
-func New(listenAddress, etcdPrefix string, etcdMembers []string, dalClient dal.IDal) *Config {
+func New(memberID, listenAddress, etcdPrefix string, etcdMembers []string, dalClient dal.IDal, eqClient *event.Client) *Config {
 	cfg := &Config{
 		ListenAddress: listenAddress,
 		EtcdPrefix:    etcdPrefix,
 		EtcdMembers:   etcdMembers,
 		DalClient:     dalClient,
+		EQClient:      eqClient,
+		MemberID:      memberID,
 	}
 
 	return cfg

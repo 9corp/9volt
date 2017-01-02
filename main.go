@@ -14,6 +14,7 @@ import (
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/dal"
 	"github.com/9corp/9volt/director"
+	"github.com/9corp/9volt/event"
 	"github.com/9corp/9volt/manager"
 	"github.com/9corp/9volt/state"
 	"github.com/9corp/9volt/util"
@@ -46,14 +47,20 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
+	memberID := util.GetMemberID(*listenAddress)
+
 	// Create an initial dal client
 	dalClient, err := dal.New(*etcdPrefix, *etcdMembers)
 	if err != nil {
 		log.Fatalf("Unable to start initial etcd client: %v", err.Error())
 	}
 
+	// Create an initial event queue
+	eventQueue := event.NewQueue(memberID, dalClient)
+	eqClient := eventQueue.NewClient()
+
 	// Load our configuration
-	cfg := config.New(*listenAddress, *etcdPrefix, *etcdMembers, dalClient)
+	cfg := config.New(memberID, *listenAddress, *etcdPrefix, *etcdMembers, dalClient, eqClient)
 
 	if err := cfg.Load(); err != nil {
 		log.Fatalf("Unable to load configuration from etcd: %v", err.Error())
@@ -114,6 +121,11 @@ func main() {
 		log.Fatalf("Unable to complete state initialization: %v", err.Error())
 	}
 
+	// Start the event queue
+	if err := eventQueue.Start(); err != nil {
+		log.Fatalf("Unable to complete event queue initialization: %v", err.Error())
+	}
+
 	// create a new middleware handler
 	mwHandler := rye.NewMWHandler(rye.Config{})
 
@@ -140,7 +152,7 @@ func main() {
 	//
 
 	log.Infof("9volt has started! API address: %v MemberID: %v", "http://"+
-		*listenAddress, util.GetMemberID(*listenAddress))
+		*listenAddress, memberID)
 
 	wg.Wait()
 }

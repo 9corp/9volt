@@ -8,7 +8,6 @@ import (
 	"github.com/gorilla/mux"
 
 	"github.com/9corp/9volt/config"
-	"github.com/9corp/9volt/util"
 )
 
 type Api struct {
@@ -28,7 +27,7 @@ func New(cfg *config.Config, mwHandler *rye.MWHandler, version string) *Api {
 	return &Api{
 		Config:     cfg,
 		Version:    version,
-		MemberID:   util.GetMemberID(cfg.ListenAddress),
+		MemberID:   cfg.MemberID,
 		Identifier: "api",
 		MWHandler:  mwHandler,
 	}

@@ -48,7 +48,7 @@ type Message struct {
 func New(cfg *config.Config, messageChannel <-chan *Message) *Alerter {
 	return &Alerter{
 		Identifier:     "alerter",
-		MemberID:       util.GetMemberID(cfg.ListenAddress),
+		MemberID:       cfg.MemberID,
 		Config:         cfg,
 		MessageChannel: messageChannel,
 		Looper:         director.NewFreeLooper(director.FOREVER, make(chan error)),
