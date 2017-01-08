@@ -189,6 +189,15 @@ type FakeIDal struct {
 		result1 *dal.ClusterStats
 		result2 error
 	}
+	FetchEventsStub        func([]string) ([]byte, error)
+	fetchEventsMutex       sync.RWMutex
+	fetchEventsArgsForCall []struct {
+		arg1 []string
+	}
+	fetchEventsReturns struct {
+		result1 []byte
+		result2 error
+	}
 	invocations map[string][][]interface{}
 }
 
@@ -883,6 +892,46 @@ func (fake *FakeIDal) GetClusterStatsReturns(result1 *dal.ClusterStats, result2 
 	fake.GetClusterStatsStub = nil
 	fake.getClusterStatsReturns = struct {
 		result1 *dal.ClusterStats
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeIDal) FetchEvents(arg1 []string) ([]byte, error) {
+	var arg1Copy []string
+	if arg1 != nil {
+		arg1Copy = make([]string, len(arg1))
+		copy(arg1Copy, arg1)
+	}
+	fake.fetchEventsMutex.Lock()
+	fake.fetchEventsArgsForCall = append(fake.fetchEventsArgsForCall, struct {
+		arg1 []string
+	}{arg1Copy})
+	fake.guard("FetchEvents")
+	fake.invocations["FetchEvents"] = append(fake.invocations["FetchEvents"], []interface{}{arg1Copy})
+	fake.fetchEventsMutex.Unlock()
+	if fake.FetchEventsStub != nil {
+		return fake.FetchEventsStub(arg1)
+	} else {
+		return fake.fetchEventsReturns.result1, fake.fetchEventsReturns.result2
+	}
+}
+
+func (fake *FakeIDal) FetchEventsCallCount() int {
+	fake.fetchEventsMutex.RLock()
+	defer fake.fetchEventsMutex.RUnlock()
+	return len(fake.fetchEventsArgsForCall)
+}
+
+func (fake *FakeIDal) FetchEventsArgsForCall(i int) []string {
+	fake.fetchEventsMutex.RLock()
+	defer fake.fetchEventsMutex.RUnlock()
+	return fake.fetchEventsArgsForCall[i].arg1
+}
+
+func (fake *FakeIDal) FetchEventsReturns(result1 []byte, result2 error) {
+	fake.FetchEventsStub = nil
+	fake.fetchEventsReturns = struct {
+		result1 []byte
 		result2 error
 	}{result1, result2}
 }
