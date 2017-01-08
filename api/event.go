@@ -9,7 +9,7 @@ import (
 )
 
 func (a *Api) EventHandler(rw http.ResponseWriter, r *http.Request) *rye.Response {
-	eventData, err := a.Config.DalClient.FetchEvents()
+	eventData, err := a.Config.DalClient.FetchEvents([]string{})
 	if err != nil {
 		return &rye.Response{
 			Err:        fmt.Errorf("Unable to fetch event data: %v", err),
@@ -30,7 +30,7 @@ func (a *Api) EventWithTypeHandler(rw http.ResponseWriter, r *http.Request) *rye
 
 	types := strings.Split(vals["type"][0], ",")
 
-	eventData, err := a.Config.DalClient.FetchEventsWithTypes(types)
+	eventData, err := a.Config.DalClient.FetchEvents(types)
 	if err != nil {
 		return &rye.Response{
 			Err:        fmt.Errorf("Unable to fetch event data: %v", err),
