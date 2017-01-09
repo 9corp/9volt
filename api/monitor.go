@@ -16,6 +16,13 @@ import (
 
 type fullMonitorConfig map[string]*json.RawMessage
 
+// @Title Fetch Monitor Configuration
+// @Description Fetch all (or specific) monitor configuration(s) from etcd
+// @Accept  json
+// @Param   check     path    string     false        "Specific check name"
+// @Success 200 {array}  fullMonitorConfig
+// @Failure 500 {object} rye.JSONStatus
+// @Router /monitor/{check} [get]
 func (a *Api) MonitorHandler(rw http.ResponseWriter, r *http.Request) *rye.Response {
 	data, err := a.Config.DalClient.Get("monitor", &dal.GetOptions{
 		Recurse: true,
@@ -49,6 +56,14 @@ func (a *Api) MonitorHandler(rw http.ResponseWriter, r *http.Request) *rye.Respo
 	return nil
 }
 
+// @Title Set Disabled State for Given Monitor
+// @Description Enable or disable a specific monitor configuration (changes are immediate)
+// @Accept  json
+// @Param   check     path    string     true        "Specific check name"
+// @Param   disable     query    string     false        "Disable/enable a check"
+// @Success 200 {array}  rye.JSONStatus
+// @Failure 500 {object} rye.JSONStatus
+// @Router /monitor/{check} [get]
 func (a *Api) MonitorDisableHandler(rw http.ResponseWriter, r *http.Request) *rye.Response {
 	checkName := mux.Vars(r)["check"]
 
