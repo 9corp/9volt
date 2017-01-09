@@ -37,6 +37,9 @@ alerter:
     options:
       to: daniel.selans@gmail.com
       address: smtp.gmail.com:587
+      username: user
+      password: pass
+      auth: plain | md5
 
 monitor:
   exec-check:
