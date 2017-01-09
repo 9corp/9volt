@@ -6,8 +6,18 @@ import (
 	"strings"
 
 	"github.com/InVisionApp/rye"
+
+	_ "github.com/9corp/9volt/state"
 )
 
+// @Title Fetch Check State Data
+// @Description Fetch check state data including latest check status, ownership, last check timestamp;
+//              optionally filter the state data by checks that contain one or more tags.
+// @Accept  json
+// @Param   tags     query    string     false        "One or more tags (comma separated)"
+// @Success 200 {array}  state.Message
+// @Failure 500 {object} rye.JSONStatus
+// @Router /state [get]
 func (a *Api) StateHandler(rw http.ResponseWriter, r *http.Request) *rye.Response {
 	stateData, err := a.Config.DalClient.FetchState()
 	if err != nil {

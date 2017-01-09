@@ -1,3 +1,13 @@
+// @APIVersion 1.0.0
+// @APITitle 9volt API
+// @APIDescription 9volt's API for fetching check state, event data and cluster information
+// @Contact daniel.selans@gmail.com
+// @License MIT
+// @LicenseUrl https://opensource.org/licenses/MIT
+// @BasePath /api/v1
+// @SubApi Cluster State [/cluster]
+// @SubApi Monitor Configuration [/monitor]
+
 package api
 
 import (
