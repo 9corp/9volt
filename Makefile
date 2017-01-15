@@ -4,7 +4,7 @@
 # - profiler target(s)
 #
 
-BIN             = auth-api
+BIN             = 9volt
 OUTPUT_DIR      = build
 TMP_DIR        := .tmp
 RELEASE_VER    := $(shell git rev-parse --short HEAD)
