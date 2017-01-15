@@ -107,6 +107,5 @@ So, with 1,000 active checks (running on a 10s interval):
 * Max rss memory 96MB (and then went down to ~82MB)
 * Thread usage averaging at 17
 
-TODO: Provide additional benchmark/performance metrics from a production `9volt` use case.
-
-TODO2: Provide folks with a way to run their own benchmarks.
+_TODO1_: Provide additional benchmark/performance metrics from a production `9volt` use case. 
+_TODO2_: Provide folks with a way to run their own benchmarks.
