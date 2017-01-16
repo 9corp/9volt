@@ -55,7 +55,7 @@ var _ = Describe("cluster", func() {
 		PIt("should error if dal fails to create member dir")
 		PIt("should error if unable to generate initial member status")
 		PIt("should error if dal fails to save initial member status")
-		Pit("should error if dal fails to create initial member config dir")
+		PIt("should error if dal fails to create initial member config dir")
 	})
 
 	Context("runMemberHeartbeat", func() {

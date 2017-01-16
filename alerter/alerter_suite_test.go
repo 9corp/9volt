@@ -1,4 +1,4 @@
-package Alerter
+package alerter
 
 import (
 	. "github.com/onsi/ginkgo"

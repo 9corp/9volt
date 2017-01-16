@@ -30,7 +30,7 @@ var _ = Describe("alerter", func() {
 		PIt("should log and append error to errorList if unable to load specific alerter config")
 		PIt("should log and append error to errorList if unable to complete alerter specific validate")
 		PIt("should log and append error to errorList if alerter message send fails")
-		Pit("should add event and log error if errorList is not empty")
+		PIt("should add event and log error if errorList is not empty")
 	})
 
 	Context("loadAlerterConfig", func() {
