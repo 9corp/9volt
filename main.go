@@ -24,6 +24,7 @@ var (
 	listenAddress = kingpin.Flag("listen", "Address for 9volt's API to listen on").Short('l').Default("0.0.0.0:8080").String()
 	etcdPrefix    = kingpin.Flag("etcd-prefix", "Prefix that 9volt's configuration is stored under in etcd").Short('p').Default("9volt").String()
 	etcdMembers   = kingpin.Flag("etcd-members", "List of etcd cluster members").Short('e').Required().Strings()
+	debugUI       = kingpin.Flag("debug-ui", "Debug the user interface locally").Short('u').Bool()
 	debug         = kingpin.Flag("debug", "Enable debug mode").Short('d').Bool()
 
 	version string
@@ -129,8 +130,14 @@ func main() {
 	// create a new middleware handler
 	mwHandler := rye.NewMWHandler(rye.Config{})
 
+	// determines whether or not to use statik or debug interactively
+	debugUserInterface := false
+	if *debugUI {
+		debugUserInterface = true
+	}
+
 	// start api server
-	apiServer := api.New(cfg, mwHandler, version)
+	apiServer := api.New(cfg, mwHandler, version, debugUserInterface)
 	go apiServer.Run()
 
 	log.Infof("9volt has started! API address: %v MemberID: %v", "http://"+

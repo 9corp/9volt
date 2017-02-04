@@ -18,10 +18,10 @@ const Root = ({store,history}) => {
         <Provider store={store}>
             <Router history={history}>
                 <Route component={App}>
-                    <Route path="/">
+                    <Route path="/ui">
                         <IndexRoute component={HomeView}/>
-                        <Route path="/Status" component={StatusView}/>
-                        <Route path="/Settings" component={SettingsView}/>
+                        <Route path="/ui/Status" component={StatusView}/>
+                        <Route path="/ui/Settings" component={SettingsView}/>
                     </Route>
                 </Route>
             </Router>

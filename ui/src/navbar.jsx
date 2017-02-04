@@ -6,9 +6,9 @@ import {push} from 'react-router-redux';
 import { Menu, Icon, Sidebar, Image, Header, Segment } from 'semantic-ui-react'
 
 const items = [
-  {key:"home",icon:"home",title:"9-Volt",path:"/"},
-  {key:"status",icon:"bar chart",title:"Status",path:"/Status"},
-  {key:"settings",icon:"settings",title:"Settings",path:"/Settings"}
+  {key:"home",icon:"home",title:"9-Volt",path:"/ui"},
+  {key:"status",icon:"bar chart",title:"Status",path:"/ui/Status"},
+  {key:"settings",icon:"settings",title:"Settings",path:"/ui/Settings"}
 ];
 
 class NavBar extends React.Component {

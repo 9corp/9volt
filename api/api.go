@@ -26,6 +26,7 @@ type Api struct {
 	MemberID   string
 	Identifier string
 	MWHandler  *rye.MWHandler
+	DebugUI    bool
 }
 
 type JSONStatus struct {
@@ -33,13 +34,14 @@ type JSONStatus struct {
 	Message string
 }
 
-func New(cfg *config.Config, mwHandler *rye.MWHandler, version string) *Api {
+func New(cfg *config.Config, mwHandler *rye.MWHandler, version string, debugUI bool) *Api {
 	return &Api{
 		Config:     cfg,
 		Version:    version,
 		MemberID:   cfg.MemberID,
 		Identifier: "api",
 		MWHandler:  mwHandler,
+		DebugUI:    debugUI,
 	}
 }
 
@@ -96,6 +98,30 @@ func (a *Api) Run() {
 	routes.Handle("/api/v1/event", a.MWHandler.Handle([]rye.Handler{
 		a.EventHandler,
 	})).Methods("GET")
+
+	if a.DebugUI {
+		log.Info("Setting up ui in dev mode.")
+		routes.PathPrefix("/dist").Handler(a.MWHandler.Handle([]rye.Handler{
+			rye.MiddlewareRouteLogger(),
+			a.uiDistHandler,
+		}))
+
+		routes.PathPrefix("/ui").Handler(a.MWHandler.Handle([]rye.Handler{
+			rye.MiddlewareRouteLogger(),
+			a.uiHandler,
+		}))
+	} else {
+		log.Info("Setting up ui in statik mode.")
+		routes.PathPrefix("/dist").Handler(a.MWHandler.Handle([]rye.Handler{
+			rye.MiddlewareRouteLogger(),
+			a.uiDistStatikHandler,
+		}))
+
+		routes.PathPrefix("/ui").Handler(a.MWHandler.Handle([]rye.Handler{
+			rye.MiddlewareRouteLogger(),
+			a.uiStatikHandler,
+		}))
+	}
 
 	http.ListenAndServe(a.Config.ListenAddress, routes)
 }
