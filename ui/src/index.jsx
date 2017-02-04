@@ -3,23 +3,15 @@ import ReactDOM from 'react-dom';
 import {Provider} from 'react-redux';
 import { browserHistory, Router, Route, IndexRoute } from 'react-router';
 import { syncHistoryWithStore } from 'react-router-redux'
-import NavBar from './navbar';
-import {setStore} from './store';
-import {HomeView} from './views';
 
-// import "./styles/bootstrap.min.css
+import {setStore} from './store';
+import {HomeView,StatusView,SettingsView} from './views';
+import {App} from './app';
+
+import '../semantic/dist/semantic.min.css';
 
 const store = setStore(window.__INITIAL_STATE__,browserHistory);
 const history = syncHistoryWithStore(browserHistory,store);
-
-const App = ({children}) => {
-    return (
-        <div>
-            <NavBar />
-            {children}
-        </div>
-    );
-}
     
 const Root = ({store,history}) => {
     return (
@@ -28,6 +20,8 @@ const Root = ({store,history}) => {
                 <Route component={App}>
                     <Route path="/">
                         <IndexRoute component={HomeView}/>
+                        <Route path="/Status" component={StatusView}/>
+                        <Route path="/Settings" component={SettingsView}/>
                     </Route>
                 </Route>
             </Router>

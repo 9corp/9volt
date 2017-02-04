@@ -3,9 +3,43 @@ import {connect} from 'react-redux'
 import {Link} from 'react-router';
 import {push} from 'react-router-redux';
 
-const NavBar = () =>
-  <div>
-    NavBar
-  </div>;
+import { Menu, Icon, Sidebar, Image, Header, Segment } from 'semantic-ui-react'
 
-export default connect()(NavBar)
+const items = [
+  {key:"home",icon:"home",title:"9-Volt",path:"/"},
+  {key:"status",icon:"bar chart",title:"Status",path:"/Status"},
+  {key:"settings",icon:"settings",title:"Settings",path:"/Settings"}
+];
+
+class NavBar extends React.Component {
+
+  pushPath = (dispatch,path,name) => {
+      dispatch(push(path));
+  };
+
+  render() {
+    const {dispatch,currentRoute} = this.props;
+
+    return (
+      <Menu color='teal' icon='labeled' vertical inverted fixed="left">
+        { items.map(i => {
+            const {key, icon, title, path} = i;
+            return (
+              <Menu.Item key={key} name={key} active={currentRoute === path} onClick={() => this.pushPath(dispatch,path,key)}>
+                <Icon name={icon} />
+                {title}
+              </Menu.Item>
+            );
+          })
+        }
+      </Menu>     
+    );
+  }
+}
+
+const mapStateToProps = (state) => ({
+  currentRoute: state.routing.locationBeforeTransitions.pathname
+});
+
+
+export default connect(mapStateToProps)(NavBar)
