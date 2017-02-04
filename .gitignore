@@ -2,3 +2,7 @@
 scripts/test.sh
 build/*
 node_modules
+
+ui/dist
+
+!ui/dist/index.html
