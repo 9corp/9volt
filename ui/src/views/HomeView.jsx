@@ -2,15 +2,12 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import {connect} from 'react-redux';
 
-class HomeView extends React.Component {
-
-  render () {
+const HomeView = () => {
     return (
-      <div>
-        HomeView
-      </div>
+        <div>
+            Welcome to 9volt!
+        </div>
     );
-  }
-}
+};
 
 export default connect()(HomeView)

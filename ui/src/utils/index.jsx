@@ -1,4 +1,4 @@
-export function createReducer(initialState, reducerMap) {
+export const createReducer = (initialState, reducerMap) => {
     return (state = initialState, action) => {
         const reducer = reducerMap[action.type];
 
