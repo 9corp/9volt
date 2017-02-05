@@ -18,7 +18,7 @@ TEST_PACKAGES      := $(shell go list ./... | grep -v vendor | grep -v fakes | g
 .DEFAULT_GOAL := help
 
 run: ## Run application (without building)
-	go run *.go -d -e http://localhost:2379
+	go run *.go -d -u -e http://localhost:2379
 
 all: test build docker ## Test, build and docker image build
 

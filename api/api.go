@@ -100,7 +100,7 @@ func (a *Api) Run() {
 	})).Methods("GET")
 
 	if a.DebugUI {
-		log.Info("Setting up ui in dev mode.")
+		log.Info("ui: local debug mode (from /ui/dist)")
 		routes.PathPrefix("/dist").Handler(a.MWHandler.Handle([]rye.Handler{
 			rye.MiddlewareRouteLogger(),
 			a.uiDistHandler,
@@ -111,7 +111,7 @@ func (a *Api) Run() {
 			a.uiHandler,
 		}))
 	} else {
-		log.Info("Setting up ui in statik mode.")
+		log.Info("ui: statik mode (from statik.go)")
 		routes.PathPrefix("/dist").Handler(a.MWHandler.Handle([]rye.Handler{
 			rye.MiddlewareRouteLogger(),
 			a.uiDistStatikHandler,

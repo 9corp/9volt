@@ -17,6 +17,7 @@ var config = {
       {test: /\.(js|jsx)$/,include : APP_DIR, loader : 'babel'},
       {test: /\.json$/, loader: "json"},
       {test: /\.css$/, loader: "style-loader!css-loader"},
+      {test: /\.styl$/, loader: 'style-loader!css-loader!stylus-loader' },
       {test: /\.less$/, loader: 'style-loader!css-loader!less-loader'},
       {test: /\.(png|jpg|ico)$/, loader: 'url-loader?limit=100000'},
       {test: /\.woff(2)?(\?v=\d+\.\d+\.\d+)?$/, loader: "url?limit=10000&mimetype=application/font-woff&name=[name].[ext]" },

@@ -5,7 +5,7 @@ import { browserHistory, Router, Route, IndexRoute } from 'react-router';
 import { syncHistoryWithStore } from 'react-router-redux'
 
 import {setStore} from './store';
-import {HomeView,StatusView,SettingsView} from './views';
+import {HomeView,StatusView,ClusterView,EventsView} from './views';
 import {App} from './app';
 
 import '../semantic/dist/semantic.min.css';
@@ -21,7 +21,8 @@ const Root = ({store,history}) => {
                     <Route path="/ui">
                         <IndexRoute component={HomeView}/>
                         <Route path="/ui/Status" component={StatusView}/>
-                        <Route path="/ui/Settings" component={SettingsView}/>
+                        <Route path="/ui/Cluster" component={ClusterView}/>
+                        <Route path="/ui/Events" component={EventsView}/>
                     </Route>
                 </Route>
             </Router>

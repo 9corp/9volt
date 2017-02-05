@@ -8,7 +8,8 @@ import { Menu, Icon, Sidebar, Image, Header, Segment } from 'semantic-ui-react'
 const items = [
   {key:"home",icon:"home",title:"9-Volt",path:"/ui"},
   {key:"status",icon:"bar chart",title:"Status",path:"/ui/Status"},
-  {key:"settings",icon:"settings",title:"Settings",path:"/ui/Settings"}
+  {key:"cluster",icon:"grid layout",title:"Cluster",path:"/ui/Cluster"},
+  {key:"events",icon:"browser",title:"Events",path:"/ui/Events"}
 ];
 
 class NavBar extends React.Component {
@@ -21,7 +22,7 @@ class NavBar extends React.Component {
     const {dispatch,currentRoute} = this.props;
 
     return (
-      <Menu color='teal' icon='labeled' vertical inverted fixed="left">
+      <Menu color='blue' icon='labeled' vertical inverted fixed="left">
         { items.map(i => {
             const {key, icon, title, path} = i;
             return (
