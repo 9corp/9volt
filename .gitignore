@@ -1,3 +1,9 @@
 .DS_Store
 scripts/test.sh
 build/*
+node_modules
+.vscode
+debug
+ui/dist
+
+!ui/dist/index.html

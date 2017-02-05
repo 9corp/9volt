@@ -267,6 +267,18 @@
 			"revisionTime": "2016-05-16T22:24:31Z"
 		},
 		{
+			"checksumSHA1": "5tcUk2xjaGGHM0d1uU2aXKmvtxk=",
+			"path": "github.com/rakyll/statik",
+			"revision": "a2b9c3533409cccb4bb188346bcfc789629a424d",
+			"revisionTime": "2017-01-07T02:50:54Z"
+		},
+		{
+			"checksumSHA1": "O0asenq7jOGImefcXVxJvBrNxu4=",
+			"path": "github.com/rakyll/statik/fs",
+			"revision": "a2b9c3533409cccb4bb188346bcfc789629a424d",
+			"revisionTime": "2017-01-07T02:50:54Z"
+		},
+		{
 			"checksumSHA1": "jEZSFOoC5WBhJHP+LDBw8+Goatg=",
 			"path": "github.com/relistan/go-director",
 			"revision": "9273dae8c839a114aa4472165f84e057d5b12e09",
