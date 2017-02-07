@@ -51,7 +51,7 @@ monitor:
       - hello
       - world
     interval: 10s
-    return-code: 1
+    return-code: 0
     expect: world
     warning-threshold: 1
     critical-threshold: 3
@@ -62,6 +62,45 @@ monitor:
     tags:
       - dbservers
       - mysql
+
+  basic-http-check:
+    type: http
+    description: "basic http status code check"
+    host: cloudsy.com
+    timeout: 5s
+    interval: 10s
+    port: 80
+    status-code: 200
+    tags:
+      - team-core
+      - golang
+    warning-threshold: 1
+    critical-threshold: 3
+    warning-alerter:
+      - primary-slack
+    critical-alerter:
+      - primary-slack
+      - primary-pagerduty
+
+  # ssh-expect-ssh-check:
+  #   type: tcp
+  #   description: "remote tcp check with expect"
+  #   host: cloudsy.com
+  #   timeout: 5s
+  #   interval: 10s
+  #   disable: true
+  #   expect: OpenSSH
+  #   port: 22
+  #   tags:
+  #     - team-core
+  #     - golang
+  #   warning-threshold: 1
+  #   critical-threshold: 3
+  #   warning-alerter:
+  #     - secondary-slack
+  #   critical-alerter:
+  #     - secondary-slack
+  #     - primary-pagerduty
 
   # ssh-tcp-check:
   #   type: tcp
