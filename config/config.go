@@ -31,6 +31,10 @@ type serverConfig struct {
 
 // Pass in the dal client in order to facilitate better/easier testing story
 func New(memberID, listenAddress, etcdPrefix string, etcdMembers, tags []string, dalClient dal.IDal, eqClient *event.Client) *Config {
+	if tags == nil {
+		tags = make([]string, 0)
+	}
+
 	cfg := &Config{
 		ListenAddress: listenAddress,
 		EtcdPrefix:    etcdPrefix,
