@@ -56,7 +56,9 @@ API documentation can be found [here](docs/api/README.md).
 
 ### Minimum requirements (can handle ~1,000-3,000 <10s interval checks)
 - 1 x 9volt instance (1 core, 256MB RAM)
-- 1 x etcd node (1 core, 512MB RAM)
+- 1 x etcd node (1 core, 256MB RAM)
+
+*Note* In the minimum configuration, you *could* run both `9volt` and `etcd` on the same node.
 
 ### Recommended (production) requirements (can handle 10,000+ <10s interval checks)
 - 3 x 9volt instances (2+ cores, 512MB RAM)
