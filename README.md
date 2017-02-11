@@ -54,13 +54,13 @@ This will produce output similar to this (and will be also available in the even
 ### API
 API documentation can be found [here](docs/api/README.md).
 
-### Recommended requirements
-- 3 x 9volt instances (4+ cores, 8GB RAM each)
-- 1 x 5-node etcd cluster (2+ cores, 4GB RAM each)
+### Minimum requirements (can handle ~1,000-3,000 <10s interval checks)
+- 1 x 9volt instance (1 core, 256MB RAM)
+- 1 x etcd node (1 core, 512MB RAM)
 
-### Minimum requirements
-- 1 x 9volt instance (1 core, 512MB RAM)
-- 1 x etcd node (1 core, 1GB RAM)
+### Recommended (production) requirements (can handle 10,000+ <10s interval checks)
+- 3 x 9volt instances (2+ cores, 512MB RAM)
+- 3 x etcd nodes (2+ cores, 1GB RAM)
 
 ### Docs
 Read through the [docs dir](docs/).
