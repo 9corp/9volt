@@ -33,7 +33,8 @@ While there are a bunch of solutions for monitoring and alerting using time seri
 - Install/setup `etcd`
 - Download latest `9volt` release
 - For first time setup, run `./scripts/setup.sh`
-- Start server: `./9volt -e http://etcd-server-1.example.com:2379 http://etcd-server-2.example.com:2379 http://etcd-server-3.example.com:2379`
+- Start server: `./9volt server -e http://etcd-server-1.example.com:2379 -e http://etcd-server-2.example.com:2379 -e http://etcd-server-3.example.com:2379`
+- Optional: use `9volt cfg` for managing configs
 - Optional: add `9volt` to be managed by `supervisord`, `upstart` or some other process manager
 
 ### H/A and scaling
@@ -63,6 +64,15 @@ API documentation can be found [here](docs/api/README.md).
 ### Recommended (production) requirements (can handle 10,000+ <10s interval checks)
 - 3 x 9volt instances (2+ cores, 512MB RAM)
 - 3 x etcd nodes (2+ cores, 1GB RAM)
+
+### Configuration
+While you can manage 9volt alerter and monitor configs via the API, another approach to config management is to use the built-in config utility (`9volt cfg <flags>`).
+
+This utility allows you to scan a given directory for any YAML files that resemble 9volt configs (_the file must contain either 'monitor' or 'alerter' sections_) and it will automatically parse, validate and push them to your etcd server(s).
+
+By default, the utility will keep your local configs **in sync** with your etcd server(s). In other words, if the utility comes across a config in etcd that does not exist locally (in config(s)), it will remove the config entry from etcd (and vice versa). This functionality can be turned off by flipping the `--nosync` flag.
+
+![cfg run](/assets/cfg-run.png?raw=true)
 
 ### Docs
 Read through the [docs dir](docs/).

@@ -63,6 +63,22 @@ build/ui: ui
 	(cd ui && npm install && npm run build)
 	statik -src=./ui/dist
 
+build/release: semvercheck build/linux build/darwin ## Prepare a build
+	mkdir $(OUTPUT_DIR)/9volt-$(SEMVER)-darwin
+	mkdir $(OUTPUT_DIR)/9volt-$(SEMVER)-linux
+	mv $(OUTPUT_DIR)/$(BIN)-darwin $(OUTPUT_DIR)/9volt-$(SEMVER)-darwin/$(BIN)
+	mv $(OUTPUT_DIR)/$(BIN)-linux $(OUTPUT_DIR)/9volt-$(SEMVER)-linux/$(BIN)
+	cp -prf docs/example-configs $(OUTPUT_DIR)/9volt-$(SEMVER)-darwin/
+	cp -prf docs/example-configs $(OUTPUT_DIR)/9volt-$(SEMVER)-linux/
+	cd $(OUTPUT_DIR) && tar -czvf 9volt-$(SEMVER)-darwin.tgz 9volt-$(SEMVER)-darwin/
+	cd $(OUTPUT_DIR) && tar -czvf 9volt-$(SEMVER)-linux.tgz 9volt-$(SEMVER)-linux/
+	@echo "A new release has been created!"
+
+semvercheck:
+ifeq ($(SEMVER),)
+	$(error 'SEMVER' must be set)
+endif
+
 clean: clean/darwin clean/linux ## Remove all build artifacts
 
 clean/darwin: ## Remove darwin build artifacts

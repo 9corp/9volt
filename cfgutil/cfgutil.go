@@ -1,4 +1,5 @@
-package config
+// This pkg is used by the `9volt cfg` portion of the tool
+package cfgutil
 
 import (
 	"encoding/json"
@@ -12,7 +13,7 @@ import (
 	"github.com/ghodss/yaml"
 )
 
-type Config struct {
+type CfgUtil struct {
 	Dir string
 }
 
@@ -24,13 +25,13 @@ type FullConfigs struct {
 type YAMLFileBlob map[string]map[string]interface{}
 
 // Instantiate a new Config client; ensure the given directory exists (and is a directory)
-func New(dir string) (*Config, error) {
+func New(dir string) (*CfgUtil, error) {
 	// Verify if the dir exists (or is a dir)
 	if err := validateDir(dir); err != nil {
 		return nil, err
 	}
 
-	return &Config{
+	return &CfgUtil{
 		Dir: dir,
 	}, nil
 }
@@ -38,7 +39,7 @@ func New(dir string) (*Config, error) {
 // Recursively walk through 'dir', find any .yaml files and verify that they are
 // in fact files containing valid YAML. If they do not contain valid YAML, skip
 // file and display warning.
-func (c *Config) Fetch() ([]string, error) {
+func (c *CfgUtil) Fetch() ([]string, error) {
 	files := make([]string, 0)
 	err := filepath.Walk(c.Dir, func(path string, info os.FileInfo, err error) error {
 		if !strings.HasSuffix(path, ".yaml") {
@@ -79,7 +80,7 @@ func (c *Config) Fetch() ([]string, error) {
 //
 // Structure for MonitorConfigs and AlerterConfigs is a map where the key is the
 // keyname for the config and the vaue is the JSON blob as a byte slice.
-func (c *Config) Parse(files []string) (*FullConfigs, error) {
+func (c *CfgUtil) Parse(files []string) (*FullConfigs, error) {
 	fullConfigs := &FullConfigs{
 		AlerterConfigs: make(map[string][]byte, 0),
 		MonitorConfigs: make(map[string][]byte, 0),
@@ -142,7 +143,7 @@ func (c *Config) Parse(files []string) (*FullConfigs, error) {
 }
 
 // Convert YAML blob -> JSON *after* validation
-func (c *Config) convertToJSON(data map[string]interface{}) (map[string][]byte, error) {
+func (c *CfgUtil) convertToJSON(data map[string]interface{}) (map[string][]byte, error) {
 	converted := make(map[string][]byte, 0)
 
 	for name, yamlBlob := range data {
@@ -159,12 +160,12 @@ func (c *Config) convertToJSON(data map[string]interface{}) (map[string][]byte, 
 
 // Validate given type config
 // data == configKey : yaml data; monitor or alerter type determined by 'configType'
-func (c *Config) validate(configType string, data map[string]interface{}) error {
+func (c *CfgUtil) validate(configType string, data map[string]interface{}) error {
 	// TODO: perform validation according to the type of configType we got
 	return nil
 }
 
-func (c *Config) containsConfigs(data []byte) ([]string, YAMLFileBlob, error) {
+func (c *CfgUtil) containsConfigs(data []byte) ([]string, YAMLFileBlob, error) {
 	// try to unmarshal entire file and verify if it contains 'alerter' or 'monitor'
 	var yamlData YAMLFileBlob
 
