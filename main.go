@@ -218,8 +218,6 @@ func runCfgUtil() {
 }
 
 func main() {
-	fmt.Println(command)
-
 	switch command {
 	case "server":
 		runServer()
