@@ -10,10 +10,10 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/coreos/etcd/client"
 
-	"github.com/9corp/9volt/9volt-cfg/config"
+	"github.com/9corp/9volt/cfgutil"
 )
 
-type Dal struct {
+type CfgUtilDal struct {
 	Client  client.Client
 	KeysAPI client.KeysAPI
 	Members []string
@@ -23,7 +23,7 @@ type Dal struct {
 	Nosync  bool
 }
 
-type PushStats struct {
+type CfgUtilPushStats struct {
 	MonitorAdded   int
 	AlerterAdded   int
 	MonitorSkipped int
@@ -32,7 +32,7 @@ type PushStats struct {
 	AlerterRemoved int
 }
 
-func New(members []string, prefix string, replace, dryrun, nosync bool) (*Dal, error) {
+func NewCfgUtil(members []string, prefix string, replace, dryrun, nosync bool) (*CfgUtilDal, error) {
 	etcdClient, err := client.New(client.Config{
 		Endpoints: members,
 		Transport: client.DefaultTransport,
@@ -42,7 +42,7 @@ func New(members []string, prefix string, replace, dryrun, nosync bool) (*Dal, e
 		return nil, err
 	}
 
-	return &Dal{
+	return &CfgUtilDal{
 		Client:  etcdClient,
 		KeysAPI: client.NewKeysAPI(etcdClient),
 		Members: members,
@@ -53,7 +53,7 @@ func New(members []string, prefix string, replace, dryrun, nosync bool) (*Dal, e
 	}, nil
 }
 
-func (d *Dal) Push(fullConfigs *config.FullConfigs) (*PushStats, []string) {
+func (d *CfgUtilDal) Push(fullConfigs *cfgutil.FullConfigs) (*CfgUtilPushStats, []string) {
 	errorList := make([]string, 0)
 
 	mAdded, mSkipped, err := d.push("monitor", fullConfigs.MonitorConfigs)
@@ -68,7 +68,7 @@ func (d *Dal) Push(fullConfigs *config.FullConfigs) (*PushStats, []string) {
 		log.Errorf("Unable to complete alerter config push: %v", err.Error())
 	}
 
-	pushStats := &PushStats{
+	pushStats := &CfgUtilPushStats{
 		MonitorAdded:   mAdded,
 		AlerterAdded:   aAdded,
 		MonitorSkipped: mSkipped,
@@ -92,7 +92,7 @@ func (d *Dal) Push(fullConfigs *config.FullConfigs) (*PushStats, []string) {
 }
 
 // Remove any configs from etcd that are not defined in fullConfigs
-func (d *Dal) sync(fullConfigs *config.FullConfigs) (int, int, error) {
+func (d *CfgUtilDal) sync(fullConfigs *cfgutil.FullConfigs) (int, int, error) {
 	count := map[string]int{"monitor": 0, "alerter": 0}
 
 	etcdKeys, err := d.getEtcdKeys()
@@ -132,7 +132,7 @@ func (d *Dal) sync(fullConfigs *config.FullConfigs) (int, int, error) {
 
 // Fetch all alerter and monitor keys, return as map containing config type and
 // slice of keys
-func (d *Dal) getEtcdKeys() (map[string][]string, error) {
+func (d *CfgUtilDal) getEtcdKeys() (map[string][]string, error) {
 	keyMap := map[string][]string{
 		"alerter": make([]string, 0),
 		"monitor": make([]string, 0),
@@ -159,7 +159,7 @@ func (d *Dal) getEtcdKeys() (map[string][]string, error) {
 }
 
 // Helper for determining if a string slice contains given string
-func (d *Dal) stringSliceContains(stringSlice []string, data string) bool {
+func (d *CfgUtilDal) stringSliceContains(stringSlice []string, data string) bool {
 	for _, v := range stringSlice {
 		if v == data {
 			return true
@@ -170,7 +170,7 @@ func (d *Dal) stringSliceContains(stringSlice []string, data string) bool {
 }
 
 // Helper for fetching keys in a map
-func (d *Dal) getMapKeys(inputMap map[string][]byte) []string {
+func (d *CfgUtilDal) getMapKeys(inputMap map[string][]byte) []string {
 	keys := make([]string, len(inputMap))
 
 	for k := range inputMap {
@@ -182,7 +182,7 @@ func (d *Dal) getMapKeys(inputMap map[string][]byte) []string {
 
 // Wrapper for comparing existing value in etcd + (potentially) pushing value to etcd.
 // If d.Replace is set, value in etcd will be replaced even if it's found to match
-func (d *Dal) push(configType string, configs map[string][]byte) (int, int, error) {
+func (d *CfgUtilDal) push(configType string, configs map[string][]byte) (int, int, error) {
 	added := 0
 	skipped := 0
 
@@ -218,7 +218,7 @@ func (d *Dal) push(configType string, configs map[string][]byte) (int, int, erro
 }
 
 // Push data blob to given key in etcd; do not care about previous setting
-func (d *Dal) pushConfig(fullPath string, data []byte) error {
+func (d *CfgUtilDal) pushConfig(fullPath string, data []byte) error {
 	_, err := d.KeysAPI.Set(
 		context.Background(),
 		fullPath,
@@ -232,7 +232,7 @@ func (d *Dal) pushConfig(fullPath string, data []byte) error {
 }
 
 // Remove a given key from etcd
-func (d *Dal) remove(key string) error {
+func (d *CfgUtilDal) remove(key string) error {
 	_, err := d.KeysAPI.Delete(
 		context.Background(),
 		d.Prefix+"/"+key,
@@ -246,7 +246,7 @@ func (d *Dal) remove(key string) error {
 
 // Check if given key exists in etcd, if it does, determine if its value
 // matches new value by performing a reflect.DeepEqual().
-func (d *Dal) compare(fullPath string, data []byte) (bool, error) {
+func (d *CfgUtilDal) compare(fullPath string, data []byte) (bool, error) {
 	resp, err := d.KeysAPI.Get(context.Background(), fullPath, nil)
 	if err != nil {
 		if client.IsKeyNotFound(err) {
