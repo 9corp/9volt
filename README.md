@@ -72,6 +72,8 @@ This utility allows you to scan a given directory for any YAML files that resemb
 
 By default, the utility will keep your local configs **in sync** with your etcd server(s). In other words, if the utility comes across a config in etcd that does not exist locally (in config(s)), it will remove the config entry from etcd (and vice versa). This functionality can be turned off by flipping the `--nosync` flag.
 
+![cfg run](/assets/cfg-run.png?raw=true)
+
 ### Docs
 Read through the [docs dir](docs/).
 
