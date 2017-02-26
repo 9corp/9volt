@@ -123,6 +123,13 @@ func (d *Director) distributeChecks() error {
 		return fmt.Errorf("Unable to fetch cluster members: %v", err.Error())
 	}
 
+	members2, err := d.DalClient.GetClusterMembersWithTags()
+	if err != nil {
+		log.Errorf("Unable to fetch members with tags: %v", err)
+	}
+
+	log.Warningf("Members2 contents: %v", members2)
+
 	if len(members) == 0 {
 		return fmt.Errorf("No active cluster members found - bug?")
 	}
@@ -134,6 +141,13 @@ func (d *Director) distributeChecks() error {
 	if err != nil {
 		return fmt.Errorf("Unable to fetch all check keys: %v", err.Error())
 	}
+
+	checkKeys2, err := d.DalClient.GetCheckKeysWithTags()
+	if err != nil {
+		log.Errorf("Unable to fetch check keys with tags: %v", err)
+	}
+
+	log.Warningf("Contents of checkKeys2: %v", checkKeys2)
 
 	if len(checkKeys) == 0 {
 		return fmt.Errorf("Check configuration is empty - nothing to distribute!")
