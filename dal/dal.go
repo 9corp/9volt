@@ -353,7 +353,7 @@ func (d *Dal) GetClusterMembersWithTags() (map[string][]string, error) {
 	return memberMap, nil
 }
 
-// Helper for parsing 'member-tag' from json payload
+// Helper for parsing 'member-tag' from monitor config JSON payload
 func (d *Dal) parseMemberTag(data string) (string, error) {
 	var tmpTag struct {
 		MemberTag string `json:"member-tag"`
@@ -366,7 +366,7 @@ func (d *Dal) parseMemberTag(data string) (string, error) {
 	return tmpTag.MemberTag, nil
 }
 
-// Helper for parsing 'Tags' or 'tags' array from a JSON payload
+// Helper for parsing 'Tags' or 'tags' array from cluster member JSON payload
 func (d *Dal) parseTags(data string) ([]string, error) {
 	var tmpTags struct {
 		Tags []string
@@ -427,6 +427,7 @@ func (d *Dal) GetCheckKeysWithMemberTag() (map[string]string, error) {
 	checkKeys := make(map[string]string, 0)
 
 	for k, v := range data {
+		// TODO: Should probably bubble-up error to event stream (and not critically fail)
 		memberTag, err := d.parseMemberTag(v)
 		if err != nil {
 			return nil, fmt.Errorf("Unable to parse member-tag for check config '%v': %v", k, err)

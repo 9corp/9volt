@@ -16,6 +16,7 @@ import (
 
 const (
 	COLLECT_CHECK_STATS_INTERVAL = time.Duration(60 * time.Second)
+	UNTAGGED_MEMBER_MAP_ENTRY    = "!UNTAGGED!"
 )
 
 type IDirector interface {
@@ -118,17 +119,10 @@ func (d *Director) distributeChecks() error {
 	log.Infof("%v-distributeChecks: Performing check distribution across members in cluster", d.Identifier)
 
 	// fetch all members in cluster
-	members, err := d.DalClient.GetClusterMembers()
+	members, err := d.DalClient.GetClusterMembersWithTags()
 	if err != nil {
 		return fmt.Errorf("Unable to fetch cluster members: %v", err.Error())
 	}
-
-	members2, err := d.DalClient.GetClusterMembersWithTags()
-	if err != nil {
-		log.Errorf("Unable to fetch members with tags: %v", err)
-	}
-
-	log.Warningf("Members2 contents: %v", members2)
 
 	if len(members) == 0 {
 		return fmt.Errorf("No active cluster members found - bug?")
@@ -137,17 +131,10 @@ func (d *Director) distributeChecks() error {
 	log.Debugf("%v-distributeChecks: Distributing checks between %v cluster members", d.Identifier, len(members))
 
 	// fetch all check keys
-	checkKeys, err := d.DalClient.GetCheckKeys()
+	checkKeys, err := d.DalClient.GetCheckKeysWithMemberTag()
 	if err != nil {
 		return fmt.Errorf("Unable to fetch all check keys: %v", err.Error())
 	}
-
-	checkKeys2, err := d.DalClient.GetCheckKeysWithMemberTag()
-	if err != nil {
-		log.Errorf("Unable to fetch check keys with tags: %v", err)
-	}
-
-	log.Warningf("Contents of checkKeys2: %v", checkKeys2)
 
 	if len(checkKeys) == 0 {
 		return fmt.Errorf("Check configuration is empty - nothing to distribute!")
@@ -162,67 +149,137 @@ func (d *Director) distributeChecks() error {
 
 // Distribute checks among cluster members
 //
-// - Fetch memberlist (w/ tags)
-// - Equally distribute untagged checks across untagged members
-//     - get members without tags
-//     - get checks without tags
-//     - distribute checks
-//     - remove untagged members and untagged checks from maps
+// This is a bit ... rough. The goal is to fairly distribute checks among
+// members with (and without) node tags.
 //
-// - Convert memberlist to map[string][]string -> map[tag][]memberID
-// - Loop through memberlist k, v = tag, members
-//     - fetch checks with 'k' tag
-//     - distribute fetched checks
-//     - remove distributed checks from map
-// func (d *Director) performCheckDistribution(members, checkKeys map[string][]string) error {
-
-// }
-
-// A simple (and equal) check distributor
+// What *should* happen:
 //
-// Divide checks equally between all members; last member gets remainder of checks
-func (d *Director) performCheckDistribution(members, checkKeys []string) error {
-	checksPerMember := len(checkKeys) / len(members)
+// - Checks that do not have a 'member-tag' will be distributed among nodes that
+//   do not have any tags
+// - Checks that have tags will be distributed among nodes that have the same tag
+// - Checks that have tags but do not have a corresponding nodes with the same tag
+//   are considered 'orphaned' and are logged.
+//
+// Order of operations:
+//
+// - Convert our available member map from map[memberID][]tags -> map[tag][]memberIDs
+//   - If a member does not have any tags, set its tag to '!UNTAGGED!'
+//
+// - Loop over our new member list map
+//   - Fetch any check keys that match the currently looped tag
+//     - If the check key does NOT have a tag and the currently looped tag == '!UNTAGGED!',
+//       add it to the list of 'checks'
+//   - Determine the number of checks each node should have
+//   - Create new check references for each node
+//   - Last node gets the remainder of checks
+//
+// Note: The words 'node' and 'member' are used interchangibly here.
+func (d *Director) performCheckDistribution(members map[string][]string, checkKeys map[string]string) error {
+	memberList := d.convertMembersMap(members)
 
-	start := 0
+	for tag, memList := range memberList {
+		checks := d.filterCheckKeysByTag(checkKeys, tag)
+		checksPerMember := len(checks) / len(memList)
 
-	for memberNum := 0; memberNum < len(members); memberNum++ {
-		// Blow away any pre-existing config references
-		if err := d.DalClient.ClearCheckReferences(members[memberNum]); err != nil {
-			log.Errorf("%v: Unable to clear existing check references for member %v: %v",
-				d.Identifier, members[memberNum], err.Error())
-			return err
-		}
+		start := 0
 
-		maxChecks := start + checksPerMember
-
-		// last member gets the remainder of the checks
-		if memberNum == len(members)-1 {
-			maxChecks = len(checkKeys)
-		}
-
-		totalAssigned := 0
-
-		for i := start; i != maxChecks; i++ {
-			log.Debugf("%v: Assigning check '%v' to member '%v'", d.Identifier, checkKeys[i], members[memberNum])
-
-			if err := d.DalClient.CreateCheckReference(members[memberNum], checkKeys[i]); err != nil {
-				log.Errorf("%v: Unable to create check reference for member %v: %v",
-					d.Identifier, members[memberNum], err.Error())
+		// This chunk of code is used for figuring out the max number of checks
+		// each member in 'memList' should have and assigning each individual
+		// member their designated checks.
+		for memberNum := 0; memberNum < len(memList); memberNum++ {
+			// Blow away any pre-existing config references
+			if err := d.DalClient.ClearCheckReferences(memList[memberNum]); err != nil {
+				log.Errorf("%v: Unable to clear existing check references for member %v: %v",
+					d.Identifier, memList[memberNum], err.Error())
 				return err
 			}
 
-			totalAssigned++
+			maxChecks := start + checksPerMember
+
+			// last member gets the remainder of the checks
+			if memberNum == len(memList)-1 {
+				maxChecks = len(checks)
+			}
+
+			totalAssigned := 0
+
+			for i := start; i != maxChecks; i++ {
+				log.Debugf("%v: Assigning check '%v' to member '%v'", d.Identifier, checks[i], memList[memberNum])
+
+				if err := d.DalClient.CreateCheckReference(memList[memberNum], checks[i]); err != nil {
+					log.Errorf("%v: Unable to create check reference for member %v: %v",
+						d.Identifier, memList[memberNum], err.Error())
+					return err
+				}
+
+				totalAssigned++
+			}
+
+			// Update our start num
+			start = maxChecks
+
+			log.Debugf("%v-performCheckDistribution: Assigned %v checks to %v (tag: '%v')", d.Identifier,
+				totalAssigned, memList[memberNum], tag)
 		}
+	}
 
-		// Update our start num
-		start = maxChecks
+	if len(checkKeys) != 0 {
+		log.Warningf("%v-performCheckDistribution: Found %v orphaned checks (unable to find any fitting nodes)", d.Identifier, len(checkKeys))
 
-		log.Debugf("%v-distributeChecks: Assigned %v checks to %v", d.Identifier,
-			totalAssigned, members[memberNum])
+		for checkName, checkTag := range checkKeys {
+			log.Debugf("%v-performCheckDistribution: Unable to find fitting member for check '%v' (w/ tag '%v')", d.Identifier, checkName, checkTag)
+		}
 	}
 
 	return nil
+}
+
+// Roll through all check keys, return checks that contain given tag; update checkKeys map
+func (d *Director) filterCheckKeysByTag(checkKeys map[string]string, tag string) []string {
+	newCheckKeys := make([]string, 0)
+
+	for checkName, checkTag := range checkKeys {
+		// Append to list if check does not have a member tag and given tag matches '!UNTAGGED!'
+		if checkTag == "" && tag == UNTAGGED_MEMBER_MAP_ENTRY {
+			newCheckKeys = append(newCheckKeys, checkName)
+			defer delete(checkKeys, checkName)
+			continue
+		}
+
+		if checkTag == tag {
+			newCheckKeys = append(newCheckKeys, checkName)
+			defer delete(checkKeys, checkName)
+		}
+	}
+
+	return newCheckKeys
+}
+
+// Convert map[memberID][]tags -> map[tag][]memberIDs
+func (d *Director) convertMembersMap(members map[string][]string) map[string][]string {
+	newMemberMap := make(map[string][]string, 0)
+
+	for memberID, tags := range members {
+		if len(tags) == 0 {
+			if _, ok := newMemberMap[UNTAGGED_MEMBER_MAP_ENTRY]; !ok {
+				newMemberMap[UNTAGGED_MEMBER_MAP_ENTRY] = make([]string, 0)
+			}
+
+			newMemberMap[UNTAGGED_MEMBER_MAP_ENTRY] = append(newMemberMap[UNTAGGED_MEMBER_MAP_ENTRY], memberID)
+			continue
+		}
+
+		for _, tag := range tags {
+			// Do we already have this tag? If not, let's create the slice
+			if _, ok := newMemberMap[tag]; !ok {
+				newMemberMap[tag] = make([]string, 0)
+			}
+
+			newMemberMap[tag] = append(newMemberMap[tag], memberID)
+		}
+	}
+
+	return newMemberMap
 }
 
 func (d *Director) runStateListener() {
