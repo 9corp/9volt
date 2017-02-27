@@ -29,6 +29,7 @@ There are a number of monitor configuration attributes that work for *all* monit
 | critical-threshold | int          | how many checks must fail before critical state |
 | warning-alerter    | string array | if check enters warning state, the following alerters will be executed |
 | critical-alerter   | string array | if check enters critical state, the following alerters will be executed |
+| member-tag         | string       | allow this check to only be assigned to members that are started with the same tag |
 
 ## Monitor Types
 

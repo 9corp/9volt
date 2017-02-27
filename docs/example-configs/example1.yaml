@@ -62,6 +62,7 @@ monitor:
     tags:
       - dbservers
       - mysql
+    member-tag: eu # lock this check to specific member(s)
 
   basic-http-check:
     type: http
@@ -71,9 +72,6 @@ monitor:
     interval: 10s
     port: 80
     status-code: 200
-    tags:
-      - team-core
-      - golang
     warning-threshold: 1
     critical-threshold: 3
     warning-alerter:
@@ -81,6 +79,9 @@ monitor:
     critical-alerter:
       - primary-slack
       - primary-pagerduty
+    tags:
+      - team-core
+      - golang
 
   # ssh-expect-ssh-check:
   #   type: tcp

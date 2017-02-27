@@ -142,7 +142,7 @@ func (d *Director) distributeChecks() error {
 		return fmt.Errorf("Unable to fetch all check keys: %v", err.Error())
 	}
 
-	checkKeys2, err := d.DalClient.GetCheckKeysWithTags()
+	checkKeys2, err := d.DalClient.GetCheckKeysWithMemberTag()
 	if err != nil {
 		log.Errorf("Unable to fetch check keys with tags: %v", err)
 	}
@@ -159,6 +159,24 @@ func (d *Director) distributeChecks() error {
 
 	return nil
 }
+
+// Distribute checks among cluster members
+//
+// - Fetch memberlist (w/ tags)
+// - Equally distribute untagged checks across untagged members
+//     - get members without tags
+//     - get checks without tags
+//     - distribute checks
+//     - remove untagged members and untagged checks from maps
+//
+// - Convert memberlist to map[string][]string -> map[tag][]memberID
+// - Loop through memberlist k, v = tag, members
+//     - fetch checks with 'k' tag
+//     - distribute fetched checks
+//     - remove distributed checks from map
+// func (d *Director) performCheckDistribution(members, checkKeys map[string][]string) error {
+
+// }
 
 // A simple (and equal) check distributor
 //

@@ -24,7 +24,7 @@ type IDal interface {
 	NewWatcher(string, bool) client.Watcher
 	GetClusterMembers() ([]string, error)
 	GetCheckKeys() ([]string, error)
-	GetCheckKeysWithTags() (map[string][]string, error)
+	GetCheckKeysWithMemberTag() (map[string]string, error)
 	CreateCheckReference(string, string) error
 	ClearCheckReference(string, string) error
 	ClearCheckReferences(string) error
@@ -353,6 +353,19 @@ func (d *Dal) GetClusterMembersWithTags() (map[string][]string, error) {
 	return memberMap, nil
 }
 
+// Helper for parsing 'member-tag' from json payload
+func (d *Dal) parseMemberTag(data string) (string, error) {
+	var tmpTag struct {
+		MemberTag string `json:"member-tag"`
+	}
+
+	if err := json.Unmarshal([]byte(data), &tmpTag); err != nil {
+		return "", fmt.Errorf("Unable to complete member-tag unmarshal: %v", err)
+	}
+
+	return tmpTag.MemberTag, nil
+}
+
 // Helper for parsing 'Tags' or 'tags' array from a JSON payload
 func (d *Dal) parseTags(data string) ([]string, error) {
 	var tmpTags struct {
@@ -401,8 +414,8 @@ func (d *Dal) GetCheckKeys() ([]string, error) {
 	return checkKeys, nil
 }
 
-// Return check keys along with tags (if any); map k = check key name, v = slice of tags
-func (d *Dal) GetCheckKeysWithTags() (map[string][]string, error) {
+// Return check keys along with tags (if any); map k = check key name, v = member tag (if any)
+func (d *Dal) GetCheckKeysWithMemberTag() (map[string]string, error) {
 	data, err := d.Get("monitor/", &GetOptions{
 		Recurse: true,
 	})
@@ -411,15 +424,15 @@ func (d *Dal) GetCheckKeysWithTags() (map[string][]string, error) {
 		return nil, err
 	}
 
-	checkKeys := make(map[string][]string, 0)
+	checkKeys := make(map[string]string, 0)
 
 	for k, v := range data {
-		tags, err := d.parseTags(v)
+		memberTag, err := d.parseMemberTag(v)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to parse tags for check config '%v': %v", k, err)
+			return nil, fmt.Errorf("Unable to parse member-tag for check config '%v': %v", k, err)
 		}
 
-		checkKeys[k] = tags
+		checkKeys[k] = memberTag
 	}
 
 	return checkKeys, nil
