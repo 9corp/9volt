@@ -15,6 +15,8 @@ While there are a bunch of solutions for monitoring and alerting using time seri
 - Incredibly easy to scale to hundreds of thousands of checks
 - Uses `etcd` for all configuration
 - Real-time configuration pick-up (update etcd - `9volt` immediately picks up the change)
+- [Support for assigning checks to specific (groups of) nodes](docs/MONITOR_CONFIGS.md)
+    + Helpful for getting around network restrictions (or requiring certain checks to run from a specific region)
 - Interval based monitoring (ie. run check XYZ every 1s, 1y, 1d or even 1ms)
 - Natively supported monitors:
     - TCP
@@ -74,6 +76,8 @@ This utility allows you to scan a given directory for any YAML files that resemb
 By default, the utility will keep your local configs **in sync** with your etcd server(s). In other words, if the utility comes across a config in etcd that does not exist locally (in config(s)), it will remove the config entry from etcd (and vice versa). This functionality can be turned off by flipping the `--nosync` flag.
 
 ![cfg run](/assets/cfg-run.png?raw=true)
+
+You can look at an example of a YAML based config [here](docs/example-configs/example1.yaml).
 
 ### Docs
 Read through the [docs dir](docs/).

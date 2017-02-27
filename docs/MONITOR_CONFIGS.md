@@ -6,6 +6,7 @@
 
 ## Table of Contents 
 - [Base Monitor Settings](#base-monitor-settings)
+- [Member Tag](#member-tag-details)
 - [Monitor Types](#monitor-types)
     - [Exec](#exec)
     - [HTTP](#http)
@@ -29,7 +30,23 @@ There are a number of monitor configuration attributes that work for *all* monit
 | critical-threshold | int          | how many checks must fail before critical state |
 | warning-alerter    | string array | if check enters warning state, the following alerters will be executed |
 | critical-alerter   | string array | if check enters critical state, the following alerters will be executed |
-| member-tag         | string       | allow this check to only be assigned to members that are started with the same tag |
+| member-tag         | string       | require this check to only be assigned to members that are started/tagged w/ the same tag |
+
+## Member Tag Details
+The `member-tag` allows you to **require** that checks are assigned ONLY to nodes that match the same tag. This is helpful in cases where a remote service/host is ONLY accessible from a specific location (say due to network restrictions); another case would be if you are running `9volt` across a large WAN and want to be absolutely sure that a given service is available from multiple, different locations.
+
+**Requiring geographic diversity example:**
+
+* Launch 2 nodes in the US with **no** tags
+* Launch 1 node in Spain with `spain` and `eu` tags
+* Launch 1 node in Germany with `germany` and `eu` tags
+* Launch 1 node in Japan with a `japan` tag
+* In this type of a configuration:
+  - Checks configured with **no** tags will be equally distributed among the 2 US nodes
+  - Checks configured with an `eu` tag will be equally distributed among the nodes in Spain and Germany
+  - Checks configured with a `japan` tag will be assigned to the node in Japan
+
+**NOTE**: If a check is given a tag that does not have a corresponding node tag, that check will be **orphaned**, or in other words, it will not be assigned to any nodes until a node with that tag is started.
 
 ## Monitor Types
 
