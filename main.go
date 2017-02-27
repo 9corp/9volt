@@ -25,6 +25,7 @@ import (
 var (
 	server        = kingpin.Command("server", "9volt server")
 	listenAddress = server.Flag("listen", "Address for 9volt's API to listen on").Short('l').Default("0.0.0.0:8080").String()
+	tags          = server.Flag("tags", "Specify one or more member tags this instance has; see MONITOR_CONFIGS.md for details").Short('t').Envar("NINEV_TAGS").Strings()
 
 	cfg         = kingpin.Command("cfg", "9volt configuration utility")
 	dirArg      = cfg.Arg("dir", "Directory to search for 9volt YAML files").Required().String()
@@ -72,7 +73,7 @@ func runServer() {
 	eqClient := eventQueue.NewClient()
 
 	// Load our configuration
-	cfg := config.New(memberID, *listenAddress, *etcdPrefix, *etcdMembers, dalClient, eqClient)
+	cfg := config.New(memberID, *listenAddress, *etcdPrefix, *etcdMembers, *tags, dalClient, eqClient)
 
 	if err := cfg.Load(); err != nil {
 		log.Fatalf("Unable to load configuration from etcd: %v", err.Error())

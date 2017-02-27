@@ -4,6 +4,7 @@ package dal
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"path"
 	"time"
@@ -23,6 +24,7 @@ type IDal interface {
 	NewWatcher(string, bool) client.Watcher
 	GetClusterMembers() ([]string, error)
 	GetCheckKeys() ([]string, error)
+	GetCheckKeysWithMemberTag() (map[string]string, error)
 	CreateCheckReference(string, string) error
 	ClearCheckReference(string, string) error
 	ClearCheckReferences(string) error
@@ -34,6 +36,7 @@ type IDal interface {
 	UpdateCheckState(bool, string) error
 	GetClusterStats() (*ClusterStats, error)
 	FetchEvents([]string) ([]byte, error)
+	GetClusterMembersWithTags() (map[string][]string, error)
 }
 
 type GetOptions struct {
@@ -125,7 +128,7 @@ func (d *Dal) Refresh(key string, ttl int) error {
 	return err
 }
 
-// Get wrapper; either returns the key contents or error; accepts *GoOptions for
+// Get wrapper; either returns the key contents or error; accepts *GetOptions for
 // specifying whether the method should recurse and/or use the default prefix.
 //
 // By default, passing a nil for Options will NOT recurse and use the default
@@ -319,6 +322,63 @@ func (d *Dal) GetClusterMembers() ([]string, error) {
 	return members, nil
 }
 
+// Keys == member id, value == slice of tags
+func (d *Dal) GetClusterMembersWithTags() (map[string][]string, error) {
+	members, err := d.GetClusterMembers()
+	if err != nil {
+		return nil, fmt.Errorf("Unable to perform initial cluster member fetch: %v", err)
+	}
+
+	memberMap := make(map[string][]string, 0)
+
+	for _, v := range members {
+		key := "cluster/members/" + v + "/status"
+		status, err := d.Get(key, nil)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to fetch member '%v' status: %v", v, err)
+		}
+
+		if _, ok := status[key]; !ok {
+			return nil, fmt.Errorf("Could not lookup member '%v' status in return map", v)
+		}
+
+		tags, err := d.parseTags(status[key])
+		if err != nil {
+			return nil, fmt.Errorf("Unable to fetch tags from member '%v' status: %v", v, err)
+		}
+
+		memberMap[v] = tags
+	}
+
+	return memberMap, nil
+}
+
+// Helper for parsing 'member-tag' from monitor config JSON payload
+func (d *Dal) parseMemberTag(data string) (string, error) {
+	var tmpTag struct {
+		MemberTag string `json:"member-tag"`
+	}
+
+	if err := json.Unmarshal([]byte(data), &tmpTag); err != nil {
+		return "", fmt.Errorf("Unable to complete member-tag unmarshal: %v", err)
+	}
+
+	return tmpTag.MemberTag, nil
+}
+
+// Helper for parsing 'Tags' or 'tags' array from cluster member JSON payload
+func (d *Dal) parseTags(data string) ([]string, error) {
+	var tmpTags struct {
+		Tags []string
+	}
+
+	if err := json.Unmarshal([]byte(data), &tmpTags); err != nil {
+		return nil, fmt.Errorf("Unable to complete tag unmarshal: %v", err)
+	}
+
+	return tmpTags.Tags, nil
+}
+
 // Fetch how many checks each cluster member has
 func (d *Dal) FetchCheckStats() (map[string]int, error) {
 	memberRefs, err := d.FetchAllMemberRefs()
@@ -349,6 +409,31 @@ func (d *Dal) GetCheckKeys() ([]string, error) {
 
 	for k := range data {
 		checkKeys = append(checkKeys, k)
+	}
+
+	return checkKeys, nil
+}
+
+// Return check keys along with tags (if any); map k = check key name, v = member tag (if any)
+func (d *Dal) GetCheckKeysWithMemberTag() (map[string]string, error) {
+	data, err := d.Get("monitor/", &GetOptions{
+		Recurse: true,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	checkKeys := make(map[string]string, 0)
+
+	for k, v := range data {
+		// TODO: Should probably bubble-up error to event stream (and not critically fail)
+		memberTag, err := d.parseMemberTag(v)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to parse member-tag for check config '%v': %v", k, err)
+		}
+
+		checkKeys[k] = memberTag
 	}
 
 	return checkKeys, nil

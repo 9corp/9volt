@@ -67,6 +67,7 @@ type MonitorConfig struct {
 	Expect      string              `json:"expect,omitempty"` // works for 'tcp', 'ssh', 'http', 'exec' checks except 'icmp'
 	Disable     bool                `json:"disable,omitempty"`
 	Tags        []string            `json:"tags,omitempty"`
+	MemberTag   string              `json:"member-tag,omitempty"` // lock a check to specific member(s)
 
 	// TCP specific attributes
 	TCPSend         string              `json:"send,omitempty"`

@@ -16,6 +16,7 @@ type Config struct {
 	ListenAddress string
 	EtcdPrefix    string
 	EtcdMembers   []string
+	Tags          []string
 	DalClient     dal.IDal
 	EQClient      *event.Client
 
@@ -29,7 +30,11 @@ type serverConfig struct {
 }
 
 // Pass in the dal client in order to facilitate better/easier testing story
-func New(memberID, listenAddress, etcdPrefix string, etcdMembers []string, dalClient dal.IDal, eqClient *event.Client) *Config {
+func New(memberID, listenAddress, etcdPrefix string, etcdMembers, tags []string, dalClient dal.IDal, eqClient *event.Client) *Config {
+	if tags == nil {
+		tags = make([]string, 0)
+	}
+
 	cfg := &Config{
 		ListenAddress: listenAddress,
 		EtcdPrefix:    etcdPrefix,
@@ -37,6 +42,7 @@ func New(memberID, listenAddress, etcdPrefix string, etcdMembers []string, dalCl
 		DalClient:     dalClient,
 		EQClient:      eqClient,
 		MemberID:      memberID,
+		Tags:          tags,
 	}
 
 	return cfg
