@@ -27,9 +27,10 @@ While there are a bunch of solutions for monitoring and alerting using time seri
     - Pagerduty
     - Email
 - RESTful API for querying current monitoring state and loaded configuration
-- Comes bundled with a web app for a quick visual view of the cluster:
-    + `./9volt-web -s 9volt-server-1.example.com, 9volt-server-2.example.com`
-- Comes bundled with a binary tool to parse YAML based configs and push/sync them to etcd
+- Comes with a built-in, react based UI that provides another way to view and manage the cluster
+    + Access the UI by going to http://hostname:8080/ui
+- Comes with a built-in monitor and alerter config management util (that parses and syncs YAML-based configs to etcd)
+    + `./9volt cfg --help`
 
 ### Usage
 - Install/setup `etcd`
