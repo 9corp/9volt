@@ -35,11 +35,12 @@ While there are a bunch of solutions for monitoring and alerting using time seri
 ### Usage
 - Install/setup `etcd`
 - Download latest `9volt` release
-- For first time setup, run `./scripts/setup.sh`
 - Start server: `./9volt server -e http://etcd-server-1.example.com:2379 -e http://etcd-server-2.example.com:2379 -e http://etcd-server-3.example.com:2379`
 - Optional: use `9volt cfg` for managing configs
 - Optional: add `9volt` to be managed by `supervisord`, `upstart` or some other process manager
 - Optional: Several configuration params can be passed to `9volt` via [env vars](docs/ENV_VARS.md), which should make it a lot easier to run `9volt` in Docker
+
+... or, if you prefer to do things via Docker, check out these [docs](docs/DOCKER.md).
 
 ### H/A and scaling
 Scaling `9volt` is incredibly simple. Launch another `9volt` service on a separate host and point it to the same `etcd` hosts as the main `9volt` service.

@@ -1,11 +1,15 @@
 Running 9volt in Docker
 =======================
 
-At some point, official images will be pushed to some public docker repo. For now, that's not the case, so you'll have to build the images yourself - which thankfully is not very difficult.
+At some point, official images will be pushed to some public docker repo. For now, that's not the case, so you'll have to build `9volt` and the images yourself - which thankfully is not very difficult.
+
+All build processes depend on `make`, `golang` and `nodejs`. For OS X users, install via brew: `brew install golang && brew install nodejs`. For other OS's, consult your favorite package manager.
+
+Golang 1.6+ should be fine.
 
 ### Just get it up and running locally (using `docker-compose`)
 
-To avoid having large containers^, our `Dockerfile` (and by proxy `docker-compose.yml`) assume that the latest build is in `./build/`. Thus we first need to perform an actual build. There's a `make` target for that though, so easy peasy.
+To avoid having large containers^, our `Dockerfile` (and by proxy `docker-compose.yml`) assume that the latest build is in `./build/`. Thus, we first need to perform an actual build. There's a `make` target for that though, so easy peasy.
 
 1. Run `make installtools`
 2. Run `make build/docker-compose`
