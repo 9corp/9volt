@@ -43,6 +43,7 @@ test/cover: ## Run all tests + open coverage report for all packages
 	$(RM) .coverage .coverage.tmp
 
 installtools: ## Install development related tools
+	echo '>>>>> NOTE: Make sure to *manually* install nodejs via your pkg manager'
 	go get github.com/kardianos/govendor
 	go get github.com/maxbrunsfeld/counterfeiter
 	go get github.com/yvasiyarov/swagger
@@ -55,6 +56,12 @@ build/linux: clean/linux build/ui ## Build for linux (save to OUTPUT_DIR/BIN)
 
 build/darwin: clean/darwin build/ui ## Build for darwin (save to OUTPUT_DIR/BIN)
 	GOOS=darwin go build -a -installsuffix cgo -ldflags "-X main.version=$(RELEASE_VER)" -o $(OUTPUT_DIR)/$(BIN)-darwin .
+
+build/docker: clean/linux build/ui build/linux ## Build docker image
+	docker build -t "9volt:$(RELEASE_VER)" .
+
+build/docker-compose: clean/linux build/ui build/linux ## Build and start 9volt (and etcd) using docker-compose
+	docker-compose up -d
 
 build/docs: ## Build markdown docs from swagger comments
 	swagger -apiPackage="github.com/9corp/9volt" -format=markdown -output=docs/api/README.md
