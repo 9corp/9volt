@@ -11,11 +11,13 @@ While there are a bunch of solutions for monitoring and alerting using time seri
 `9volt` offers the following things out of the box:
 
 - Single binary deploy
-- Fully H/A
+- Fully distributed
 - Incredibly easy to scale to hundreds of thousands of checks
 - Uses `etcd` for all configuration
 - Real-time configuration pick-up (update etcd - `9volt` immediately picks up the change)
-- Interval based monitoring (ie. run check XYZ every 1s or 1y or 1d or even 1ms)
+- [Support for assigning checks to specific (groups of) nodes](docs/MONITOR_CONFIGS.md)
+    + Helpful for getting around network restrictions (or requiring certain checks to run from a specific region)
+- Interval based monitoring (ie. run check XYZ every 1s, 1y, 1d or even 1ms)
 - Natively supported monitors:
     - TCP
     - HTTP
@@ -25,34 +27,59 @@ While there are a bunch of solutions for monitoring and alerting using time seri
     - Pagerduty
     - Email
 - RESTful API for querying current monitoring state and loaded configuration
-- Comes bundled with a web app for a quick visual view of the cluster:
-    + `./9volt-web -s 9volt-server-1.example.com, 9volt-server-2.example.com`
-- Comes bundled with a binary tool to push parse YAML based configs and push them to etcd
+- Comes with a built-in, react based UI that provides another way to view and manage the cluster
+    + Access the UI by going to http://hostname:8080/ui
+- Comes with a built-in monitor and alerter config management util (that parses and syncs YAML-based configs to etcd)
+    + `./9volt cfg --help`
 
 ### Usage
 - Install/setup `etcd`
 - Download latest `9volt` release
-- For first time setup, run `./9volt-init` and follow prompts for setup
-- Start server: `./9volt -e http://etcd-server-1.example.com:2379 http://etcd-server-2.example.com:2379 http://etcd-server-3.example.com:2379`
+- Start server: `./9volt server -e http://etcd-server-1.example.com:2379 -e http://etcd-server-2.example.com:2379 -e http://etcd-server-3.example.com:2379`
+- Optional: use `9volt cfg` for managing configs
 - Optional: add `9volt` to be managed by `supervisord`, `upstart` or some other process manager
+- Optional: Several configuration params can be passed to `9volt` via [env vars](docs/ENV_VARS.md)
+
+... or, if you prefer to do things via Docker, check out these [docs](docs/DOCKER.md).
 
 ### H/A and scaling
 Scaling `9volt` is incredibly simple. Launch another `9volt` service on a separate host and point it to the same `etcd` hosts as the main `9volt` service.
 
-Checks will be automatically divided between the two+ `9volt` instances.
+Your main `9volt` node will produce output similar to this when it detects a node join:
 
-If one of the nodes were to go down, a new leader will be elected and checks will be redistributed among the remaining nodes.
+![node join](/assets/node-join.png?raw=true)
+
+Checks will be automatically divided between the all `9volt` instances.
+
+If one of the nodes were to go down, a new leader will be elected (*if the node that went down was the previous leader*) and checks will be redistributed among the remaining nodes.
+
+This will produce output similar to this (and will be also available in the event stream via the API and UI):
+
+![node-leave](/assets/node-leave.png?raw=true)
 
 ### API
-TODO
+API documentation can be found [here](docs/api/README.md).
 
-### Recommended requirements
-- 3 x 9volt instances (4+ cores, 8GB RAM each)
-- 1 x 5-node etcd cluster (2+ cores, 4GB RAM each)
+### Minimum requirements (can handle ~1,000-3,000 <10s interval checks)
+- 1 x 9volt instance (1 core, 256MB RAM)
+- 1 x etcd node (1 core, 256MB RAM)
 
-### Minimum requirements
-- 1 x 9volt instance (2+ cores, 4GB RAM each)
-- 1 x 3-node etcd cluster (2+ cores, 2GB RAM each)
+*Note* In the minimum configuration, you *could* run both `9volt` and `etcd` on the same node.
+
+### Recommended (production) requirements (can handle 10,000+ <10s interval checks)
+- 3 x 9volt instances (2+ cores, 512MB RAM)
+- 3 x etcd nodes (2+ cores, 1GB RAM)
+
+### Configuration
+While you can manage 9volt alerter and monitor configs via the API, another approach to config management is to use the built-in config utility (`9volt cfg <flags>`).
+
+This utility allows you to scan a given directory for any YAML files that resemble 9volt configs (_the file must contain either 'monitor' or 'alerter' sections_) and it will automatically parse, validate and push them to your etcd server(s).
+
+By default, the utility will keep your local configs **in sync** with your etcd server(s). In other words, if the utility comes across a config in etcd that does not exist locally (in config(s)), it will remove the config entry from etcd (and vice versa). This functionality can be turned off by flipping the `--nosync` flag.
+
+![cfg run](/assets/cfg-run.png?raw=true)
+
+You can look at an example of a YAML based config [here](docs/example-configs/example1.yaml).
 
 ### Docs
 Read through the [docs dir](docs/).

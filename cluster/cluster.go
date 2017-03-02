@@ -93,6 +93,7 @@ type MemberJSON struct {
 	Hostname      string
 	ListenAddress string
 	LastUpdated   time.Time
+	Tags          []string
 }
 
 func New(cfg *config.Config, stateChan, distributeChan chan<- bool) (ICluster, error) {
@@ -347,6 +348,7 @@ func (c *Cluster) generateMemberJSON() (string, error) {
 		Hostname:      c.Hostname,
 		ListenAddress: c.Config.ListenAddress,
 		LastUpdated:   time.Now(),
+		Tags:          c.Config.Tags,
 	}
 
 	data, err := json.Marshal(memberJSON)

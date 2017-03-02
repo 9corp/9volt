@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 
-	// log "github.com/Sirupsen/logrus"
-
 	"github.com/9corp/9volt/dal"
 	"github.com/9corp/9volt/event"
 	"github.com/9corp/9volt/util"
+)
+
+const (
+	DEFAULT_CONFIG = `{"HeartbeatInterval":"3s","HeartbeatTimeout":"6s","StateDumpInterval":"10s"}`
 )
 
 type Config struct {
@@ -16,6 +18,7 @@ type Config struct {
 	ListenAddress string
 	EtcdPrefix    string
 	EtcdMembers   []string
+	Tags          []string
 	DalClient     dal.IDal
 	EQClient      *event.Client
 
@@ -29,7 +32,11 @@ type serverConfig struct {
 }
 
 // Pass in the dal client in order to facilitate better/easier testing story
-func New(memberID, listenAddress, etcdPrefix string, etcdMembers []string, dalClient dal.IDal, eqClient *event.Client) *Config {
+func New(memberID, listenAddress, etcdPrefix string, etcdMembers, tags []string, dalClient dal.IDal, eqClient *event.Client) *Config {
+	if tags == nil {
+		tags = make([]string, 0)
+	}
+
 	cfg := &Config{
 		ListenAddress: listenAddress,
 		EtcdPrefix:    etcdPrefix,
@@ -37,13 +44,14 @@ func New(memberID, listenAddress, etcdPrefix string, etcdMembers []string, dalCl
 		DalClient:     dalClient,
 		EQClient:      eqClient,
 		MemberID:      memberID,
+		Tags:          tags,
 	}
 
 	return cfg
 }
 
 func (c *Config) ValidateDirs() []string {
-	dirs := []string{"cluster", "cluster/members", "monitor", "alerter"}
+	dirs := []string{"cluster", "cluster/members", "monitor", "alerter", "event", "state"}
 
 	var errorList []string
 
@@ -55,7 +63,11 @@ func (c *Config) ValidateDirs() []string {
 		}
 
 		if !exists {
-			errorList = append(errorList, fmt.Sprintf("required key '%v' does not exist", d))
+			if err := c.DalClient.Set(d, "", true, 0, ""); err != nil {
+				errorList = append(errorList, fmt.Sprintf("unable to auto-create missing dir '%v': %v", d, err))
+				continue
+			}
+
 			continue
 		}
 
@@ -75,7 +87,11 @@ func (c *Config) Load() error {
 	}
 
 	if !exists {
-		return fmt.Errorf("'config' does not appear to exist in etcd")
+		if err := c.DalClient.Set("config", DEFAULT_CONFIG, false, 0, ""); err != nil {
+			return fmt.Errorf("unable to create initial config: %v", err)
+		}
+
+		return c.load(DEFAULT_CONFIG)
 	}
 
 	if isDir {
