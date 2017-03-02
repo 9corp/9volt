@@ -1,3 +1,7 @@
-FROM golang:1.6-onbuild
+FROM alpine
 
-CMD ./scripts/setup.sh; go run main.go -e http://etcd:2379
+COPY build/9volt-linux /
+
+EXPOSE 8080
+
+ENTRYPOINT ["/9volt-linux", "server"]
