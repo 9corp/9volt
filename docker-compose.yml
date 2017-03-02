@@ -3,13 +3,24 @@ services:
   9volt:
     depends_on: 
       - etcd
-    build: .
+    image: 9corp/9volt:latest
     ports:
       - "8080:8080"
     links: 
      - etcd
     environment:
       - NINEV_ETCD_MEMBERS=http://etcd:2379
+  9volt2:
+    depends_on: 
+      - etcd
+    image: 9corp/9volt:latest
+    ports:
+      - "8181:8181"
+    links: 
+     - etcd
+    environment:
+      - NINEV_ETCD_MEMBERS=http://etcd:2379
+      - NINEV_LISTEN_ADDRESS=:8181
   etcd:
     image: quay.io/coreos/etcd:v3.1.2
     ports:
