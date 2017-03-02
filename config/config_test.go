@@ -7,7 +7,7 @@ import (
 	"github.com/9corp/9volt/dal/dalfakes"
 )
 
-var _ = Describe("ValidateDirs", func() {
+var _ = Describe("config", func() {
 	var (
 		fakeDalClient *dalfakes.FakeIDal
 		cfg           *Config
@@ -22,11 +22,37 @@ var _ = Describe("ValidateDirs", func() {
 	BeforeEach(func() {
 		fakeDalClient = &dalfakes.FakeIDal{}
 		cfg = New(testMemberID, testListenAddress, testEtcdPrefix, testEtcdMembers, testTags, fakeDalClient, nil)
+    Expect(cfg).ToNot(BeNil())
 	})
 
-	Context("blah", func() {
-		It("blah", func() {
-			Expect(1).To(Equal(1))
-		})
+	Context("ValidateDirs", func() {
+		PIt("should return empty string slice on no errors")
+		PIt("should error if dal runs into an error during key existance check")
+		PIt("should error if required key does not exist")
+		PIt("should error if required key is not a dir")
+		PIt("should return a slice of errors (if errors are hit)")
+	})
+
+	Context("Load", func() {
+		PIt("should load server config")
+		PIt("should error if dal runs into error on initial config fetch")
+		PIt("should error if config does not exist")
+		PIt("should error if config is a dir (and not a key)")
+		PIt("should error if dal get errors")
+		PIt("should error if returned value map does not contain config")
+		PIt("should error if load() returns an error")
+	})
+
+	Context("load", func() {
+		PIt("should load server config")
+		PIt("should error if config can't be unmarshalled onto serverConfig struct")
+		PIt("should error if validate() fails")
+	})
+
+	Context("validate", func() {
+		PIt("should return nil on happy path")
+		PIt("should error on invalid HeartbeatInterval")
+		PIt("should error on invalid HeartbeatTimeout")
+		PIt("should error on invalid StateDumpInterval")
 	})
 })
