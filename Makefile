@@ -81,6 +81,11 @@ build/release: semvercheck build/linux build/darwin ## Prepare a build
 	cd $(OUTPUT_DIR) && tar -czvf 9volt-$(SEMVER)-linux.tgz 9volt-$(SEMVER)-linux/
 	@echo "A new release has been created!"
 
+build/release-docker: semvercheck build/linux ## Build, tag and push a docker image to dockerhubs
+	docker build -t "9corp/9volt:$(SEMVER)" -t "9corp/9volt:latest" . && \
+	docker push 9corp/9volt:$(SEMVER)
+	docker push 9corp/9volt:latest
+
 semvercheck:
 ifeq ($(SEMVER),)
 	$(error 'SEMVER' must be set)
