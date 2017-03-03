@@ -36,7 +36,7 @@ var (
 	etcdPrefix  = kingpin.Flag("etcd-prefix", "Prefix that 9volt's configuration is stored under in etcd").Short('p').Default("9volt").Envar("NINEV_ETCD_PREFIX").String()
 	etcdMembers = kingpin.Flag("etcd-members", "List of etcd cluster members").Short('e').Default("http://localhost:2379").Envar("NINEV_ETCD_MEMBERS").Strings()
 	debugUI     = kingpin.Flag("debug-ui", "Debug the user interface locally").Short('u').Bool()
-	debug       = kingpin.Flag("debug", "Enable debug mode").Short('d').Bool()
+	debug       = kingpin.Flag("debug", "Enable debug mode").Short('d').Envar("NINEV_DEBUG").Bool()
 
 	version string
 	command string
