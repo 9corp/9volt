@@ -28,7 +28,7 @@ type IDal interface {
 	CreateCheckReference(string, string) error
 	ClearCheckReference(string, string) error
 	ClearCheckReferences(string) error
-	FetchAllMemberRefs() (map[string]string, error)
+	FetchAllMemberRefs() (map[string]string, []string, error)
 	FetchCheckStats() (map[string]int, error)
 	FetchAlerterConfig(string) (string, error)
 	FetchState() ([]byte, error)
@@ -194,14 +194,15 @@ func (d *Dal) CreateCheckReference(memberID, keyName string) error {
 // that has 'map[check_key]memberID' structure
 //
 // TODO: This is not great; should utilize caching at some point
-func (d *Dal) FetchAllMemberRefs() (map[string]string, error) {
+func (d *Dal) FetchAllMemberRefs() (map[string]string, []string, error) {
 	// Fetch all cluster members
 	memberIDs, err := d.GetClusterMembers()
 	if err != nil {
-		return nil, fmt.Errorf("Unable to fetch cluster members: %v", err.Error())
+		return nil, nil, fmt.Errorf("Unable to fetch cluster members: %v", err.Error())
 	}
 
 	memberRefs := make(map[string]string, 0)
+	freeMembers := make([]string, 0)
 
 	// Recursively fetch every member ref and build our memberRefs structure
 	for _, memberID := range memberIDs {
@@ -209,7 +210,12 @@ func (d *Dal) FetchAllMemberRefs() (map[string]string, error) {
 			Recurse: true,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("Problem fetching refs for '%v': %v", memberID, err.Error())
+			return nil, nil, fmt.Errorf("Problem fetching refs for '%v': %v", memberID, err.Error())
+		}
+
+		if len(refs) == 0 {
+			freeMembers = append(freeMembers, memberID)
+			continue
 		}
 
 		for _, v := range refs {
@@ -217,7 +223,7 @@ func (d *Dal) FetchAllMemberRefs() (map[string]string, error) {
 		}
 	}
 
-	return memberRefs, nil
+	return memberRefs, freeMembers, nil
 }
 
 // Create director state entry (expecting director state key to not exist)
@@ -381,7 +387,7 @@ func (d *Dal) parseTags(data string) ([]string, error) {
 
 // Fetch how many checks each cluster member has
 func (d *Dal) FetchCheckStats() (map[string]int, error) {
-	memberRefs, err := d.FetchAllMemberRefs()
+	memberRefs, freeMembers, err := d.FetchAllMemberRefs()
 	if err != nil {
 		return nil, fmt.Errorf("Unable to fetch memberRefs for FetchCheckStats(): %v", err.Error())
 	}
@@ -390,6 +396,10 @@ func (d *Dal) FetchCheckStats() (map[string]int, error) {
 
 	for _, v := range memberRefs {
 		checkStats[v] = checkStats[v] + 1
+	}
+
+	for _, v := range freeMembers {
+		checkStats[v] = 0
 	}
 
 	return checkStats, nil

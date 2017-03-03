@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	COLLECT_CHECK_STATS_INTERVAL = time.Duration(60 * time.Second)
+	COLLECT_CHECK_STATS_INTERVAL = time.Duration(5 * time.Second)
 	UNTAGGED_MEMBER_MAP_ENTRY    = "!UNTAGGED!"
 )
 
@@ -388,7 +388,7 @@ func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
 	log.Debugf("%v-handleCheckConfigChange: Received new response for key %v",
 		d.Identifier, resp.Node.Key)
 
-	memberRefs, err := d.DalClient.FetchAllMemberRefs()
+	memberRefs, _, err := d.DalClient.FetchAllMemberRefs()
 	if err != nil {
 		return fmt.Errorf("Unable to fetch all member refs: %v", err.Error())
 	}
@@ -429,6 +429,7 @@ func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
 }
 
 // Return the least taxed cluster member
+// TODO: This needs to be updated to understand node tags + check pinning
 func (d *Director) PickNextMember() string {
 	d.CheckStatsMutex.Lock()
 	defer d.CheckStatsMutex.Unlock()
@@ -455,6 +456,9 @@ func (d *Director) PickNextMember() string {
 			leastChecks = v
 		}
 	}
+
+	// Let's bump up check stats for picked member (so they do not get picked immediately thereafter)
+	d.CheckStats[leastTaxedMember]++
 
 	return leastTaxedMember
 }
