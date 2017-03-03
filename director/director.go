@@ -179,6 +179,7 @@ func (d *Director) performCheckDistribution(members map[string][]string, checkKe
 
 	for tag, memList := range memberList {
 		checks := d.filterCheckKeysByTag(checkKeys, tag)
+
 		checksPerMember := len(checks) / len(memList)
 
 		start := 0
@@ -187,6 +188,7 @@ func (d *Director) performCheckDistribution(members map[string][]string, checkKe
 		// each member in 'memList' should have and assigning each individual
 		// member their designated checks.
 		for memberNum := 0; memberNum < len(memList); memberNum++ {
+
 			// Blow away any pre-existing config references
 			if err := d.DalClient.ClearCheckReferences(memList[memberNum]); err != nil {
 				log.Errorf("%v: Unable to clear existing check references for member %v: %v",
@@ -223,6 +225,7 @@ func (d *Director) performCheckDistribution(members map[string][]string, checkKe
 		}
 	}
 
+	// entries in checkKeys are deleted during filterCheckKeysByTag()
 	if len(checkKeys) != 0 {
 		log.Warningf("%v-performCheckDistribution: Found %v orphaned checks (unable to find any fitting nodes)", d.Identifier, len(checkKeys))
 
@@ -242,13 +245,13 @@ func (d *Director) filterCheckKeysByTag(checkKeys map[string]string, tag string)
 		// Append to list if check does not have a member tag and given tag matches '!UNTAGGED!'
 		if checkTag == "" && tag == UNTAGGED_MEMBER_MAP_ENTRY {
 			newCheckKeys = append(newCheckKeys, checkName)
-			defer delete(checkKeys, checkName)
+			delete(checkKeys, checkName)
 			continue
 		}
 
 		if checkTag == tag {
 			newCheckKeys = append(newCheckKeys, checkName)
-			defer delete(checkKeys, checkName)
+			delete(checkKeys, checkName)
 		}
 	}
 
