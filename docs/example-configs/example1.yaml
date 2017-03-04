@@ -42,7 +42,7 @@ alerter:
       auth: plain | md5
 
 monitor:
-  exec-check:
+  exec-check1:
     type: exec
     description: exec check test
     timeout: 5s
@@ -62,26 +62,256 @@ monitor:
     tags:
       - dbservers
       - mysql
-    member-tag: eu # lock this check to specific member(s)
 
-  basic-http-check:
-    type: http
-    description: "basic http status code check"
-    host: cloudsy.com
+  exec-check2:
+    type: exec
+    description: exec check test
     timeout: 5s
+    command: echo
+    args:
+      - hello
+      - world
     interval: 10s
-    port: 80
-    status-code: 200
+    return-code: 0
+    expect: world
     warning-threshold: 1
     critical-threshold: 3
     warning-alerter:
       - primary-slack
     critical-alerter:
-      - primary-slack
-      - primary-pagerduty
+      - primary-email
     tags:
-      - team-core
-      - golang
+      - dbservers
+      - mysql
+
+  exec-check3:
+    type: exec
+    description: exec check test
+    timeout: 5s
+    command: echo
+    args:
+      - hello
+      - world
+    interval: 10s
+    return-code: 0
+    expect: world
+    warning-threshold: 1
+    critical-threshold: 3
+    warning-alerter:
+      - primary-slack
+    critical-alerter:
+      - primary-email
+    tags:
+      - dbservers
+      - mysql
+
+  exec-check4:
+    type: exec
+    description: exec check test
+    timeout: 5s
+    command: echo
+    args:
+      - hello
+      - world
+    interval: 10s
+    return-code: 0
+    expect: world
+    warning-threshold: 1
+    critical-threshold: 3
+    warning-alerter:
+      - primary-slack
+    critical-alerter:
+      - primary-email
+    tags:
+      - dbservers
+      - mysql
+
+  exec-check5:
+    type: exec
+    description: exec check test
+    timeout: 5s
+    command: echo
+    args:
+      - hello
+      - world
+    interval: 10s
+    return-code: 0
+    expect: world
+    warning-threshold: 1
+    critical-threshold: 3
+    warning-alerter:
+      - primary-slack
+    critical-alerter:
+      - primary-email
+    tags:
+      - dbservers
+      - mysql
+
+  exec-check6:
+    type: exec
+    description: exec check test
+    timeout: 5s
+    command: echo
+    args:
+      - hello
+      - world
+    interval: 10s
+    return-code: 0
+    expect: world
+    warning-threshold: 1
+    critical-threshold: 3
+    warning-alerter:
+      - primary-slack
+    critical-alerter:
+      - primary-email
+    tags:
+      - dbservers
+      - mysql
+
+  exec-check7:
+    type: exec
+    description: exec check test
+    timeout: 5s
+    command: echo
+    args:
+      - hello
+      - world
+    interval: 10s
+    return-code: 0
+    expect: world
+    warning-threshold: 1
+    critical-threshold: 3
+    warning-alerter:
+      - primary-slack
+    critical-alerter:
+      - primary-email
+    tags:
+      - dbservers
+      - mysql
+
+  exec-check8:
+    type: exec
+    description: exec check test
+    timeout: 5s
+    command: echo
+    args:
+      - hello
+      - world
+    interval: 10s
+    return-code: 0
+    expect: world
+    warning-threshold: 1
+    critical-threshold: 3
+    warning-alerter:
+      - primary-slack
+    critical-alerter:
+      - primary-email
+    tags:
+      - dbservers
+      - mysql
+
+  exec-check9:
+    type: exec
+    description: exec check test
+    timeout: 5s
+    command: echo
+    args:
+      - hello
+      - world
+    interval: 10s
+    return-code: 0
+    expect: world
+    warning-threshold: 1
+    critical-threshold: 3
+    warning-alerter:
+      - primary-slack
+    critical-alerter:
+      - primary-email
+    tags:
+      - dbservers
+      - mysql
+
+  exec-check10:
+    type: exec
+    description: exec check test
+    timeout: 5s
+    command: echo
+    args:
+      - hello
+      - world
+    interval: 10s
+    return-code: 0
+    expect: world
+    warning-threshold: 1
+    critical-threshold: 3
+    warning-alerter:
+      - primary-slack
+    critical-alerter:
+      - primary-email
+    tags:
+      - dbservers
+      - mysql
+
+  exec-check11:
+    type: exec
+    description: exec check test
+    timeout: 5s
+    command: echo
+    args:
+      - hello
+      - world
+    interval: 10s
+    return-code: 0
+    expect: world
+    warning-threshold: 1
+    critical-threshold: 3
+    warning-alerter:
+      - primary-slack
+    critical-alerter:
+      - primary-email
+    tags:
+      - dbservers
+      - mysql
+
+  exec-check12:
+    type: exec
+    description: exec check test
+    timeout: 5s
+    command: echo
+    args:
+      - hello
+      - world
+    interval: 10s
+    return-code: 0
+    expect: world
+    warning-threshold: 1
+    critical-threshold: 3
+    warning-alerter:
+      - primary-slack
+    critical-alerter:
+      - primary-email
+    tags:
+      - dbservers
+      - mysql
+
+  # basic-http-check:
+  #   type: http
+  #   description: "basic http status code check"
+  #   host: cloudsy.com
+  #   timeout: 5s
+  #   interval: 10s
+  #   port: 80
+  #   status-code: 200
+  #   warning-threshold: 1
+  #   critical-threshold: 3
+  #   warning-alerter:
+  #     - primary-slack
+  #   critical-alerter:
+  #     - primary-slack
+  #     - primary-pagerduty
+  #   tags:
+  #     - team-core
+  #     - golang
 
   # ssh-expect-ssh-check:
   #   type: tcp
