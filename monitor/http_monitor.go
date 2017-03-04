@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
+	"github.com/9corp/9volt/util"
 	log "github.com/Sirupsen/logrus"
 )
 
@@ -28,7 +30,7 @@ func NewHTTPMonitor(rmc *RootMonitorConfig) IMonitor {
 		},
 	}
 
-	if rmc.Config.Timeout.String() == "0s" {
+	if rmc.Config.Timeout == util.CustomDuration(0) {
 		h.Timeout = DEFAULT_HTTP_TIMEOUT
 	} else {
 		h.Timeout = time.Duration(rmc.Config.Timeout)
@@ -85,45 +87,32 @@ func (h *HTTPMonitor) httpCheck() error {
 }
 
 func (h *HTTPMonitor) constructURL() string {
-	fullURL := "http://"
-
-	// Use http:// or https://
+	scheme := "http"
 	if h.RMC.Config.HTTPSSL {
-		fullURL = "https://"
+		scheme = "https"
 	}
 
-	fullURL = fullURL + h.RMC.Config.Host
+	checkUrl := url.URL{
+		Scheme: scheme,
+		Host:   h.RMC.Config.Host,
+	}
 
 	// If port is set, tack on a ':PORT'
 	if h.RMC.Config.Port != 0 {
-		fullURL = fmt.Sprintf("%v:%v", fullURL, h.RMC.Config.Port)
+		checkUrl.Host = fmt.Sprintf("%s:%d", checkUrl.Host, h.RMC.Config.Port)
 	}
 
-	// If URL does not start with '/', tack it on
-	if !strings.HasPrefix(h.RMC.Config.HTTPURL, "/") {
-		fullURL = fullURL + "/"
-	}
+	checkUrl.Path = "/" + strings.TrimLeft(h.RMC.Config.HTTPURL, "/")
 
-	// Return the constructed URL
-	fullURL = fullURL + h.RMC.Config.HTTPURL
-
-	return fullURL
+	return checkUrl.String()
 }
 
 // Create and perform a new HTTP request with a timeout; return http Response
 func (h *HTTPMonitor) performRequest(method, urlStr, requestBody string) (*http.Response, error) {
-	client := &http.Client{
-		Timeout: h.Timeout,
-	}
 
-	// TODO: Not sure if it's okay to just `body := strings.NewReader(requestBody)`,
-	//       even if the requestBody is empty.
-	var body *strings.Reader
-	body = nil
+	client := &http.Client{Timeout: h.Timeout}
 
-	if requestBody == "" {
-		body = strings.NewReader(requestBody)
-	}
+	body := strings.NewReader(requestBody)
 
 	req, err := http.NewRequest(method, urlStr, body)
 	if err != nil {

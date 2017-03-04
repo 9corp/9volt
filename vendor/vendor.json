@@ -321,6 +321,12 @@
 			"revisionTime": "2016-06-23T20:43:43Z"
 		},
 		{
+			"checksumSHA1": "633tQ6c9/WCpYjpiJ7fdDvBl+UY=",
+			"path": "gopkg.in/jarcoal/httpmock.v1",
+			"revision": "5bb0e54a2c1b7c8cbfd5a5c4d0a50435e142ecc1",
+			"revisionTime": "2017-02-24T14:03:50Z"
+		},
+		{
 			"checksumSHA1": "+OgOXBoiQ+X+C2dsAeiOHwBIEH0=",
 			"path": "gopkg.in/yaml.v2",
 			"revision": "a83829b6f1293c91addabc89d0571c246397bbf4",
