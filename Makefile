@@ -57,10 +57,10 @@ build/linux: clean/linux build/ui ## Build for linux (save to OUTPUT_DIR/BIN)
 build/darwin: clean/darwin build/ui ## Build for darwin (save to OUTPUT_DIR/BIN)
 	GOOS=darwin go build -a -installsuffix cgo -ldflags "-X main.version=$(RELEASE_VER)" -o $(OUTPUT_DIR)/$(BIN)-darwin .
 
-build/docker: clean/linux build/ui build/linux ## Build docker image
+build/docker: build/linux ## Build docker image
 	docker build -t "9volt:$(RELEASE_VER)" .
 
-build/docker-compose: clean/linux build/ui build/linux ## Build and start 9volt (and etcd) using docker-compose
+build/docker-compose: build/linux ## Build and start 9volt (and etcd) using docker-compose
 	docker-compose up -d
 
 build/docs: ## Build markdown docs from swagger comments

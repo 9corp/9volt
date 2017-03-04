@@ -403,7 +403,7 @@ func (c *Cluster) handleState(directorJSON *DirectorJSON) error {
 		if !c.amDirector() {
 			log.Infof("%v-directorMonitor: Not a director, but etcd says we are (updating state)!",
 				c.Identifier)
-			return c.changeState(START, nil, NOOP)
+			return c.changeState(START, directorJSON, UPDATE) // update so we can compareAndSwap
 		}
 	}
 
