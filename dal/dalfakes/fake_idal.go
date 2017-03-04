@@ -141,12 +141,13 @@ type FakeIDal struct {
 	clearCheckReferencesReturns struct {
 		result1 error
 	}
-	FetchAllMemberRefsStub        func() (map[string]string, error)
+	FetchAllMemberRefsStub        func() (map[string]string, []string, error)
 	fetchAllMemberRefsMutex       sync.RWMutex
 	fetchAllMemberRefsArgsForCall []struct{}
 	fetchAllMemberRefsReturns     struct {
 		result1 map[string]string
-		result2 error
+		result2 []string
+		result3 error
 	}
 	FetchCheckStatsStub        func() (map[string]int, error)
 	fetchCheckStatsMutex       sync.RWMutex
@@ -719,7 +720,7 @@ func (fake *FakeIDal) ClearCheckReferencesReturns(result1 error) {
 	}{result1}
 }
 
-func (fake *FakeIDal) FetchAllMemberRefs() (map[string]string, error) {
+func (fake *FakeIDal) FetchAllMemberRefs() (map[string]string, []string, error) {
 	fake.fetchAllMemberRefsMutex.Lock()
 	fake.fetchAllMemberRefsArgsForCall = append(fake.fetchAllMemberRefsArgsForCall, struct{}{})
 	fake.guard("FetchAllMemberRefs")
@@ -728,7 +729,7 @@ func (fake *FakeIDal) FetchAllMemberRefs() (map[string]string, error) {
 	if fake.FetchAllMemberRefsStub != nil {
 		return fake.FetchAllMemberRefsStub()
 	} else {
-		return fake.fetchAllMemberRefsReturns.result1, fake.fetchAllMemberRefsReturns.result2
+		return fake.fetchAllMemberRefsReturns.result1, fake.fetchAllMemberRefsReturns.result2, fake.fetchAllMemberRefsReturns.result3
 	}
 }
 
@@ -738,12 +739,13 @@ func (fake *FakeIDal) FetchAllMemberRefsCallCount() int {
 	return len(fake.fetchAllMemberRefsArgsForCall)
 }
 
-func (fake *FakeIDal) FetchAllMemberRefsReturns(result1 map[string]string, result2 error) {
+func (fake *FakeIDal) FetchAllMemberRefsReturns(result1 map[string]string, result2 []string, result3 error) {
 	fake.FetchAllMemberRefsStub = nil
 	fake.fetchAllMemberRefsReturns = struct {
 		result1 map[string]string
-		result2 error
-	}{result1, result2}
+		result2 []string
+		result3 error
+	}{result1, result2, result3}
 }
 
 func (fake *FakeIDal) FetchCheckStats() (map[string]int, error) {
