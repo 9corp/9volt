@@ -29,7 +29,7 @@ type IDal interface {
 	ClearCheckReference(string, string) error
 	ClearCheckReferences(string) error
 	FetchAllMemberRefs() (map[string]string, []string, error)
-	FetchCheckStats() (map[string]int, error)
+	FetchCheckStats() (map[string]*MemberStat, error)
 	FetchAlerterConfig(string) (string, error)
 	FetchState() ([]byte, error)
 	FetchStateWithTags([]string) ([]byte, error)
@@ -37,6 +37,7 @@ type IDal interface {
 	GetClusterStats() (*ClusterStats, error)
 	FetchEvents([]string) ([]byte, error)
 	GetClusterMembersWithTags() (map[string][]string, error)
+	GetCheckMemberTag(string) (string, error)
 }
 
 type GetOptions struct {
@@ -54,11 +55,10 @@ type Dal struct {
 	Prefix  string
 }
 
-// Helper struct for findings tags in a state config blob
-type simpleState struct {
-	Config struct {
-		Tags []string `json:"tags"`
-	} `json:"config"`
+// Helper struct for FetchCheckStats()
+type MemberStat struct {
+	NumChecks int
+	Tags      []string
 }
 
 func New(prefix string, members []string) (*Dal, error) {
@@ -386,20 +386,41 @@ func (d *Dal) parseTags(data string) ([]string, error) {
 }
 
 // Fetch how many checks each cluster member has
-func (d *Dal) FetchCheckStats() (map[string]int, error) {
+func (d *Dal) FetchCheckStats() (map[string]*MemberStat, error) {
 	memberRefs, freeMembers, err := d.FetchAllMemberRefs()
 	if err != nil {
 		return nil, fmt.Errorf("Unable to fetch memberRefs for FetchCheckStats(): %v", err.Error())
 	}
 
-	checkStats := make(map[string]int)
-
-	for _, v := range memberRefs {
-		checkStats[v] = checkStats[v] + 1
+	memberTags, err := d.GetClusterMembersWithTags()
+	if err != nil {
+		return nil, fmt.Errorf("Unable to fetch member tags for FetchCheckStats(): %v", err)
 	}
 
-	for _, v := range freeMembers {
-		checkStats[v] = 0
+	checkStats := make(map[string]*MemberStat)
+
+	// Let's record the members that have checks already assigned to them
+	for _, memberID := range memberRefs {
+		if _, ok := checkStats[memberID]; !ok {
+			checkStats[memberID] = &MemberStat{}
+		}
+
+		checkStats[memberID].NumChecks = checkStats[memberID].NumChecks + 1
+	}
+
+	// Let's record the members that have no checks assigned to them
+	for _, memberID := range freeMembers {
+		checkStats[memberID].NumChecks = 0
+	}
+
+	// Let's assign tags to each
+	for memberID, tags := range memberTags {
+		if _, ok := checkStats[memberID]; !ok {
+			return nil, errors.New("FetchCheckStats potential bug - memberTags contains a member " +
+				"that does not exist in memberRefs or freeMembers")
+		}
+
+		checkStats[memberID].Tags = tags
 	}
 
 	return checkStats, nil
@@ -422,6 +443,22 @@ func (d *Dal) GetCheckKeys() ([]string, error) {
 	}
 
 	return checkKeys, nil
+}
+
+func (d *Dal) GetCheckMemberTag(checkKey string) (string, error) {
+	data, err := d.Get(checkKey, &GetOptions{
+		NoPrefix: true,
+	})
+	if err != nil {
+		return "", fmt.Errorf("Unable to fetch member-tag for check '%v': %v", checkKey, err)
+	}
+
+	memberTag, err := d.parseMemberTag(data[checkKey])
+	if err != nil {
+		return "", fmt.Errorf("Unable to parse member-tag for check '%v': %v", checkKey, err)
+	}
+
+	return memberTag, nil
 }
 
 // Return check keys along with tags (if any); map k = check key name, v = member tag (if any)

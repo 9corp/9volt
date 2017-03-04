@@ -1,16 +1,16 @@
 version: '2'
 services:
-  9volt1:
-    depends_on: 
-      - etcd
-    image: 9corp/9volt:latest
-    ports:
-      - "8081:8080"
-    links: 
-     - etcd
-    environment:
-      - NINEV_ETCD_MEMBERS=http://etcd:2379
-      - NINEV_DEBUG=true
+  # 9volt1:
+  #   depends_on: 
+  #     - etcd
+  #   image: 9corp/9volt:latest
+  #   ports:
+  #     - "8081:8080"
+  #   links: 
+  #    - etcd
+  #   environment:
+  #     - NINEV_ETCD_MEMBERS=http://etcd:2379
+  #     - NINEV_DEBUG=true
   # 9volt2:
   #   depends_on: 
   #     - etcd

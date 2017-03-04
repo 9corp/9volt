@@ -12,6 +12,7 @@ import (
 
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/dal"
+	"github.com/9corp/9volt/util"
 )
 
 const (
@@ -33,7 +34,7 @@ type Director struct {
 	StateLock      *sync.Mutex
 	DalClient      dal.IDal
 
-	CheckStats      map[string]int
+	CheckStats      map[string]*dal.MemberStat
 	CheckStatsMutex *sync.Mutex
 }
 
@@ -51,7 +52,7 @@ func New(cfg *config.Config, stateChan <-chan bool, distributeChan <-chan bool) 
 		DistributeChan:  distributeChan,
 		StateLock:       &sync.Mutex{},
 		DalClient:       dalClient,
-		CheckStats:      make(map[string]int, 0),
+		CheckStats:      make(map[string]*dal.MemberStat, 0),
 		CheckStatsMutex: &sync.Mutex{},
 	}, nil
 }
@@ -393,13 +394,31 @@ func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
 		return fmt.Errorf("Unable to fetch all member refs: %v", err.Error())
 	}
 
+	var checkTag string
+
+	if resp.Action != "delete" {
+		var err error
+
+		checkTag, err = d.DalClient.GetCheckMemberTag(resp.Node.Key)
+		if err != nil {
+			return fmt.Errorf("handleCheckConfigChange: %v", err)
+		}
+	}
+
 	log.Debugf("handleCheckConfigChange: contents of memberRefs: %v", memberRefs)
 
 	var memberID string
 
 	// If the check is brand new (ie. does not run on any node) - pick a node to run it on
 	if val, ok := memberRefs[resp.Node.Key]; !ok {
-		memberID = d.PickNextMember()
+		var err error
+
+		memberID, err = d.PickNextMember(checkTag)
+		if err != nil {
+			return fmt.Errorf("%v-handleCheckConfigChange: Unable to pick next available member for check '%v': %v",
+				d.Identifier, resp.Node.Key, err)
+		}
+
 		log.Debugf("Check '%v' IS brand new; picked new node '%v' for it", resp.Node.Key, memberID)
 	} else {
 		log.Debugf("Check '%v' is NOT brand new and exists on member %v", resp.Node.Key, val)
@@ -430,37 +449,51 @@ func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
 
 // Return the least taxed cluster member
 // TODO: This needs to be updated to understand node tags + check pinning
-func (d *Director) PickNextMember() string {
+func (d *Director) PickNextMember(checkTag string) (string, error) {
 	d.CheckStatsMutex.Lock()
 	defer d.CheckStatsMutex.Unlock()
 
+	// Check stats not yet populated, return self
 	if len(d.CheckStats) == 0 {
-		// Check stats not yet populated, return self
-		log.Debug("PickNextMember: Check stats are not yet populated, returning self")
-		return d.MemberID
-	}
-
-	var leastTaxedMember string
-	var leastChecks int
-
-	for k, v := range d.CheckStats {
-		// Handle first iteration
-		if leastTaxedMember == "" {
-			leastTaxedMember = k
-			leastChecks = v
-			continue
+		// Return ourselves if we do not have any tags configured and the check has no tags either
+		if checkTag == "" && len(d.Config.Tags) == 0 {
+			return d.MemberID, nil
 		}
 
-		if v < leastChecks {
-			leastTaxedMember = k
-			leastChecks = v
+		// Return ourselves if we have the same tag that the check is tagged to
+		if util.StringSliceContains(d.Config.Tags, checkTag) {
+			return d.MemberID, nil
 		}
+
+		return "", fmt.Errorf("Unable to find a suitable member; required tag: %v", checkTag)
 	}
 
-	// Let's bump up check stats for picked member (so they do not get picked immediately thereafter)
-	d.CheckStats[leastTaxedMember]++
+	// figure out feasible members
+	feasibleMembers := make([]string, 0)
 
-	return leastTaxedMember
+	// TODO ergh
+
+	// var leastTaxedMember string
+	// var leastChecks int
+
+	// for k, v := range d.CheckStats {
+	// 	// Handle first iteration
+	// 	if leastTaxedMember == "" {
+	// 		leastTaxedMember = k
+	// 		leastChecks = v.NumChecks
+	// 		continue
+	// 	}
+
+	// 	if v.NumChecks < leastChecks {
+	// 		leastTaxedMember = k
+	// 		leastChecks = v.NumChecks
+	// 	}
+	// }
+
+	// // Let's bump up check stats for picked member (so they do not get picked immediately thereafter)
+	// d.CheckStats[leastTaxedMember].NumChecks++
+
+	// return leastTaxedMember
 }
 
 // Determine if a specific event can be ignored
