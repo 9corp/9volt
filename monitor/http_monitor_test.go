@@ -43,7 +43,7 @@ var _ = Describe("http_monitor", func() {
 					HTTPStatusCode: 200,
 				},
 			}
-			monitor = NewHTTPMonitor(config).(*HTTPMonitor)
+			monitor = NewHTTPMonitor(config)
 
 			Expect(monitor.Timeout).NotTo(Equal(util.CustomDuration(0)))
 			Expect(monitor.MonitorFunc).NotTo(BeNil())
@@ -61,7 +61,7 @@ var _ = Describe("http_monitor", func() {
 					HTTPStatusCode: 200,
 				},
 			}
-			monitor = NewHTTPMonitor(config).(*HTTPMonitor)
+			monitor = NewHTTPMonitor(config)
 		})
 
 		It("should return nil with correct settings", func() {
@@ -87,7 +87,7 @@ var _ = Describe("http_monitor", func() {
 					HTTPStatusCode: 200,
 				},
 			}
-			monitor = NewHTTPMonitor(config).(*HTTPMonitor)
+			monitor = NewHTTPMonitor(config)
 			url = monitor.constructURL()
 		})
 
@@ -133,7 +133,7 @@ var _ = Describe("http_monitor", func() {
 				Config: &MonitorConfig{},
 			}
 
-			monitor = NewHTTPMonitor(config).(*HTTPMonitor)
+			monitor = NewHTTPMonitor(config)
 		})
 
 		It("handles http URLs", func() {
@@ -180,7 +180,7 @@ var _ = Describe("http_monitor", func() {
 					Host:    "beowulf",
 				},
 			}
-			monitor = NewHTTPMonitor(config).(*HTTPMonitor)
+			monitor = NewHTTPMonitor(config)
 			url = monitor.constructURL()
 		})
 

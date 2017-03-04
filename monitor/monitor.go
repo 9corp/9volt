@@ -104,9 +104,9 @@ func New(cfg *config.Config, messageChannel chan *alerter.Message, stateChannel 
 		StateChannel:   stateChannel,
 		MemberID:       cfg.MemberID,
 		SupportedMonitors: map[string]func(*RootMonitorConfig) IMonitor{
-			"http": NewHTTPMonitor,
-			"tcp":  NewTCPMonitor,
-			"exec": NewExecMonitor,
+			"http": func(cfg *RootMonitorConfig) IMonitor { return NewHTTPMonitor(cfg) },
+			"tcp":  func(cfg *RootMonitorConfig) IMonitor { return NewTCPMonitor(cfg) },
+			"exec": func(cfg *RootMonitorConfig) IMonitor { return NewExecMonitor(cfg) },
 		},
 		runningMonitors:    make(map[string]IMonitor, 0),
 		runningMonitorLock: &sync.Mutex{},

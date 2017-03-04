@@ -23,7 +23,7 @@ type ExecMonitor struct {
 	FullCmd string
 }
 
-func NewExecMonitor(rmc *RootMonitorConfig) IMonitor {
+func NewExecMonitor(rmc *RootMonitorConfig) *ExecMonitor {
 	e := &ExecMonitor{
 		Base: Base{
 			RMC:        rmc,
