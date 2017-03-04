@@ -2,7 +2,9 @@ package monitor
 
 import (
 	"io/ioutil"
+	"time"
 
+	"github.com/9corp/9volt/util"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"gopkg.in/jarcoal/httpmock.v1"
@@ -29,14 +31,49 @@ var _ = Describe("http_monitor", func() {
 		config  *RootMonitorConfig
 		url     string
 	)
+
 	Context("NewHTTPMonitor", func() {
-		// Not very easy to test monitor internal settings due to constructor returning an interface
-		PIt("should return IMonitor instance")
+		It("should return IMonitor instance", func() {
+			config = &RootMonitorConfig{
+				Config: &MonitorConfig{
+					HTTPURL:        "/health",
+					Port:           31337,
+					HTTPSSL:        true,
+					Host:           "beowulf",
+					HTTPStatusCode: 200,
+				},
+			}
+			monitor = NewHTTPMonitor(config).(*HTTPMonitor)
+
+			Expect(monitor.Timeout).NotTo(Equal(util.CustomDuration(0)))
+			Expect(monitor.MonitorFunc).NotTo(BeNil())
+		})
 	})
 
 	Context("Validate", func() {
-		PIt("should return nil with correct settings")
-		PIt("should return error if timeout exceeds or is equal to ")
+		BeforeEach(func() {
+			config = &RootMonitorConfig{
+				Config: &MonitorConfig{
+					HTTPURL:        "/health",
+					Port:           31337,
+					HTTPSSL:        true,
+					Host:           "beowulf",
+					HTTPStatusCode: 200,
+				},
+			}
+			monitor = NewHTTPMonitor(config).(*HTTPMonitor)
+		})
+
+		It("should return nil with correct settings", func() {
+			config.Config.Interval = util.CustomDuration(5 * time.Second)
+			Expect(monitor.Validate()).To(BeNil())
+		})
+
+		It("should return error if timeout exceeds or is equal to interval", func() {
+			err := monitor.Validate()
+			Expect(err).NotTo(BeNil())
+			Expect(err.Error()).To(ContainSubstring("cannot equal or exceed"))
+		})
 	})
 
 	Context("httpCheck", func() {
