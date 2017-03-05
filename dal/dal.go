@@ -135,6 +135,8 @@ func (d *Dal) Refresh(key string, ttl int) error {
 // By default, passing a nil for Options will NOT recurse and use the default
 // prefix of `d.Prefix`. Passing in a `GetOptions{NoPrefix: true}` will cause
 // GET to not use ANY prefix (assuming key name includes full path).
+//
+// Returns a map[keyname]value; if dir is empty, return an empty map.
 func (d *Dal) Get(key string, getOptions *GetOptions) (map[string]string, error) {
 	// if given no options, instantiate default GetOptions
 	if getOptions == nil {
@@ -293,21 +295,33 @@ func (d *Dal) ClearCheckReference(memberID, keyName string) error {
 
 // Remove all key refs under individual member config dir
 func (d *Dal) ClearCheckReferences(memberID string) error {
-	_, err := d.KeysAPI.Delete(
-		context.Background(),
-		d.Prefix+"/cluster/members/"+memberID+"/config/",
-		&client.DeleteOptions{
-			Recursive: true,
-			Dir:       false,
-		},
-	)
-
-	// Prevent erroring on a 404
-	if client.IsKeyNotFound(err) {
-		return nil
+	// A recursive delete removes all child entries AND the dir itself; this is
+	// a no-go for us, so we first perform a recursive fetch and then remove
+	// each individual entry. See: https://github.com/coreos/etcd/issues/2385
+	data, err := d.Get("/cluster/members/"+memberID+"/config/", &GetOptions{
+		Recurse: true,
+	})
+	if err != nil {
+		if !client.IsKeyNotFound(err) {
+			return err
+		}
 	}
 
-	return err
+	for key, _ := range data {
+		_, err := d.KeysAPI.Delete(
+			context.Background(),
+			key,
+			&client.DeleteOptions{
+				Recursive: false,
+			},
+		)
+
+		if err != nil {
+			return fmt.Errorf("Unable to delete '%v' during ClearCheckReferences: %v", key, err)
+		}
+	}
+
+	return nil
 }
 
 // Get slice of all member id's under /cluster/members/*

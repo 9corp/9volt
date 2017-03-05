@@ -55,7 +55,7 @@ Mainloop:
 		}
 	}
 
-	log.Warningf("%v-%v: Goroutine has been stopped for monitor %v; exiting...", b.Identify(), b.RMC.GID, b.RMC.Name)
+	log.Debugf("%v-%v: Goroutine has been stopped for monitor %v; exiting...", b.Identify(), b.RMC.GID, b.RMC.Name)
 	return nil
 }
 
