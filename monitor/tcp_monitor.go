@@ -25,7 +25,7 @@ type TCPMonitor struct {
 	ReadSize     int
 }
 
-func NewTCPMonitor(rmc *RootMonitorConfig) IMonitor {
+func NewTCPMonitor(rmc *RootMonitorConfig) *TCPMonitor {
 	t := &TCPMonitor{
 		Base: Base{
 			RMC:        rmc,

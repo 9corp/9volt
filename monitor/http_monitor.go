@@ -22,7 +22,7 @@ type HTTPMonitor struct {
 	Timeout time.Duration
 }
 
-func NewHTTPMonitor(rmc *RootMonitorConfig) IMonitor {
+func NewHTTPMonitor(rmc *RootMonitorConfig) *HTTPMonitor {
 	h := &HTTPMonitor{
 		Base: Base{
 			RMC:        rmc,
