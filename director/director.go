@@ -407,6 +407,12 @@ func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
 
 	var memberID string
 
+	// NOTE: `delete` logic should execute *BEFORE* everything else to avoid stuff like this:
+	//
+	// DEBU[1048] director-handleCheckConfigChange: Received new response for key /9volt/monitor/exec-check12
+	// DEBU[1048] Check '/9volt/monitor/exec-check12' IS brand new; picked new member '141bb500' for it
+	// ERRO[1048] director-checkConfigWatcher: Unable to process config change for /9volt/monitor/exec-check12: director-handleCheckConfigChange: Unable to complete check config update: 100: Key not found (/9volt/cluster/members/141bb500/config/Lzl2b2x0L21vbml0b3IvZXhlYy1jaGVjazEy) [17339]
+	//
 	// The below block should be updated to the following logic:
 	//
 	// if memberRefs contain the key {
