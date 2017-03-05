@@ -405,9 +405,20 @@ func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
 		}
 	}
 
-	log.Debugf("handleCheckConfigChange: contents of memberRefs: %v", memberRefs)
-
 	var memberID string
+
+	// The below block should be updated to the following logic:
+	//
+	// if memberRefs contain the key {
+	//   if member contains the same tag as new check config {
+	//     perform set
+	//   } else {
+	//     delete existing reference
+	//     attempt to pick next member
+	//   }
+	// } else {
+	//   pick next member
+	// }
 
 	// If the check is brand new (ie. does not run on any node) - pick a node to run it on
 	if val, ok := memberRefs[resp.Node.Key]; !ok {
@@ -419,8 +430,13 @@ func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
 				d.Identifier, resp.Node.Key, err)
 		}
 
-		log.Debugf("Check '%v' IS brand new; picked new node '%v' for it", resp.Node.Key, memberID)
+		log.Debugf("Check '%v' IS brand new; picked new member '%v' for it", resp.Node.Key, memberID)
 	} else {
+		// TODO: Unhandled case here: if the check was re-pinned to a new node OR
+		// previously had no member-tag and now does - the check will be restarted
+		// on the *same* existing node.
+		//
+		// This entire if/else block needs to be updated to deal with this case
 		log.Debugf("Check '%v' is NOT brand new and exists on member %v", resp.Node.Key, val)
 		memberID = val
 	}
@@ -448,7 +464,6 @@ func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
 }
 
 // Return the least taxed cluster member
-// TODO: This needs to be updated to understand node tags + check pinning
 func (d *Director) PickNextMember(checkTag string) (string, error) {
 	d.CheckStatsMutex.Lock()
 	defer d.CheckStatsMutex.Unlock()
@@ -465,35 +480,72 @@ func (d *Director) PickNextMember(checkTag string) (string, error) {
 			return d.MemberID, nil
 		}
 
-		return "", fmt.Errorf("Unable to find a suitable member; required tag: %v", checkTag)
+		return "", fmt.Errorf("Unable to find a suitable member with empty check stats; required tag: '%v'", checkTag)
 	}
 
 	// figure out feasible members
-	feasibleMembers := make([]string, 0)
+	feasibleMembers := d.filterMembersByTag(d.CheckStats, checkTag)
 
-	// TODO ergh
+	log.Warningf(">>>>>> FEASIBLE MEMBER CONTENT: %v", feasibleMembers)
 
-	// var leastTaxedMember string
-	// var leastChecks int
+	if len(feasibleMembers) == 0 {
+		return "", fmt.Errorf("No feasible members found after filter; required tag: '%v'", checkTag)
+	}
 
-	// for k, v := range d.CheckStats {
-	// 	// Handle first iteration
-	// 	if leastTaxedMember == "" {
-	// 		leastTaxedMember = k
-	// 		leastChecks = v.NumChecks
-	// 		continue
-	// 	}
+	// Let's figure out the least taxed, *feasible* member now
+	var leastTaxedMember string
+	var leastChecks int
 
-	// 	if v.NumChecks < leastChecks {
-	// 		leastTaxedMember = k
-	// 		leastChecks = v.NumChecks
-	// 	}
-	// }
+	for _, memberID := range feasibleMembers {
+		if _, ok := d.CheckStats[memberID]; !ok {
+			log.Warningf("CheckStats do not (yet) contain cluster member '%v'; new check distribution suboptimal", memberID)
+			continue
+		}
 
-	// // Let's bump up check stats for picked member (so they do not get picked immediately thereafter)
-	// d.CheckStats[leastTaxedMember].NumChecks++
+		// Handle first iteration
+		if leastTaxedMember == "" {
+			leastTaxedMember = memberID
+			leastChecks = d.CheckStats[memberID].NumChecks
+			continue
+		}
 
-	// return leastTaxedMember
+		if d.CheckStats[memberID].NumChecks < leastChecks {
+			leastTaxedMember = memberID
+			leastChecks = d.CheckStats[memberID].NumChecks
+		}
+	}
+
+	if leastTaxedMember == "" {
+		// Edge case - d.CheckStats do not (yet) contain any of the feasible members
+		return "", fmt.Errorf("Unable to find least taxed member")
+	}
+
+	// Let's bump up check stats for picked member (so they do not get picked immediately thereafter)
+	d.CheckStats[leastTaxedMember].NumChecks++
+
+	return leastTaxedMember, nil
+}
+
+// Go through a checkstat map, find any members that are tagged with `checkTag`;
+// return slice of memberID's; note that it is _assumed_ that something else
+// is managing the mutex for checkStats prior to this method being executed.
+func (d *Director) filterMembersByTag(checkStats map[string]*dal.MemberStat, checkTag string) []string {
+	members := make([]string, 0)
+
+	for memberID, memberStat := range checkStats {
+		// Match, if the check doesn't have a tag and the member doesn't have any tags either
+		if len(memberStat.Tags) == 0 && checkTag == "" {
+			members = append(members, memberID)
+			continue
+		}
+
+		if util.StringSliceContains(memberStat.Tags, checkTag) {
+			members = append(members, memberID)
+			continue
+		}
+	}
+
+	return members
 }
 
 // Determine if a specific event can be ignored

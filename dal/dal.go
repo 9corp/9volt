@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path"
 	"time"
@@ -410,6 +411,10 @@ func (d *Dal) FetchCheckStats() (map[string]*MemberStat, error) {
 
 	// Let's record the members that have no checks assigned to them
 	for _, memberID := range freeMembers {
+		if _, ok := checkStats[memberID]; !ok {
+			checkStats[memberID] = &MemberStat{}
+		}
+
 		checkStats[memberID].NumChecks = 0
 	}
 
