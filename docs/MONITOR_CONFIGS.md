@@ -179,3 +179,63 @@ monitor:
 | read-timeout | false   | duration     |    2s   |
 | write-timeout | false | duration      |    2s   |
 | read-size   | false   | int           |  4096 (4K) |
+
+### DNS
+Perform various DNS resolution checks for a particular DNS query against a
+specific DNS server.
+
+This check can detect a number of possible errors with a DNS query. It attempts
+to check the most important things first and only check the other settings
+after those pass. It does not currently roll up a set of failures. The order
+that checks proceed is:
+
+1. Can we query this server at all?
+2. If we had an expected number of records, did we get them?
+3. Did we get any results?
+4. Did we take longer than `dns-max-time` to resolve?
+5. Did all of the records match the `expect` regex we passed?
+
+Failing any of the above (if specified) will result in an error.
+
+A sample configuration looks like:
+
+```yaml
+monitor:
+  google-com-dns:
+    type: dns
+    description: "google.com DNS check"
+    dns-target: "google.com"
+    host: 8.8.8.8
+    dns-expected-count: 5
+    dns-record-type: "A"
+    dns-max-time: "100ms"
+    expect: "IN\\s+A"
+    interval: 10s
+    timeout: 1s
+    warning-threshold: 1
+    critical-threshold: 3
+    warning-alerter:
+      - primary-slack
+    critical-alerter:
+      - primary-email
+```
+
+We will make a DNS query to `host` and try to resolve the record `dns-target`.
+Afterward we will make optional checks and then validate the regex contained in
+`expect`. This will be matched against the full text line returned from DNS. E.g.
+for an `A` record this would be matched against:
+
+```
+google.com.	299	IN	A	 209.85.202.102
+```
+
+|  Attribute         | Required |     Type     | Default   | 
+|--------------------|----------|--------------|-----------|
+| host               | **true** | string       |     -     |
+| interval           | **true** | duration     |     -     |
+| dns-target         | **true** | string       |     -     |
+| expect             | false    | string(regex)|    "."    |
+| dns-record-type    | false    | string       |    "A"    |
+| dns-max-time       | false    | duration     |     -     |
+| dns-expected-count | false    | int          |     -     |
+

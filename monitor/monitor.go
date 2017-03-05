@@ -87,6 +87,12 @@ type MonitorConfig struct {
 	ExecArgs       []string `json:"args,omitempty"`
 	ExecReturnCode int      `json:"return-code,omitempty"`
 
+	// DNS specific attributes
+	DnsTarget        string              `json:"dns-target, omitempty"`
+	DnsRecordType    string              `json:"dns-record-type, omitempty"`
+	DnsMaxTime       util.CustomDuration `json:"dns-max-time, omitempty"`
+	DnsExpectedCount int                 `json:"dns-expected-count, omitempty"`
+
 	// Alerting related configuration
 	WarningThreshold  int      `json:"warning-threshold,omitempty"`  // how many times a check must fail before a warning alert is emitted
 	CriticalThreshold int      `json:"critical-threshold,omitempty"` // how many times a check must fail before a critical alert is emitted
@@ -104,9 +110,10 @@ func New(cfg *config.Config, messageChannel chan *alerter.Message, stateChannel 
 		StateChannel:   stateChannel,
 		MemberID:       cfg.MemberID,
 		SupportedMonitors: map[string]func(*RootMonitorConfig) IMonitor{
+			"dns":  func(cfg *RootMonitorConfig) IMonitor { return NewDnsMonitor(cfg) },
+			"exec": func(cfg *RootMonitorConfig) IMonitor { return NewExecMonitor(cfg) },
 			"http": func(cfg *RootMonitorConfig) IMonitor { return NewHTTPMonitor(cfg) },
 			"tcp":  func(cfg *RootMonitorConfig) IMonitor { return NewTCPMonitor(cfg) },
-			"exec": func(cfg *RootMonitorConfig) IMonitor { return NewExecMonitor(cfg) },
 		},
 		runningMonitors:    make(map[string]IMonitor, 0),
 		runningMonitorLock: &sync.Mutex{},
