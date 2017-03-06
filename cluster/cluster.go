@@ -522,10 +522,5 @@ func (c *Cluster) amDirector() bool {
 	c.DirectorLock.Lock()
 	defer c.DirectorLock.Unlock()
 
-	// TODO: hmm - can we just `return c.DirectorState` here?
-	if c.DirectorState {
-		return true
-	}
-
-	return false
+	return c.DirectorState
 }
