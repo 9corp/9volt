@@ -88,10 +88,10 @@ type MonitorConfig struct {
 	ExecReturnCode int      `json:"return-code,omitempty"`
 
 	// DNS specific attributes
-	DnsTarget        string              `json:"dns-target, omitempty"`
-	DnsRecordType    string              `json:"dns-record-type, omitempty"`
-	DnsMaxTime       util.CustomDuration `json:"dns-max-time, omitempty"`
-	DnsExpectedCount int                 `json:"dns-expected-count, omitempty"`
+	DnsTarget        string              `json:"dns-target,omitempty"`
+	DnsRecordType    string              `json:"dns-record-type,omitempty"`
+	DnsMaxTime       util.CustomDuration `json:"dns-max-time,omitempty"`
+	DnsExpectedCount int                 `json:"dns-expected-count,omitempty"`
 
 	// Alerting related configuration
 	WarningThreshold  int      `json:"warning-threshold,omitempty"`  // how many times a check must fail before a warning alert is emitted
