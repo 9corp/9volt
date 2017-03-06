@@ -22,6 +22,7 @@ While there are a bunch of solutions for monitoring and alerting using time seri
     - TCP
     - HTTP
     - Exec
+    - DNS
 - Natively supported alerters:
     - Slack
     - Pagerduty
