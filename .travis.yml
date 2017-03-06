@@ -2,6 +2,7 @@ language: go
 sudo: false
 go:
   - 1.7.3
+  - 1.8.x
   - tip
 env:
   global:
