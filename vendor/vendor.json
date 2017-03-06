@@ -99,6 +99,12 @@
 			"revisionTime": "2016-09-20T23:08:13Z"
 		},
 		{
+			"checksumSHA1": "Y89CHl2URaBbobeyCOr4kzbLwYE=",
+			"path": "github.com/miekg/dns",
+			"revision": "5d001d020961ae1c184f9f8152fdc73810481677",
+			"revisionTime": "2016-06-14T16:21:01Z"
+		},
+		{
 			"checksumSHA1": "BUTvC6/V0sBmyz2ZEqyh+Qmrm10=",
 			"path": "github.com/nlopes/slack",
 			"revision": "b7940f209838f93dc7ab0d823145513c9660f22a",

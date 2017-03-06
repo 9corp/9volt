@@ -6,5 +6,7 @@ node_modules
 debug
 ui/dist
 statik/statik.go
+*.swp
+*.swo
 
 !ui/dist/index.html
