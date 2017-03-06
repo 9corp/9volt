@@ -11,6 +11,7 @@
     - [Exec](#exec)
     - [HTTP](#http)
     - [TCP](#tcp)
+    - [DNS](#dns)
 
 ## Base Monitor Settings 
 There are a number of monitor configuration attributes that work for *all* monitor configs.
