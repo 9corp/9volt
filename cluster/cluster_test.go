@@ -1,8 +1,15 @@
 package cluster
 
 import (
+	"errors"
+	"fmt"
+	"github.com/9corp/9volt/config"
+	"github.com/9corp/9volt/dal/dalfakes"
+	"github.com/9corp/9volt/fakes/eventfakes"
 	. "github.com/onsi/ginkgo"
-	// . "github.com/onsi/gomega"
+	. "github.com/onsi/gomega"
+	d "github.com/relistan/go-director"
+	"sync"
 )
 
 var _ = Describe("cluster", func() {
@@ -18,9 +25,93 @@ var _ = Describe("cluster", func() {
 	})
 
 	Context("runDirectorMonitor", func() {
-		PIt("should handle state change")
-		PIt("should add event and log error if unable to fetch director state")
-		PIt("should add event and log error if unable to handle state change")
+		var (
+			loop            *d.FreeLooper
+			clust           *Cluster
+			fakeDAL         *dalfakes.FakeIDal
+			fakeEventClient *eventfakes.FakeIClient
+
+			directorID string
+		)
+		BeforeEach(func() {
+			fakeDAL = &dalfakes.FakeIDal{}
+			fakeEventClient = &eventfakes.FakeIClient{}
+
+			loop = d.NewFreeLooper(d.ONCE, make(chan error))
+			directorID = "myid123"
+			clust = &Cluster{
+				DalClient: fakeDAL,
+				Config: &config.Config{
+					EQClient: fakeEventClient,
+				},
+				DirectorLock:  &sync.Mutex{},
+				MemberID:      directorID,
+				DirectorState: true,
+			}
+		})
+
+		JustBeforeEach(func() {
+			go clust.runDirectorMonitor(loop)
+		})
+
+		Context("happy path", func() {
+			BeforeEach(func() {
+				By("is the director already")
+				fakeDAL.GetReturns(
+					map[string]string{
+						DIRECTOR_KEY: fmt.Sprintf(`{"MemberID":"%s","LastUpdate":"2017-03-05T09:39:54.465896214-08:00"}`, directorID),
+					},
+					nil,
+				)
+			})
+
+			It("should do nothing", func() {
+				err := loop.Wait()
+				Expect(err).ToNot(HaveOccurred())
+				Expect(clust.DirectorState).To(BeTrue())
+			})
+
+		})
+
+		Context("get state fails", func() {
+			BeforeEach(func() {
+				fakeDAL.GetReturns(nil, errors.New("some error"))
+			})
+
+			It("should log an error event", func() {
+				err := loop.Wait()
+				Expect(err).ToNot(HaveOccurred())
+
+				k, v := fakeEventClient.AddWithErrorLogArgsForCall(0)
+				Expect(k).To(Equal("error"))
+				Expect(v).To(ContainSubstring("directorMonitor: Unable to fetch director state"))
+				Expect(v).To(ContainSubstring("some error"))
+			})
+		})
+
+		Context("handle state fails", func() {
+			BeforeEach(func() {
+				By("not director but etcd disagrees")
+				clust.DirectorState = false
+				fakeDAL.GetReturns(
+					map[string]string{
+						DIRECTOR_KEY: fmt.Sprintf(`{"MemberID":"%s","LastUpdate":"2017-03-05T09:39:54.465896214-08:00"}`, directorID),
+					},
+					nil,
+				)
+				fakeDAL.UpdateDirectorStateReturns(errors.New("failed that"))
+			})
+
+			It("should log an error event", func() {
+				err := loop.Wait()
+				Expect(err).ToNot(HaveOccurred())
+
+				k, v := fakeEventClient.AddWithErrorLogArgsForCall(0)
+				Expect(k).To(Equal("error"))
+				Expect(v).To(ContainSubstring("directorMonitor: Unable to handle state"))
+				Expect(v).To(ContainSubstring("failed that"))
+			})
+		})
 	})
 
 	Context("runDirectorHeartbeat", func() {
