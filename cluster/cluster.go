@@ -33,6 +33,7 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	d "github.com/relistan/go-director"
 
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/dal"
@@ -55,7 +56,7 @@ type ICluster interface {
 	Start() error
 
 	// TODO: Implement go-director for loop control
-	runDirectorMonitor()
+	runDirectorMonitor(d.Looper)
 	runDirectorHeartbeat()
 	runMemberHeartbeat()
 	runMemberMonitor()
@@ -124,7 +125,8 @@ func New(cfg *config.Config, stateChan, distributeChan chan<- bool) (ICluster, e
 func (c *Cluster) Start() error {
 	log.Debugf("%v: Launching cluster engine components...", c.Identifier)
 
-	go c.runDirectorMonitor()
+	go c.runDirectorMonitor(
+		d.NewImmediateTimedLooper(d.FOREVER, time.Duration(c.Config.HeartbeatInterval), nil))
 	go c.runDirectorHeartbeat()
 
 	// memberHeartbeat creates initial member structure; wait until that's
@@ -140,18 +142,17 @@ func (c *Cluster) Start() error {
 }
 
 // ALWAYS: monitor /9volt/cluster/director to expire; become director
-func (c *Cluster) runDirectorMonitor() {
+func (c *Cluster) runDirectorMonitor(looper d.Looper) {
 	log.Debugf("%v: Launching director monitor...", c.Identifier)
 
-	for {
+	looper.Loop(func() error {
 		directorJSON, err := c.getState()
 		if err != nil {
 			c.Config.EQClient.AddWithErrorLog("error",
 				fmt.Sprintf("%v-directorMonitor: Unable to fetch director state: %v",
 					c.Identifier, err.Error()))
 
-			time.Sleep(time.Duration(c.Config.HeartbeatInterval))
-			continue
+			return nil
 		}
 
 		if err := c.handleState(directorJSON); err != nil {
@@ -159,8 +160,8 @@ func (c *Cluster) runDirectorMonitor() {
 				fmt.Sprintf("%v-directorMonitor: Unable to handle state: %v", c.Identifier, err.Error()))
 		}
 
-		time.Sleep(time.Duration(c.Config.HeartbeatInterval))
-	}
+		return nil
+	})
 }
 
 // IF DIRECTOR: send periodic heartbeats to /9volt/cluster/director
