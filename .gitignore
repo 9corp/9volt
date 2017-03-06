@@ -8,5 +8,6 @@ ui/dist
 statik/statik.go
 *.swp
 *.swo
+/default.etcd/
 
 !ui/dist/index.html
