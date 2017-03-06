@@ -20,7 +20,7 @@ type Config struct {
 	EtcdMembers   []string
 	Tags          []string
 	DalClient     dal.IDal
-	EQClient      *event.Client
+	EQClient      event.IClient
 
 	serverConfig
 }

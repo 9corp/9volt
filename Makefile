@@ -49,6 +49,10 @@ installtools: ## Install development related tools
 	go get github.com/yvasiyarov/swagger
 	go get github.com/rakyll/statik
 
+generate: ## Run generate for non-vendor packages only
+	go list ./... | grep -v vendor | xargs go generate
+	go fmt ./fakes/...
+
 build: clean build/linux build/darwin ## Build for linux and darwin (save to OUTPUT_DIR/BIN)
 
 build/linux: clean/linux build/ui ## Build for linux (save to OUTPUT_DIR/BIN)

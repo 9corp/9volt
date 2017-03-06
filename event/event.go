@@ -26,6 +26,13 @@ type Queue struct {
 	channel    chan *Event
 }
 
+//go:generate counterfeiter -o ../fakes/eventfakes/fake_client.go event.go IClient
+
+type IClient interface {
+	Add(string, string) error
+	AddWithErrorLog(string, string) error
+}
+
 type Client struct {
 	queue *Queue
 }
