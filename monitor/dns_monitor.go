@@ -65,6 +65,10 @@ func (dns *DnsMonitor) Validate() error {
 		dns.Identifier, dns.RMC.ConfigName,
 	)
 
+	if _, ok := resolver.StringToType[strings.ToUpper(dns.RMC.Config.DnsRecordType)]; !ok {
+		return fmt.Errorf("Unknown record type: %s", dns.RMC.Config.DnsRecordType)
+	}
+
 	if len(dns.RMC.Config.DnsTarget) < 1 {
 		return fmt.Errorf("No DNS target configured!")
 	}

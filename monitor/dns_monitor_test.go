@@ -17,10 +17,11 @@ var _ = Describe("dns_monitor", func() {
 	BeforeEach(func() {
 		config = &RootMonitorConfig{
 			Config: &MonitorConfig{
-				Host:      "beowulf",
-				DnsTarget: "grendel",
-				Expect:    "IN A",
-				Interval:  util.CustomDuration(3 * time.Second),
+				Host:          "beowulf",
+				DnsTarget:     "grendel",
+				Expect:        "IN A",
+				DnsRecordType: "A",
+				Interval:      util.CustomDuration(3 * time.Second),
 			},
 		}
 
@@ -33,7 +34,7 @@ var _ = Describe("dns_monitor", func() {
 			Expect(monitor.RecordType).To(Equal(DEFAULT_DNS_RECORD_TYPE))
 			Expect(monitor.Client).NotTo(BeNil())
 			Expect(monitor.MonitorFunc).NotTo(BeNil())
-      Expect(monitor.Expect).NotTo(BeNil())
+			Expect(monitor.Expect).NotTo(BeNil())
 		})
 
 		It("sources some instance configs from the main config", func() {
@@ -47,6 +48,14 @@ var _ = Describe("dns_monitor", func() {
 		})
 
 		Context("with bad settings", func() {
+			It("bad record type", func() {
+				config.Config.DnsRecordType = "foobar"
+				err := monitor.Validate()
+
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(ContainSubstring("Unknown record type"))
+			})
+
 			It("bad timeouts", func() {
 				config.Config.Interval = 0
 				err := monitor.Validate()
