@@ -25,7 +25,7 @@ import (
 var (
 	server        = kingpin.Command("server", "9volt server")
 	listenAddress = server.Flag("listen", "Address for 9volt's API to listen on").Short('l').Default("0.0.0.0:8080").Envar("NINEV_LISTEN_ADDRESS").String()
-	tags          = server.Flag("tags", "Specify one or more member tags this instance has; see MONITOR_CONFIGS.md for details").Short('t').Envar("NINEV_TAGS").Strings()
+	tags          = server.Flag("tags", "Specify one or more member tags this instance has; see MONITOR_CONFIGS.md for details").Short('t').Envar("NINEV_TAGS").String()
 
 	cfg         = kingpin.Command("cfg", "9volt configuration utility")
 	dirArg      = cfg.Arg("dir", "Directory to search for 9volt YAML files").Required().String()
@@ -62,6 +62,9 @@ func runServer() {
 
 	memberID := util.GetMemberID(*listenAddress)
 
+	// kingpin splits on newline (?); split our tags on ',' instead
+	memberTags := util.SplitTags(*tags)
+
 	// Create an initial dal client
 	dalClient, err := dal.New(*etcdPrefix, *etcdMembers)
 	if err != nil {
@@ -73,7 +76,7 @@ func runServer() {
 	eqClient := eventQueue.NewClient()
 
 	// Load our configuration
-	cfg := config.New(memberID, *listenAddress, *etcdPrefix, *etcdMembers, *tags, dalClient, eqClient)
+	cfg := config.New(memberID, *listenAddress, *etcdPrefix, *etcdMembers, memberTags, dalClient, eqClient)
 
 	if err := cfg.Load(); err != nil {
 		log.Fatalf("Unable to load configuration from etcd: %v", err.Error())
@@ -152,8 +155,8 @@ func runServer() {
 	apiServer := api.New(cfg, mwHandler, version, debugUserInterface)
 	go apiServer.Run()
 
-	log.Infof("9volt has started! API address: %v MemberID: %v", "http://"+
-		*listenAddress, memberID)
+	log.Infof("9volt has started! API address: %v MemberID: %v Tags: %v", "http://"+
+		*listenAddress, memberID, strings.Join(memberTags, ", "))
 
 	wg.Wait()
 }
