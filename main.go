@@ -25,7 +25,7 @@ import (
 var (
 	server        = kingpin.Command("server", "9volt server")
 	listenAddress = server.Flag("listen", "Address for 9volt's API to listen on").Short('l').Default("0.0.0.0:8080").Envar("NINEV_LISTEN_ADDRESS").String()
-	tags          = server.Flag("tags", "Specify one or more member tags this instance has; see MONITOR_CONFIGS.md for details").Short('t').Envar("NINEV_TAGS").String()
+	tags          = server.Flag("tags", "Specify one or more member tags this instance has; see MONITOR_CONFIGS.md for details").Short('t').Envar("NINEV_MEMBER_TAGS").String()
 
 	cfg         = kingpin.Command("cfg", "9volt configuration utility")
 	dirArg      = cfg.Arg("dir", "Directory to search for 9volt YAML files").Required().String()
@@ -34,7 +34,7 @@ var (
 	dryrunFlag  = cfg.Flag("dryrun", "Do NOT push any changes, just show me what you'd do").Bool()
 
 	etcdPrefix  = kingpin.Flag("etcd-prefix", "Prefix that 9volt's configuration is stored under in etcd").Short('p').Default("9volt").Envar("NINEV_ETCD_PREFIX").String()
-	etcdMembers = kingpin.Flag("etcd-members", "List of etcd cluster members").Short('e').Default("http://localhost:2379").Envar("NINEV_ETCD_MEMBERS").Strings()
+	etcdMembers = kingpin.Flag("etcd-members", "List of etcd cluster members").Short('e').Default("http://localhost:2379").Envar("NINEV_ETCD_MEMBERS").String()
 	debugUI     = kingpin.Flag("debug-ui", "Debug the user interface locally").Short('u').Bool()
 	debug       = kingpin.Flag("debug", "Enable debug mode").Short('d').Envar("NINEV_DEBUG").Bool()
 
@@ -64,9 +64,10 @@ func runServer() {
 
 	// kingpin splits on newline (?); split our tags on ',' instead
 	memberTags := util.SplitTags(*tags)
+	etcdMemberList := strings.Split(*etcdMembers, ",")
 
 	// Create an initial dal client
-	dalClient, err := dal.New(*etcdPrefix, *etcdMembers)
+	dalClient, err := dal.New(*etcdPrefix, etcdMemberList)
 	if err != nil {
 		log.Fatalf("Unable to start initial etcd client: %v", err.Error())
 	}
@@ -76,7 +77,7 @@ func runServer() {
 	eqClient := eventQueue.NewClient()
 
 	// Load our configuration
-	cfg := config.New(memberID, *listenAddress, *etcdPrefix, *etcdMembers, memberTags, dalClient, eqClient)
+	cfg := config.New(memberID, *listenAddress, *etcdPrefix, etcdMemberList, memberTags, dalClient, eqClient)
 
 	if err := cfg.Load(); err != nil {
 		log.Fatalf("Unable to load configuration from etcd: %v", err.Error())
@@ -162,7 +163,9 @@ func runServer() {
 }
 
 func runCfgUtil() {
-	etcdClient, err := dal.NewCfgUtil(*etcdMembers, *etcdPrefix, *replaceFlag, *dryrunFlag, *nosyncFlag)
+	etcdMemberList := strings.Split(*etcdMembers, ",")
+
+	etcdClient, err := dal.NewCfgUtil(etcdMemberList, *etcdPrefix, *replaceFlag, *dryrunFlag, *nosyncFlag)
 	if err != nil {
 		log.Fatalf("Unable to create initial etcd client: %v", err.Error())
 	}
