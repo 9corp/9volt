@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"math/rand"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -83,6 +84,11 @@ func StringSliceContains(stringSlice []string, data string) bool {
 	}
 
 	return false
+}
+
+func SplitTags(tags string) []string {
+	tags = strings.Replace(tags, " ", "", -1)
+	return strings.Split(tags, ",")
 }
 
 // Return true if ANY element in s1 appears in s2, otherwise return false
