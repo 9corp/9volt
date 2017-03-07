@@ -12,6 +12,7 @@ import (
 
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/dal"
+	"github.com/9corp/9volt/util"
 )
 
 const (
@@ -33,7 +34,7 @@ type Director struct {
 	StateLock      *sync.Mutex
 	DalClient      dal.IDal
 
-	CheckStats      map[string]int
+	CheckStats      map[string]*dal.MemberStat
 	CheckStatsMutex *sync.Mutex
 }
 
@@ -51,7 +52,7 @@ func New(cfg *config.Config, stateChan <-chan bool, distributeChan <-chan bool) 
 		DistributeChan:  distributeChan,
 		StateLock:       &sync.Mutex{},
 		DalClient:       dalClient,
-		CheckStats:      make(map[string]int, 0),
+		CheckStats:      make(map[string]*dal.MemberStat, 0),
 		CheckStatsMutex: &sync.Mutex{},
 	}, nil
 }
@@ -388,79 +389,179 @@ func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
 	log.Debugf("%v-handleCheckConfigChange: Received new response for key %v",
 		d.Identifier, resp.Node.Key)
 
+	// Let's not bother going any further if we got an unsupported action
+	knownActions := []string{"set", "update", "create", "delete"}
+	if !util.StringSliceContains(knownActions, resp.Action) {
+		return fmt.Errorf("Unrecognized etcd action '%v' for check key '%v'", resp.Action, resp.Node.Key)
+	}
+
 	memberRefs, _, err := d.DalClient.FetchAllMemberRefs()
 	if err != nil {
 		return fmt.Errorf("Unable to fetch all member refs: %v", err.Error())
 	}
 
-	log.Debugf("handleCheckConfigChange: contents of memberRefs: %v", memberRefs)
+	// If this is a delete, let's get rid of the check
+	if resp.Action == "delete" {
+		if memberID, ok := memberRefs[resp.Node.Key]; ok {
+			if err := d.DalClient.ClearCheckReference(memberID, resp.Node.Key); err != nil {
+				return fmt.Errorf("Unable to clear check reference on member '%v' for '%v': %v",
+					memberID, resp.Node.Key, err)
+			}
+		} else {
+			log.Warningf("'delete' action for an orphaned check '%v' -- nothing to do", resp.Node.Key)
+		}
 
-	var memberID string
+		return nil
+	}
 
-	// If the check is brand new (ie. does not run on any node) - pick a node to run it on
-	if val, ok := memberRefs[resp.Node.Key]; !ok {
-		memberID = d.PickNextMember()
-		log.Debugf("Check '%v' IS brand new; picked new node '%v' for it", resp.Node.Key, memberID)
+	// Not a delete, so let's get this check's tag
+	checkTag, err := d.DalClient.GetCheckMemberTag(resp.Node.Key)
+	if err != nil {
+		return fmt.Errorf("handleCheckConfigChange: Unable to figure out tag for '%v': %v", resp.Node.Key, err)
+	}
+
+	var (
+		newMemberID  string
+		newMemberErr error
+	)
+
+	// This is the result of 3 or 4 attempts at mapping out all of the logic all
+	// thanks to the introduction of node tags and check pinning.
+	if existingMemberID, ok := memberRefs[resp.Node.Key]; ok {
+		// This check already exists on a node; does that member support the tags
+		// this check is configured with?
+		tags, err := d.DalClient.GetClusterMemberTags(existingMemberID)
+		if err != nil {
+			return fmt.Errorf("Unable to determine configured tags for member '%v': %v", existingMemberID, err)
+		}
+
+		// Yes! The check is not tagged, and the existing member does not have any tags!
+		if checkTag == "" && len(tags) == 0 {
+			newMemberID = existingMemberID
+		} else if util.StringSliceContains(tags, checkTag) {
+			newMemberID = existingMemberID
+		} else {
+			// No! This member is no longer a feasible place for this check to run.
+			// (delete the old check ref, followed by a create on the new member)
+			if err := d.DalClient.ClearCheckReference(existingMemberID, resp.Node.Key); err != nil {
+				return fmt.Errorf("Unable to remove old reference for check '%v' from member '%v': %v",
+					resp.Node.Key, existingMemberID, err)
+			}
+
+			newMemberID, newMemberErr = d.PickNextMember(checkTag)
+		}
 	} else {
-		log.Debugf("Check '%v' is NOT brand new and exists on member %v", resp.Node.Key, val)
-		memberID = val
+		// This is a brand new check
+		newMemberID, newMemberErr = d.PickNextMember(checkTag)
 	}
 
-	var actionErr error
-
-	switch resp.Action {
-	case "set":
-		actionErr = d.DalClient.CreateCheckReference(memberID, resp.Node.Key)
-	case "update":
-		actionErr = d.DalClient.CreateCheckReference(memberID, resp.Node.Key)
-	case "create":
-		actionErr = d.DalClient.CreateCheckReference(memberID, resp.Node.Key)
-	case "delete":
-		actionErr = d.DalClient.ClearCheckReference(memberID, resp.Node.Key)
-	default:
-		return fmt.Errorf("%v-handleCheckConfigChange: Unrecognized action '%v'", d.Identifier, resp.Action)
+	// Did PickNextMember() run into any errors?
+	if newMemberErr != nil {
+		return fmt.Errorf("Unable to pick next member for check '%v': %v", resp.Node.Key, newMemberErr)
 	}
 
-	if actionErr != nil {
-		return fmt.Errorf("%v-handleCheckConfigChange: Unable to complete check config update: %v", d.Identifier, actionErr.Error())
+	// Finally, let's create the actual check reference (and cause manager to start the check)
+	if err := d.DalClient.CreateCheckReference(newMemberID, resp.Node.Key); err != nil {
+		return fmt.Errorf("%v-handleCheckConfigChange: Unable to complete check config update: %v", d.Identifier, err)
 	}
 
 	return nil
 }
 
 // Return the least taxed cluster member
-// TODO: This needs to be updated to understand node tags + check pinning
-func (d *Director) PickNextMember() string {
+//
+// If check stats are blank; return our own memberid:
+//  - if the check tag is blank and we have no tags
+// 	- if the check tag is the same as one of our own tags
+//  - else, return a "no feasible members found" error
+//
+// If check stats are not blank:
+//	- build a 'feasible members' slice
+//  - determine if any of the feasible members have the 'checkTag'
+//  - if not, return a "no feasible members found" error
+//
+func (d *Director) PickNextMember(checkTag string) (string, error) {
 	d.CheckStatsMutex.Lock()
 	defer d.CheckStatsMutex.Unlock()
 
+	// Check stats not yet populated, return self
 	if len(d.CheckStats) == 0 {
-		// Check stats not yet populated, return self
-		log.Debug("PickNextMember: Check stats are not yet populated, returning self")
-		return d.MemberID
+		// Return ourselves if we do not have any tags configured and the check has no tags either
+		if checkTag == "" && len(d.Config.Tags) == 0 {
+			return d.MemberID, nil
+		}
+
+		// Return ourselves if we have the same tag that the check is tagged to
+		if util.StringSliceContains(d.Config.Tags, checkTag) {
+			return d.MemberID, nil
+		}
+
+		return "", fmt.Errorf("Unable to find a suitable member with empty check stats; required tag: '%v'", checkTag)
 	}
 
+	// figure out feasible members
+	feasibleMembers := d.filterMembersByTag(d.CheckStats, checkTag)
+
+	log.Warningf(">>>>>> FEASIBLE MEMBER CONTENT: %v", feasibleMembers)
+
+	if len(feasibleMembers) == 0 {
+		return "", fmt.Errorf("No feasible members found after filter; required tag: '%v'", checkTag)
+	}
+
+	// Let's figure out the least taxed, *feasible* member now
 	var leastTaxedMember string
 	var leastChecks int
 
-	for k, v := range d.CheckStats {
-		// Handle first iteration
-		if leastTaxedMember == "" {
-			leastTaxedMember = k
-			leastChecks = v
+	for _, memberID := range feasibleMembers {
+		if _, ok := d.CheckStats[memberID]; !ok {
+			log.Warningf("CheckStats do not (yet) contain cluster member '%v'; new check distribution suboptimal", memberID)
 			continue
 		}
 
-		if v < leastChecks {
-			leastTaxedMember = k
-			leastChecks = v
+		// Handle first iteration
+		if leastTaxedMember == "" {
+			leastTaxedMember = memberID
+			leastChecks = d.CheckStats[memberID].NumChecks
+			continue
+		}
+
+		if d.CheckStats[memberID].NumChecks < leastChecks {
+			leastTaxedMember = memberID
+			leastChecks = d.CheckStats[memberID].NumChecks
 		}
 	}
 
-	// Let's bump up check stats for picked member (so they do not get picked immediately thereafter)
-	d.CheckStats[leastTaxedMember]++
+	if leastTaxedMember == "" {
+		// Edge case - d.CheckStats do not (yet) contain any of the feasible members
+		return "", fmt.Errorf("Unable to find least taxed member")
+	}
 
-	return leastTaxedMember
+	// Let's bump up check stats for picked member (so they do not get picked immediately thereafter)
+	d.CheckStats[leastTaxedMember].NumChecks++
+
+	return leastTaxedMember, nil
+}
+
+// Go through a checkstat map, find any members that are tagged with `checkTag`;
+// return slice of memberID's; note that it is _assumed_ that something else
+// is managing the mutex for checkStats prior to this method being executed.
+func (d *Director) filterMembersByTag(checkStats map[string]*dal.MemberStat, checkTag string) []string {
+	members := make([]string, 0)
+
+	for memberID, memberStat := range checkStats {
+		// Match, if the check doesn't have a tag and the member doesn't have any tags either
+		if len(memberStat.Tags) == 0 && checkTag == "" {
+			members = append(members, memberID)
+			continue
+		}
+
+		if util.StringSliceContains(memberStat.Tags, checkTag) {
+			members = append(members, memberID)
+			continue
+		}
+	}
+
+	return members
 }
 
 // Determine if a specific event can be ignored

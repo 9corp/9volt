@@ -293,6 +293,7 @@ monitor:
     tags:
       - dbservers
       - mysql
+    member-tag: foobar
 
   # basic-http-check:
   #   type: http
