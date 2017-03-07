@@ -38,6 +38,7 @@ type IDal interface {
 	GetClusterStats() (*ClusterStats, error)
 	FetchEvents([]string) ([]byte, error)
 	GetClusterMembersWithTags() (map[string][]string, error)
+	GetClusterMemberTags(string) ([]string, error)
 	GetCheckMemberTag(string) (string, error)
 }
 
@@ -503,6 +504,26 @@ func (d *Dal) GetCheckKeysWithMemberTag() (map[string]string, error) {
 	}
 
 	return checkKeys, nil
+}
+
+// Get tags for a single cluster member
+func (d *Dal) GetClusterMemberTags(memberID string) ([]string, error) {
+	fullKey := "/cluster/members/" + memberID + "/status"
+	data, err := d.Get(fullKey, nil)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to fetch cluster member status for '%v': %v", memberID, err)
+	}
+
+	if _, ok := data[fullKey]; !ok {
+		return nil, fmt.Errorf("Returned data set does not contain our expected key '%v'", fullKey)
+	}
+
+	tags, err := d.parseTags(data[fullKey])
+	if err != nil {
+		return nil, fmt.Errorf("Unable to parse member tags for '%v': %v", memberID, err)
+	}
+
+	return tags, nil
 }
 
 // Fetch a specific alerter config by its key name

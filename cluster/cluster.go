@@ -284,8 +284,6 @@ func (c *Cluster) createInitialMemberStructure(memberDir string, heartbeatTimeou
 	}
 
 	// create member config dir
-	log.Warningf("ATTEMPTING TO CREATE A CONFIG DIR here: %v", memberDir)
-
 	if err := c.DalClient.Set(memberDir+"/config", "", true, 0, ""); err != nil {
 		return fmt.Errorf("Creating member config dir failed: %v", err.Error())
 	}
