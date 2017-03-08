@@ -64,7 +64,7 @@ func runServer() {
 
 	// kingpin splits on newline (?); split our tags on ',' instead
 	memberTags := util.SplitTags(*tags)
-	etcdMemberList := strings.Split(*etcdMembers, ",")
+	etcdMemberList := util.SplitTags(*etcdMembers)
 
 	// Create an initial dal client
 	dalClient, err := dal.New(*etcdPrefix, etcdMemberList)
@@ -163,7 +163,7 @@ func runServer() {
 }
 
 func runCfgUtil() {
-	etcdMemberList := strings.Split(*etcdMembers, ",")
+	etcdMemberList := util.SplitTags(*etcdMembers)
 
 	etcdClient, err := dal.NewCfgUtil(etcdMemberList, *etcdPrefix, *replaceFlag, *dryrunFlag, *nosyncFlag)
 	if err != nil {
