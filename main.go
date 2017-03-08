@@ -63,7 +63,12 @@ func runServer() {
 	memberID := util.GetMemberID(*listenAddress)
 
 	// kingpin splits on newline (?); split our tags on ',' instead
-	memberTags := util.SplitTags(*tags)
+	memberTags := make([]string, 0)
+
+	if *tags != "" {
+		memberTags = util.SplitTags(*tags)
+	}
+
 	etcdMemberList := util.SplitTags(*etcdMembers)
 
 	// Create an initial dal client
