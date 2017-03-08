@@ -22,7 +22,7 @@ services:
     environment:
       - NINEV_ETCD_MEMBERS=http://etcd:2379
       - NINEV_DEBUG=true
-      - NINEV_TAGS=foo
+      - NINEV_MEMBER_TAGS=foo
   9volt3:
     depends_on: 
       - etcd
@@ -34,7 +34,7 @@ services:
     environment:
       - NINEV_ETCD_MEMBERS=http://etcd:2379
       - NINEV_DEBUG=true
-      - NINEV_TAGS=foo, bar
+      - NINEV_MEMBER_TAGS=foo, bar
   etcd:
     image: quay.io/coreos/etcd:v3.1.2
     ports:
