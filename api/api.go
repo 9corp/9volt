@@ -12,9 +12,11 @@ package api
 
 import (
 	"net/http"
+	"os"
 
 	"github.com/InVisionApp/rye"
 	log "github.com/Sirupsen/logrus"
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 
 	"github.com/9corp/9volt/config"
@@ -50,54 +52,65 @@ func (a *Api) Run() {
 
 	routes := mux.NewRouter().StrictSlash(true)
 
-	routes.Handle("/", a.MWHandler.Handle([]rye.Handler{
-		a.HomeHandler,
-	})).Methods("GET")
+	routes.Handle(a.setupHandler(
+		"/", []rye.Handler{
+			a.HomeHandler,
+		})).Methods("GET")
 
 	// Common handlers
-	routes.Handle("/version", a.MWHandler.Handle([]rye.Handler{
-		a.VersionHandler,
-	})).Methods("GET")
+	routes.Handle(a.setupHandler(
+		"/version", []rye.Handler{
+			a.VersionHandler,
+		})).Methods("GET")
 
-	routes.Handle("/status/check", a.MWHandler.Handle([]rye.Handler{
-		a.StatusHandler,
-	})).Methods("GET")
+	routes.Handle(a.setupHandler(
+		"/status/check", []rye.Handler{
+			a.StatusHandler,
+		})).Methods("GET")
 
 	// State handlers (route order matters!)
-	routes.Handle("/api/v1/state", a.MWHandler.Handle([]rye.Handler{
-		a.StateWithTagsHandler,
-	})).Methods("GET").Queries("tags", "")
+	routes.Handle(a.setupHandler(
+		"/api/v1/state", []rye.Handler{
+			a.StateWithTagsHandler,
+		})).Methods("GET").Queries("tags", "")
 
-	routes.Handle("/api/v1/state", a.MWHandler.Handle([]rye.Handler{
-		a.StateHandler,
-	})).Methods("GET")
+	routes.Handle(a.setupHandler(
+		"/api/v1/state", []rye.Handler{
+			a.StateHandler,
+		})).Methods("GET")
 
 	// Cluster handlers
-	routes.Handle("/api/v1/cluster", a.MWHandler.Handle([]rye.Handler{
-		a.ClusterHandler,
-	})).Methods("GET")
+	routes.Handle(a.setupHandler(
+		"/api/v1/cluster", []rye.Handler{
+			a.ClusterHandler,
+		})).Methods("GET")
 
 	// Monitor handlers (route order matters!)
-	routes.Handle("/api/v1/monitor", a.MWHandler.Handle([]rye.Handler{
-		a.MonitorHandler,
-	})).Methods("GET")
+	routes.Handle(a.setupHandler(
+		"/api/v1/monitor", []rye.Handler{
+			a.MonitorHandler,
+		})).Methods("GET")
 
-	routes.Handle("/api/v1/monitor/{check}", a.MWHandler.Handle([]rye.Handler{
-		a.MonitorDisableHandler,
-	})).Methods("GET").Queries("disable", "")
+	routes.Handle(a.setupHandler(
+		"/api/v1/monitor/{check}", []rye.Handler{
+			a.MonitorDisableHandler,
+		})).Methods("GET").Queries("disable", "")
 
-	routes.Handle("/api/v1/monitor/{check}", a.MWHandler.Handle([]rye.Handler{
-		a.MonitorCheckHandler,
-	})).Methods("GET")
+	routes.Handle(a.setupHandler(
+		"/api/v1/monitor/{check}", []rye.Handler{
+			a.MonitorCheckHandler,
+		})).Methods("GET")
 
 	// Events handlers
-	routes.Handle("/api/v1/event", a.MWHandler.Handle([]rye.Handler{
-		a.EventWithTypeHandler,
-	})).Methods("GET").Queries("type", "")
+	routes.Handle(a.setupHandler(
+		"/api/v1/event", []rye.Handler{
+			a.EventWithTypeHandler,
+		})).Methods("GET").Queries("type", "")
 
-	routes.Handle("/api/v1/event", a.MWHandler.Handle([]rye.Handler{
-		a.EventHandler,
-	})).Methods("GET")
+	routes.Handle(a.setupHandler(
+		"/api/v1/event", []rye.Handler{
+			a.EventHandler,
+		})).Methods("GET")
 
 	if a.DebugUI {
 		log.Info("ui: local debug mode (from /ui/dist)")
@@ -124,4 +137,9 @@ func (a *Api) Run() {
 	}
 
 	http.ListenAndServe(a.Config.ListenAddress, routes)
+}
+
+// appends an apache style logger to each route. also dry up some boiler plate
+func (a *Api) setupHandler(path string, ryeStack []rye.Handler) (string, http.Handler) {
+	return path, handlers.LoggingHandler(os.Stdout, a.MWHandler.Handle(ryeStack))
 }
