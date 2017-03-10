@@ -64,7 +64,7 @@ alerter:
     type: email
     description: "primary email alerter"
     options:
-      to: daniel.selans@gmail.com
+      to: someone.important@gmail.com
       address: smtp.gmail.com:587
       username: user
       password: pass
