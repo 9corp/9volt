@@ -71,6 +71,8 @@ func runServer() {
 
 	etcdMemberList := util.SplitTags(*etcdMembers)
 
+	log.Infof("Starting 9volt server ID:%s Tags:%v", memberID, memberTags)
+
 	// Create an initial dal client
 	dalClient, err := dal.New(*etcdPrefix, etcdMemberList)
 	if err != nil {

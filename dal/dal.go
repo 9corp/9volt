@@ -10,6 +10,8 @@ import (
 	"path"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
+
 	"github.com/coreos/etcd/client"
 )
 
@@ -64,6 +66,8 @@ type MemberStat struct {
 }
 
 func New(prefix string, members []string) (*Dal, error) {
+	log.Debugf("Connecting to etcd cluster with members: %v", members) //needs to be before any errs
+
 	etcdClient, err := client.New(client.Config{
 		Endpoints: members,
 		Transport: client.DefaultTransport,
