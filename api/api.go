@@ -91,15 +91,28 @@ func (a *Api) Run() {
 			a.MonitorHandler,
 		})).Methods("GET")
 
+	// Add monitor config
+	routes.Handle(a.setupHandler(
+		"/api/v1/monitor", []rye.Handler{
+			a.MonitorAddHandler,
+		})).Methods("POST")
+
+	// Disable a specific monitor config
 	routes.Handle(a.setupHandler(
 		"/api/v1/monitor/{check}", []rye.Handler{
 			a.MonitorDisableHandler,
 		})).Methods("GET").Queries("disable", "")
 
+	// Fetch a specific monitor config
 	routes.Handle(a.setupHandler(
 		"/api/v1/monitor/{check}", []rye.Handler{
 			a.MonitorCheckHandler,
 		})).Methods("GET")
+
+	routes.Handle(a.setupHandler(
+		"/api/v1/monitor/{check}", []rye.Handler{
+			a.MonitorDeleteHandler,
+		})).Methods("DELETE")
 
 	// Events handlers
 	routes.Handle(a.setupHandler(

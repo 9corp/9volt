@@ -98,6 +98,43 @@ func (a *Api) MonitorDisableHandler(rw http.ResponseWriter, r *http.Request) *ry
 	return nil
 }
 
+// Add/Update monitor config
+func (a *Api) MonitorAddHandler(rw http.ResponseWriter, r *http.Request) *rye.Response {
+	return nil
+}
+
+// Delete monitor config
+func (a *Api) MonitorDeleteHandler(rw http.ResponseWriter, r *http.Request) *rye.Response {
+	checkName := mux.Vars(r)["check"]
+
+	if checkName == "" {
+		return &rye.Response{
+			Err:        errors.New("Check name not found. Bug?"),
+			StatusCode: http.StatusInternalServerError,
+		}
+	}
+
+	fullPath := fmt.Sprintf("monitor/%v", checkName)
+
+	if err := a.Config.DalClient.Delete(fullPath, false); err != nil {
+		if client.IsKeyNotFound(err) {
+			return &rye.Response{
+				Err:        fmt.Errorf("Unable to find any check named '%v'", checkName),
+				StatusCode: http.StatusNotFound,
+			}
+		}
+
+		return &rye.Response{
+			Err:        fmt.Errorf("Unexpected etcd error: %v", err),
+			StatusCode: http.StatusInternalServerError,
+		}
+	}
+
+	rye.WriteJSONStatus(rw, "ok", fmt.Sprintf("Successfully removed check '%v'", checkName), http.StatusOK)
+
+	return nil
+}
+
 func (a *Api) MonitorCheckHandler(rw http.ResponseWriter, r *http.Request) *rye.Response {
 	checkName := mux.Vars(r)["check"]
 
