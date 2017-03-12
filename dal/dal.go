@@ -58,6 +58,9 @@ type GetOptions struct {
 	prefix string
 }
 
+//go:generate counterfeiter -o ../fakes/etcdclientfakes/fake_keysapi.go ../vendor/github.com/coreos/etcd/client/keys.go KeysAPI
+//go:generate perl -pi -e s/github.com\/9corp\/9volt\/vendor\///g ../fakes/etcdclientfakes/fake_keysapi.go
+
 type Dal struct {
 	Client  client.Client
 	KeysAPI client.KeysAPI
@@ -120,9 +123,12 @@ func (d *Dal) KeyExists(key string) (bool, bool, error) {
 func (d *Dal) Set(key, value string, dir bool, ttl int, prevExist string) error {
 	existState := client.PrevExistType(prevExist)
 
+	if key[0] != '/' {
+		key = "/" + key
+	}
 	_, err := d.KeysAPI.Set(
 		context.Background(),
-		d.Prefix+"/"+key,
+		d.Prefix+key,
 		value,
 		&client.SetOptions{
 			Dir:       dir,
