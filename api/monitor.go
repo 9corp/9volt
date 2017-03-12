@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/coreos/etcd/client"
 	"github.com/gorilla/mux"
 
+	"github.com/9corp/9volt/cfgutil"
 	"github.com/9corp/9volt/dal"
 )
 
@@ -100,6 +102,35 @@ func (a *Api) MonitorDisableHandler(rw http.ResponseWriter, r *http.Request) *ry
 
 // Add/Update monitor config
 func (a *Api) MonitorAddHandler(rw http.ResponseWriter, r *http.Request) *rye.Response {
+	data, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return &rye.Response{
+			Err:        fmt.Errorf("Unable to read POST body: %v", err),
+			StatusCode: http.StatusBadRequest,
+		}
+	}
+	defer r.Body.Close()
+
+	c := &cfgutil.CfgUtil{}
+
+	configs, err := c.ParseData(cfgutil.MONITOR_TYPE, data)
+	if err != nil {
+		return &rye.Response{
+			Err:        fmt.Errorf("Unable to complete config parsing: %v", err),
+			StatusCode: http.StatusBadRequest,
+		}
+	}
+
+	pushed, skipped, err := a.Config.CfgUtilDal.Push(cfgutil.ALERTER_TYPE, configs)
+	if err != nil {
+		return &rye.Response{
+			Err:        fmt.Errorf("Unable to complete config push: %v", err),
+			StatusCode: http.StatusInternalServerError,
+		}
+	}
+
+	rye.WriteJSONStatus(rw, "ok", fmt.Sprintf("Pushed %v configs; skipped %v configs", pushed, skipped), http.StatusOK)
+
 	return nil
 }
 

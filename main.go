@@ -79,12 +79,18 @@ func runServer() {
 		log.Fatalf("Unable to start initial etcd client: %v", err.Error())
 	}
 
+	cfgUtilDal, err := dal.NewCfgUtil(*etcdPrefix, etcdMemberList, false, false, false)
+	if err != nil {
+		log.Fatalf("Unable to start cfg util client: %v", err)
+	}
+
 	// Create and start event queue
 	eventQueue := event.NewQueue(memberID, dalClient)
 	eqClient := eventQueue.NewClient()
 
 	// Load our configuration
-	cfg := config.New(memberID, *listenAddress, *etcdPrefix, etcdMemberList, memberTags, dalClient, eqClient)
+	cfg := config.New(memberID, *listenAddress, *etcdPrefix, etcdMemberList, memberTags,
+		dalClient, eqClient, cfgUtilDal)
 
 	if err := cfg.Load(); err != nil {
 		log.Fatalf("Unable to load configuration from etcd: %v", err.Error())
@@ -172,7 +178,7 @@ func runServer() {
 func runCfgUtil() {
 	etcdMemberList := util.SplitTags(*etcdMembers)
 
-	etcdClient, err := dal.NewCfgUtil(etcdMemberList, *etcdPrefix, *replaceFlag, *dryrunFlag, *nosyncFlag)
+	etcdClient, err := dal.NewCfgUtil(*etcdPrefix, etcdMemberList, *replaceFlag, *dryrunFlag, *nosyncFlag)
 	if err != nil {
 		log.Fatalf("Unable to create initial etcd client: %v", err.Error())
 	}
@@ -201,7 +207,7 @@ func runCfgUtil() {
 	log.Infof("Pushing 9volt configs to etcd hosts: %v", *etcdMembers)
 
 	// push to etcd
-	stats, errorList := etcdClient.Push(configs)
+	stats, errorList := etcdClient.PushFullConfigs(configs)
 	if len(errorList) != 0 {
 		log.Errorf("Encountered %v errors: %v", len(errorList), errorList)
 	}

@@ -13,6 +13,11 @@ import (
 	"github.com/ghodss/yaml"
 )
 
+const (
+	MONITOR_TYPE = "monitor"
+	ALERTER_TYPE = "alerter"
+)
+
 type CfgUtil struct {
 	Dir string
 }
@@ -72,6 +77,26 @@ func (c *CfgUtil) Fetch() ([]string, error) {
 	}
 
 	return files, nil
+}
+
+func (c *CfgUtil) ParseData(configType string, data []byte) (map[string][]byte, error) {
+	var validateConfigs map[string]interface{}
+
+	if err := json.Unmarshal(data, &validateConfigs); err != nil {
+		return nil, fmt.Errorf("Unable to unmarshal input configs: %v", err)
+	}
+
+	if err := c.validate(configType, validateConfigs); err != nil {
+		return nil, fmt.Errorf("Unable to complete config validation: %v", err)
+	}
+
+	// This is unfortunate but necessary without a medium-sized refactor
+	var finalConfigs map[string][]byte
+	if err := json.Unmarshal(data, &finalConfigs); err != nil {
+		return nil, fmt.Errorf("Unable to complete final unmarshal: %v", err)
+	}
+
+	return finalConfigs, nil
 }
 
 // Roll through the list of YAML files, parsing each for all 'alerter' and 'monitor'
