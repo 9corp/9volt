@@ -18,6 +18,6 @@ func (a *Api) StatusHandler(rw http.ResponseWriter, r *http.Request) *rye.Respon
 }
 
 func (a *Api) VersionHandler(rw http.ResponseWriter, r *http.Request) *rye.Response {
-	rye.WriteJSONStatus(rw, "version", fmt.Sprintf("9volt %v", a.Version), http.StatusOK)
+	rye.WriteJSONStatus(rw, "version", fmt.Sprintf("9volt %v - %v", a.Config.SemVer, a.Config.Version), http.StatusOK)
 	return nil
 }

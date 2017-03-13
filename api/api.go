@@ -24,7 +24,6 @@ import (
 
 type Api struct {
 	Config     *config.Config
-	Version    string
 	MemberID   string
 	Identifier string
 	MWHandler  *rye.MWHandler
@@ -36,10 +35,9 @@ type JSONStatus struct {
 	Message string
 }
 
-func New(cfg *config.Config, mwHandler *rye.MWHandler, version string, debugUI bool) *Api {
+func New(cfg *config.Config, mwHandler *rye.MWHandler, debugUI bool) *Api {
 	return &Api{
 		Config:     cfg,
-		Version:    version,
 		MemberID:   cfg.MemberID,
 		Identifier: "api",
 		MWHandler:  mwHandler,

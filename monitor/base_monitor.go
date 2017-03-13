@@ -172,10 +172,10 @@ func (b *Base) updateState(monitorErr error) error {
 
 	status := "ok"
 
-	if b.warningAlertSent {
-		status = "warning"
-	} else if b.criticalAlertSent {
+	if b.criticalAlertSent {
 		status = "critical"
+	} else if b.warningAlertSent {
+		status = "warning"
 	}
 
 	// If no error is set, set it to N/A for display purposes
