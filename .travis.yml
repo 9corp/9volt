@@ -7,13 +7,7 @@ go:
 env:
   global:
     - GOARCH=amd64
-
-before_install:
- - go get github.com/9corp/9volt
- - go get github.com/onsi/ginkgo/ginkgo
- - go get github.com/onsi/gomega
-
-install:
+    - SEMVER=test
 
 script:
-  - go test -v ./...
+  - make test
