@@ -22,6 +22,9 @@ type Config struct {
 	DalClient     dal.IDal
 	EQClient      event.IClient
 
+	Version string
+	SemVer  string
+
 	serverConfig
 }
 
@@ -32,7 +35,9 @@ type serverConfig struct {
 }
 
 // Pass in the dal client in order to facilitate better/easier testing story
-func New(memberID, listenAddress, etcdPrefix string, etcdMembers, tags []string, dalClient dal.IDal, eqClient *event.Client) *Config {
+func New(memberID, listenAddress, etcdPrefix string, etcdMembers, tags []string,
+	dalClient dal.IDal, eqClient *event.Client, version, semver string) *Config {
+
 	if tags == nil {
 		tags = make([]string, 0)
 	}
@@ -45,6 +50,8 @@ func New(memberID, listenAddress, etcdPrefix string, etcdMembers, tags []string,
 		EQClient:      eqClient,
 		MemberID:      memberID,
 		Tags:          tags,
+		Version:       version,
+		SemVer:        semver,
 	}
 
 	return cfg

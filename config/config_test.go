@@ -17,12 +17,16 @@ var _ = Describe("config", func() {
 		testEtcdPrefix    = "9volt"
 		testEtcdMembers   = []string{"http://127.0.0.1:2379", "http://127.0.0.2:2379"}
 		testTags          = []string{"tag1", "tag2"}
+		testVersion       = "12345"
+		testSemver        = "0.0.1"
 	)
 
 	BeforeEach(func() {
 		fakeDalClient = &dalfakes.FakeIDal{}
-		cfg = New(testMemberID, testListenAddress, testEtcdPrefix, testEtcdMembers, testTags, fakeDalClient, nil)
-    Expect(cfg).ToNot(BeNil())
+		cfg = New(testMemberID, testListenAddress, testEtcdPrefix, testEtcdMembers,
+			testTags, fakeDalClient, nil, testVersion, testSemver)
+
+		Expect(cfg).ToNot(BeNil())
 	})
 
 	Context("ValidateDirs", func() {
