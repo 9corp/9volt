@@ -22,6 +22,11 @@ import (
 	"github.com/9corp/9volt/util"
 )
 
+const (
+	DEFAULT_VERSION = "N/A"
+	DEFAULT_SEMVER  = "N/A"
+)
+
 var (
 	server        = kingpin.Command("server", "9volt server")
 	listenAddress = server.Flag("listen", "Address for 9volt's API to listen on").Short('l').Default("0.0.0.0:8080").Envar("NINEV_LISTEN_ADDRESS").String()
@@ -39,14 +44,24 @@ var (
 	debug       = kingpin.Flag("debug", "Enable debug mode").Short('d').Envar("NINEV_DEBUG").Bool()
 
 	version string
+	semver  string
 	command string
 )
 
 func init() {
 	log.SetLevel(log.InfoLevel)
 
+	// Friendlier versions
+	if version == "" {
+		version = DEFAULT_VERSION
+	}
+
+	if semver == "" {
+		semver = DEFAULT_SEMVER
+	}
+
 	// Parse CLI stuff
-	kingpin.Version(version)
+	kingpin.Version(semver + " - " + version)
 	kingpin.CommandLine.HelpFlag.Short('h')
 	kingpin.CommandLine.VersionFlag.Short('v')
 	command = kingpin.Parse()
@@ -84,7 +99,8 @@ func runServer() {
 	eqClient := eventQueue.NewClient()
 
 	// Load our configuration
-	cfg := config.New(memberID, *listenAddress, *etcdPrefix, etcdMemberList, memberTags, dalClient, eqClient)
+	cfg := config.New(memberID, *listenAddress, *etcdPrefix, etcdMemberList,
+		memberTags, dalClient, eqClient, version, semver)
 
 	if err := cfg.Load(); err != nil {
 		log.Fatalf("Unable to load configuration from etcd: %v", err.Error())
@@ -160,7 +176,7 @@ func runServer() {
 	}
 
 	// start api server
-	apiServer := api.New(cfg, mwHandler, version, debugUserInterface)
+	apiServer := api.New(cfg, mwHandler, debugUserInterface)
 	go apiServer.Run()
 
 	log.Infof("9volt has started! API address: %v MemberID: %v Tags: %v", "http://"+
