@@ -38,7 +38,7 @@ var _ = Describe("dal", func() {
 			})
 
 			It("does not error", func() {
-				err := testDAL.Set(testKey, testVal, testDir, testTTL, testPrevExists)
+				err := testDAL.Set(testKey, testVal, &SetOptions{Dir: testDir, TTLSec: testTTL, PrevExist: testPrevExists})
 				Expect(err).ToNot(HaveOccurred())
 
 				_, gotKey, gotVal, gotOpts := fakeKeysAPI.SetArgsForCall(0)
@@ -55,7 +55,7 @@ var _ = Describe("dal", func() {
 				})
 
 				It("handles properly", func() {
-					err := testDAL.Set(testKey, testVal, testDir, testTTL, testPrevExists)
+					err := testDAL.Set(testKey, testVal, &SetOptions{Dir: testDir, TTLSec: testTTL, PrevExist: testPrevExists})
 					Expect(err).ToNot(HaveOccurred())
 
 					_, gotKey, _, _ := fakeKeysAPI.SetArgsForCall(0)
@@ -70,7 +70,7 @@ var _ = Describe("dal", func() {
 			})
 
 			It("returns error unmodified", func() {
-				err := testDAL.Set(testKey, testVal, testDir, testTTL, testPrevExists)
+				err := testDAL.Set(testKey, testVal, &SetOptions{Dir: testDir, TTLSec: testTTL, PrevExist: testPrevExists})
 				Expect(err).To(HaveOccurred())
 				etcdErr, ok := err.(client.Error)
 				Expect(ok).To(BeTrue())

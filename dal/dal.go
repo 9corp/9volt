@@ -21,7 +21,7 @@ import (
 
 type IDal interface {
 	Get(string, *GetOptions) (map[string]string, error)
-	Set(string, string, bool, int, string) error
+	Set(string, string, *SetOptions) error
 	Delete(string, bool) error
 	Refresh(string, int) error
 	KeyExists(string) (bool, bool, error)
@@ -119,9 +119,16 @@ func (d *Dal) KeyExists(key string) (bool, bool, error) {
 	return true, resp.Node.Dir, nil
 }
 
-// An unwieldy wrapper for setting a new key
-func (d *Dal) Set(key, value string, dir bool, ttl int, prevExist string) error {
-	existState := client.PrevExistType(prevExist)
+type SetOptions struct {
+	Dir       bool
+	TTLSec    int
+	PrevExist string
+}
+
+// A wrapper for setting a new key
+// If SetOptions.Dir=true then value is ignored.
+func (d *Dal) Set(key, value string, opt *SetOptions) error {
+	existState := client.PrevExistType(opt.PrevExist)
 
 	if key[0] != '/' {
 		key = "/" + key
@@ -131,8 +138,8 @@ func (d *Dal) Set(key, value string, dir bool, ttl int, prevExist string) error 
 		d.Prefix+key,
 		value,
 		&client.SetOptions{
-			Dir:       dir,
-			TTL:       time.Duration(ttl) * time.Second,
+			Dir:       opt.Dir,
+			TTL:       time.Duration(opt.TTLSec) * time.Second,
 			PrevExist: existState,
 		},
 	)
