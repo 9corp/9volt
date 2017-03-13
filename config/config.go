@@ -21,7 +21,6 @@ type Config struct {
 	Tags          []string
 	DalClient     dal.IDal
 	EQClient      event.IClient
-	CfgUtilDal    dal.ICfgUtilDal
 
 	serverConfig
 }
@@ -34,7 +33,7 @@ type serverConfig struct {
 
 // Pass in the dal client in order to facilitate better/easier testing story
 func New(memberID, listenAddress, etcdPrefix string, etcdMembers, tags []string,
-	dalClient dal.IDal, eqClient *event.Client, cfgUtilDal dal.ICfgUtilDal) *Config {
+	dalClient dal.IDal, eqClient *event.Client) *Config {
 
 	if tags == nil {
 		tags = make([]string, 0)
@@ -45,7 +44,6 @@ func New(memberID, listenAddress, etcdPrefix string, etcdMembers, tags []string,
 		EtcdPrefix:    etcdPrefix,
 		EtcdMembers:   etcdMembers,
 		DalClient:     dalClient,
-		CfgUtilDal:    cfgUtilDal,
 		EQClient:      eqClient,
 		MemberID:      memberID,
 		Tags:          tags,

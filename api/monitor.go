@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 
@@ -14,6 +13,7 @@ import (
 
 	"github.com/9corp/9volt/cfgutil"
 	"github.com/9corp/9volt/dal"
+	"github.com/9corp/9volt/monitor"
 )
 
 type fullMonitorConfig map[string]*json.RawMessage
@@ -102,26 +102,33 @@ func (a *Api) MonitorDisableHandler(rw http.ResponseWriter, r *http.Request) *ry
 
 // Add/Update monitor config
 func (a *Api) MonitorAddHandler(rw http.ResponseWriter, r *http.Request) *rye.Response {
-	data, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return &rye.Response{
-			Err:        fmt.Errorf("Unable to read POST body: %v", err),
-			StatusCode: http.StatusBadRequest,
-		}
-	}
 	defer r.Body.Close()
 
-	c := &cfgutil.CfgUtil{}
+	dec := json.NewDecoder(r.Body)
 
-	configs, err := c.ParseData(cfgutil.MONITOR_TYPE, data)
-	if err != nil {
+	var monitors = map[string]monitor.MonitorConfig{}
+	if err := dec.Decode(&monitors); err != nil {
 		return &rye.Response{
 			Err:        fmt.Errorf("Unable to complete config parsing: %v", err),
 			StatusCode: http.StatusBadRequest,
 		}
 	}
 
-	pushed, skipped, err := a.Config.CfgUtilDal.Push(cfgutil.ALERTER_TYPE, configs)
+	finalMonitors := map[string][]byte{}
+
+	for k, v := range monitors {
+		mon, err := json.Marshal(v)
+		if err != nil {
+			return &rye.Response{
+				Err:        fmt.Errorf("Unable to complete config parsing: %v", err),
+				StatusCode: http.StatusBadRequest,
+			}
+		}
+
+		finalMonitors[k] = mon
+	}
+
+	pushed, skipped, err := a.Config.DalClient.PushConfigs(cfgutil.MONITOR_TYPE, finalMonitors)
 	if err != nil {
 		return &rye.Response{
 			Err:        fmt.Errorf("Unable to complete config push: %v", err),

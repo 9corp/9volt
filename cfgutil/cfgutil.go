@@ -2,6 +2,8 @@
 package cfgutil
 
 import (
+	"bytes"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -11,6 +13,8 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/ghodss/yaml"
+
+	"github.com/9corp/9volt/dal"
 )
 
 const (
@@ -20,11 +24,6 @@ const (
 
 type CfgUtil struct {
 	Dir string
-}
-
-type FullConfigs struct {
-	AlerterConfigs map[string][]byte // alerter name : json blob
-	MonitorConfigs map[string][]byte // monitor name : json blob
 }
 
 type YAMLFileBlob map[string]map[string]interface{}
@@ -91,9 +90,18 @@ func (c *CfgUtil) ParseData(configType string, data []byte) (map[string][]byte, 
 	}
 
 	// This is unfortunate but necessary without a medium-sized refactor
-	var finalConfigs map[string][]byte
-	if err := json.Unmarshal(data, &finalConfigs); err != nil {
-		return nil, fmt.Errorf("Unable to complete final unmarshal: %v", err)
+	finalConfigs := map[string][]byte{}
+
+	for k, v := range validateConfigs {
+		var buf bytes.Buffer
+		gob.Register([]interface{}{})
+		enc := gob.NewEncoder(&buf)
+		if err := enc.Encode(v); err != nil {
+			return nil, fmt.Errorf("Unable to complete final unmarshal: %v", err)
+		}
+
+		finalConfigs[k] = buf.Bytes()
+		fmt.Printf("%v %v", k, string(buf.Bytes()))
 	}
 
 	return finalConfigs, nil
@@ -105,8 +113,8 @@ func (c *CfgUtil) ParseData(configType string, data []byte) (map[string][]byte, 
 //
 // Structure for MonitorConfigs and AlerterConfigs is a map where the key is the
 // keyname for the config and the vaue is the JSON blob as a byte slice.
-func (c *CfgUtil) Parse(files []string) (*FullConfigs, error) {
-	fullConfigs := &FullConfigs{
+func (c *CfgUtil) Parse(files []string) (*dal.FullConfigs, error) {
+	fullConfigs := &dal.FullConfigs{
 		AlerterConfigs: make(map[string][]byte, 0),
 		MonitorConfigs: make(map[string][]byte, 0),
 	}

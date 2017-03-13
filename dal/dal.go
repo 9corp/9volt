@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"path/filepath"
+	"reflect"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -42,6 +44,8 @@ type IDal interface {
 	GetClusterMembersWithTags() (map[string][]string, error)
 	GetClusterMemberTags(string) ([]string, error)
 	GetCheckMemberTag(string) (string, error)
+	PushConfigs(string, map[string][]byte) (int, int, error)
+	PushFullConfigs(*FullConfigs) (*CfgUtilPushStats, []string)
 }
 
 type GetOptions struct {
@@ -57,6 +61,9 @@ type Dal struct {
 	KeysAPI client.KeysAPI
 	Members []string
 	Prefix  string
+	Replace bool
+	Dryrun  bool
+	Nosync  bool
 }
 
 // Helper struct for FetchCheckStats()
@@ -65,14 +72,18 @@ type MemberStat struct {
 	Tags      []string
 }
 
-func New(prefix string, members []string) (*Dal, error) {
+type FullConfigs struct {
+	AlerterConfigs map[string][]byte // alerter name : json blob
+	MonitorConfigs map[string][]byte // monitor name : json blob
+}
+
+func New(prefix string, members []string, replace, dryrun, nosync bool) (*Dal, error) {
 	log.Debugf("Connecting to etcd cluster with members: %v", members) //needs to be before any errs
 
 	etcdClient, err := client.New(client.Config{
 		Endpoints: members,
 		Transport: client.DefaultTransport,
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -82,6 +93,9 @@ func New(prefix string, members []string) (*Dal, error) {
 		KeysAPI: client.NewKeysAPI(etcdClient),
 		Members: members,
 		Prefix:  prefix,
+		Replace: replace,
+		Dryrun:  dryrun,
+		Nosync:  nosync,
 	}, nil
 }
 
@@ -543,4 +557,59 @@ func (d *Dal) FetchAlerterConfig(alertKey string) (string, error) {
 // wrapper for etcd client's KeyNotFound error
 func (d *Dal) IsKeyNotFound(err error) bool {
 	return client.IsKeyNotFound(err)
+}
+
+// Check if given key exists in etcd, if it does, determine if its value
+// matches new value by performing a reflect.DeepEqual().
+func (d *Dal) compare(fullPath string, data []byte) (bool, error) {
+	resp, err := d.KeysAPI.Get(context.Background(), fullPath, nil)
+	if err != nil {
+		if client.IsKeyNotFound(err) {
+			return false, nil
+		}
+
+		return false, err
+	}
+
+	// Unmarshal and compare both entries
+	var etcdEntry interface{}
+	var newEntry interface{}
+
+	if err := json.Unmarshal([]byte(resp.Node.Value), &etcdEntry); err != nil {
+		return false, fmt.Errorf("Unable to unmarshal existing entry in etcd '%v': %v", fullPath, err.Error())
+	}
+
+	if err := json.Unmarshal(data, &newEntry); err != nil {
+		return false, fmt.Errorf("Unable to unmarshal existing entry in etcd '%v': %v", fullPath, err.Error())
+	}
+
+	return reflect.DeepEqual(etcdEntry, newEntry), nil
+}
+
+// Fetch all alerter and monitor keys, return as map containing config type and
+// slice of keys
+func (d *Dal) getEtcdKeys() (map[string][]string, error) {
+	keyMap := map[string][]string{
+		"alerter": make([]string, 0),
+		"monitor": make([]string, 0),
+	}
+
+	for k := range keyMap {
+		fullPath := "/" + d.Prefix + "/" + k + "/"
+
+		resp, err := d.KeysAPI.Get(context.Background(), fullPath, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		if !resp.Node.Dir {
+			return nil, fmt.Errorf("Etcd problem: %v is not a dir!", fullPath)
+		}
+
+		for _, etcdKey := range resp.Node.Nodes {
+			keyMap[k] = append(keyMap[k], filepath.Base(etcdKey.Key))
+		}
+	}
+
+	return keyMap, nil
 }

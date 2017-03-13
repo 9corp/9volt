@@ -19,28 +19,38 @@ const (
 type CustomDuration time.Duration
 
 func (cd *CustomDuration) UnmarshalJSON(data []byte) error {
-	var s string
-	if err := json.Unmarshal(data, &s); err != nil {
-		return err
+	// we got a string
+	if data[0] == '"' {
+		sd := string(data[1 : len(data)-1])
+		duration, err := time.ParseDuration(sd)
+		if err != nil {
+			return err
+		}
+
+		*cd = (CustomDuration)(duration)
+		return nil
 	}
 
-	duration, err := time.ParseDuration(s)
-
+	// not a string so it must be a number
+	var id int64
+	id, err := json.Number(string(data)).Int64()
 	if err != nil {
 		return err
 	}
+
+	duration := time.Duration(id)
 
 	*cd = (CustomDuration)(duration)
 
 	return nil
 }
 
-func (cd *CustomDuration) String() string {
-	return time.Duration(*cd).String()
-}
-
 func (cd *CustomDuration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(time.Duration(*cd).String())
+}
+
+func (cd *CustomDuration) String() string {
+	return time.Duration(*cd).String()
 }
 
 func MD5Hash(data string, length int) string {
@@ -102,4 +112,15 @@ func StringSliceInStringSlice(s1, s2 []string) bool {
 	}
 
 	return false
+}
+
+// Helper for fetching keys in a map
+func GetMapKeys(inputMap map[string][]byte) []string {
+	keys := make([]string, len(inputMap))
+
+	for k := range inputMap {
+		keys = append(keys, k)
+	}
+
+	return keys
 }
