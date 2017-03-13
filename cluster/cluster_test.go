@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/9corp/9volt/config"
-	"github.com/9corp/9volt/dal/dalfakes"
+	"github.com/9corp/9volt/fakes/dalfakes"
 	"github.com/9corp/9volt/fakes/eventfakes"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
