@@ -2,8 +2,6 @@
 package cfgutil
 
 import (
-	"bytes"
-	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -90,18 +88,9 @@ func (c *CfgUtil) ParseData(configType string, data []byte) (map[string][]byte, 
 	}
 
 	// This is unfortunate but necessary without a medium-sized refactor
-	finalConfigs := map[string][]byte{}
-
-	for k, v := range validateConfigs {
-		var buf bytes.Buffer
-		gob.Register([]interface{}{})
-		enc := gob.NewEncoder(&buf)
-		if err := enc.Encode(v); err != nil {
-			return nil, fmt.Errorf("Unable to complete final unmarshal: %v", err)
-		}
-
-		finalConfigs[k] = buf.Bytes()
-		fmt.Printf("%v %v", k, string(buf.Bytes()))
+	var finalConfigs map[string][]byte
+	if err := json.Unmarshal(data, &finalConfigs); err != nil {
+		return nil, fmt.Errorf("Unable to complete final unmarshal: %v", err)
 	}
 
 	return finalConfigs, nil
