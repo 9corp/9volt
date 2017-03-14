@@ -56,10 +56,10 @@ generate: ## Run generate for non-vendor packages only
 build: semvercheck clean build/linux build/darwin ## Build for linux and darwin (save to OUTPUT_DIR/BIN)
 
 build/linux: semvercheck clean/linux build/ui ## Build for linux (save to OUTPUT_DIR/BIN)
-	GOOS=linux go build -a -installsuffix cgo -ldflags "-X main.version=$(RELEASE_VER)" -o $(OUTPUT_DIR)/$(BIN)-linux .
+	GOOS=linux go build -a -installsuffix cgo -ldflags "-X main.version=$(RELEASE_VER) -X main.semver=$(SEMVER)" -o $(OUTPUT_DIR)/$(BIN)-linux .
 
 build/darwin: semvercheck clean/darwin build/ui ## Build for darwin (save to OUTPUT_DIR/BIN)
-	GOOS=darwin go build -a -installsuffix cgo -ldflags "-X main.version=$(RELEASE_VER)" -o $(OUTPUT_DIR)/$(BIN)-darwin .
+	GOOS=darwin go build -a -installsuffix cgo -ldflags "-X main.version=$(RELEASE_VER) -X main.semver=$(SEMVER)" -o $(OUTPUT_DIR)/$(BIN)-darwin .
 
 build/docker: semvercheck build/linux ## Build docker image
 	docker build -t "9volt:$(RELEASE_VER)" .
