@@ -80,12 +80,13 @@ Mainloop:
 
 // Handle triggering/resolving alerts based on check results
 func (b *Base) handle(monitorErr error) error {
+	var err error
 	// Update state every run
 	defer b.updateState(monitorErr)
 
 	// No problems, reset counter
 	if monitorErr == nil {
-		b.transitionStateTo(OK, "")
+		err = b.transitionStateTo(OK, "")
 		b.attemptCount = 0
 		return nil
 	}
@@ -93,9 +94,13 @@ func (b *Base) handle(monitorErr error) error {
 	// Increase attempt count
 	b.attemptCount++
 	if b.attemptCount >= b.RMC.Config.CriticalThreshold {
-		b.transitionStateTo(CRITICAL, monitorErr.Error())
+		err = b.transitionStateTo(CRITICAL, monitorErr.Error())
 	} else if b.attemptCount >= b.RMC.Config.WarningThreshold {
-		b.transitionStateTo(WARNING, monitorErr.Error())
+		err = b.transitionStateTo(WARNING, monitorErr.Error())
+	}
+
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -214,5 +219,5 @@ func (b *Base) transitionStateTo(state int, monitorErr string) error {
 			return nil
 		}
 	}
-	return errors.New("State transition failed")
+	return fmt.Errorf("Failed to transition from state %d to %d", b.currentState, state)
 }
