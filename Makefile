@@ -46,11 +46,11 @@ installnode: ## Used by TravisCI
 	rm -rf ~/.nvm && \
 	git clone https://github.com/creationix/nvm.git ~/.nvm && \
 	(cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && \
-	source ~/.nvm/nvm.sh && \
+	. ~/.nvm/nvm.sh && \
 	nvm install 6
 
 installtools: ## Install development related tools
-	echo '>>>>> NOTE: Make sure to *manually* install nodejs via your pkg manager'
+	echo 'NOTE: NodeJS 6+ needs to be available to build 9volt'
 	go get github.com/kardianos/govendor
 	go get github.com/maxbrunsfeld/counterfeiter
 	go get github.com/yvasiyarov/swagger
