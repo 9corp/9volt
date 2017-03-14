@@ -101,7 +101,7 @@ func (b *Base) handle(monitorErr error) error {
 }
 
 // Construct a new alert message, send down the message channel and update alert state
-func (b *Base) sendMessage(curState int, titleMessage, alertMessage, errorDetails string, resolve bool) error {
+func (b *Base) sendMessage(curState int, titleMessage, alertMessage, errorDetails string) error {
 	var alertType = [3]string{"resolve", "warning", "critical"}
 	var alertKey = [3][]string{[]string{}, b.RMC.Config.WarningAlerter, b.RMC.Config.CriticalAlerter}
 
@@ -131,9 +131,11 @@ func (b *Base) sendMessage(curState int, titleMessage, alertMessage, errorDetail
 
 	// Get resolve functions ready
 	for _, alert := range alertKey[curState] {
+		// If we don't have a resolution func for the check then let's add it
 		if _, exists := b.resolveFuncs[alert]; !exists {
 			b.resolveFuncs[alert] = func() {
 				resolvMsg := &alerter.Message{}
+				// Copy the previous message
 				*resolvMsg = *msg
 
 				resolvMsg.Type = alertType[OK]
@@ -142,6 +144,7 @@ func (b *Base) sendMessage(curState int, titleMessage, alertMessage, errorDetail
 				// Send the message
 				b.RMC.MessageChannel <- resolvMsg
 
+				// Delete this call from the map
 				delete(b.resolveFuncs, alert)
 			}
 		}
@@ -186,6 +189,7 @@ func (b *Base) updateState(monitorErr error) error {
 func (b *Base) stateEvent(curState int, monitorErr string) {
 	if curState == OK {
 		for _, resolve := range b.resolveFuncs {
+			// If we've resolved then let's call all those resolve funcs
 			resolve()
 		}
 		return
@@ -193,14 +197,17 @@ func (b *Base) stateEvent(curState int, monitorErr string) {
 	var stateStr = [3]string{"", "warning", "critical"}
 	titleMessage := fmt.Sprintf("%v check '%v' failure", strings.ToUpper(b.Identify()), b.RMC.ConfigName)
 	alertMessage := fmt.Sprintf("Check has entered into %s state after %v checks", stateStr[curState], b.attemptCount)
-	b.sendMessage(curState, titleMessage, alertMessage, monitorErr, false)
+	b.sendMessage(curState, titleMessage, alertMessage, monitorErr)
 }
 
 func (b *Base) transitionStateTo(state int, monitorErr string) error {
+	// If the state is the same, then we don't want to trigger the events
 	if state == b.currentState {
 		return nil
 	}
+
 	for _, potentialNextState := range stateTransition[b.currentState] {
+		// Is the state I want to transition to a valid next state
 		if potentialNextState == state {
 			b.currentState = state
 			b.stateEvent(state, monitorErr)
