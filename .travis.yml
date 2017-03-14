@@ -1,13 +1,26 @@
 language: go
 sudo: false
 go:
-  - 1.7.3
-  - 1.8.x
-  - tip
+- 1.7.3
+- 1.8.x
+- tip
+
 env:
   global:
-    - GOARCH=amd64
-    - SEMVER=test
+  - GOARCH=amd64
+  - SEMVER=test
 
 script:
-  - make test
+- make test
+
+before_deploy: SEMVER=$TRAVIS_TAG make build/release
+
+deploy:
+  provider: releases
+  api_key:
+    secure: sAR3Zz2f1wA8n6/gakAEjns9FF33m1168sagF+M8wSzZJjAMiIQ5dU0cQ/l9noLNag32mRljMy+Hr586DmKlaciQsXHn0AlQlybZs0mEL5xPQDKrsb4/CVbNCFWyjZnNEVZ0p/zF05pm96OVnFtTGN3eNIrHTT761x881Y3WaHQDhF0OIRraIslgNaZCwXp3MZ8CIzn9Sdf9Zt2YflF28oGkfjVsXrsvSaMPrY4mD05H6nuVXfqftaiFT+2BBg7TQ74RwUzkqF5abcqn3LsL9WvHoFC9GizFbbWt1W8EzUBF3NjbIS461wn1ksNWcEYRncF4nA3VEr3SyTuh1Q+sv3AqkDaxe35/dIpX3q5ymuL4+wGAZeB5BHcQ6e1LXMeHB846aFZAtAqnzb28yKjDJTsBjBf/y1vSisXAhvQly1sXlebDihEPHrQF1+pUTVMmNmYGtSpI1ZW5EMucnZKPVYMIeuS+pRwtwFOuKMS/8Z+9+xUCQ6WDApCdK531FDCXKEg4hdxJcJUSUwB5qMlUIZkr7+kL6Vp2s26J+iaus21+1nVJB4ao1EhB6InE8V5vS9oCLnowxqr+X/boCizB22vTvLbW/JDP0oSAurmvmOZ2v8REAAgfB5aqGhU5EAGQxciCwVkQT1I/8hQ8ODNmF+z6r1PGsDQWziaDb+4Rs7A=
+  file:
+    - "build/9volt-$TRAVIS_TAG-darwin.tgz"
+    - "build/9volt-$TRAVIS_TAG-linux.tgz"
+  on:
+    tags: true
