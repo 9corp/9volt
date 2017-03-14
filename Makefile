@@ -54,7 +54,7 @@ installnode: ## Used by TravisCI
 	git clone https://github.com/creationix/nvm.git ~/.nvm && \
 	(cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && \
 	. ~/.nvm/nvm.sh && \
-	nvm install 6 && \
+	nvm install 6
 
 generate: ## Run generate for non-vendor packages only
 	go list ./... | grep -v vendor | xargs go generate
