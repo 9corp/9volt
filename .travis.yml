@@ -16,8 +16,9 @@ script:
 
 # Install a recent version of node && install go tools && build
 before_deploy:
-  - test $TRAVIS_TEST_RESULT = 0 \
-    && rm -rf ~/.nvm && git clone https://github.com/creationix/nvm.git ~/.nvm && (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && source ~/.nvm/nvm.sh && nvm install $TRAVIS_NODE_VERSION \
+  - echo "$TRAVIS_TEST_RESULT"
+  - if [ "$TRAVIS_TEST_RESULT" != 0 ]; then echo "Test result is not 0 -- bailing out"; exit 1; fi
+  - rm -rf ~/.nvm && git clone https://github.com/creationix/nvm.git ~/.nvm && (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && source ~/.nvm/nvm.sh && nvm install $TRAVIS_NODE_VERSION \
     && cd $TRAVIS_BUILD_DIR \
     && make installtools \
     && SEMVER=$TRAVIS_TAG make build/release
