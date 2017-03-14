@@ -17,6 +17,8 @@ import (
 	"github.com/coreos/etcd/client"
 )
 
+//go:generate counterfeiter -o ./dalfakes/fake_idal.go dal.go IDal
+
 type IDal interface {
 	Get(string, *GetOptions) (map[string]string, error)
 	Set(string, string, bool, int, string) error
