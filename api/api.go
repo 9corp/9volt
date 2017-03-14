@@ -112,6 +112,29 @@ func (a *Api) Run() {
 			a.MonitorDeleteHandler,
 		})).Methods("DELETE")
 
+	// Alerter handlers (route order matters!)
+	routes.Handle(a.setupHandler(
+		"/api/v1/alerter", []rye.Handler{
+			a.AlerterHandler,
+		})).Methods("GET")
+
+	// Add alerter config
+	routes.Handle(a.setupHandler(
+		"/api/v1/alerter", []rye.Handler{
+			a.AlerterAddHandler,
+		})).Methods("POST")
+
+	// Fetch a specific alerter config
+	routes.Handle(a.setupHandler(
+		"/api/v1/alerter/{alerterName}", []rye.Handler{
+			a.AlerterGetHandler,
+		})).Methods("GET")
+
+	routes.Handle(a.setupHandler(
+		"/api/v1/alerter/{alerterName}", []rye.Handler{
+			a.AlerterDeleteHandler,
+		})).Methods("DELETE")
+
 	// Events handlers
 	routes.Handle(a.setupHandler(
 		"/api/v1/event", []rye.Handler{
