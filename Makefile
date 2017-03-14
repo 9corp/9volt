@@ -42,19 +42,19 @@ test/cover: ## Run all tests + open coverage report for all packages
 	go tool cover -html=.coverage
 	$(RM) .coverage .coverage.tmp
 
-installnode: ## Used by TravisCI
-	rm -rf ~/.nvm && \
-	git clone https://github.com/creationix/nvm.git ~/.nvm && \
-	(cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && \
-	. ~/.nvm/nvm.sh && \
-	nvm install 6
-
 installtools: ## Install development related tools
 	echo 'NOTE: NodeJS 6+ needs to be available to build 9volt'
 	go get github.com/kardianos/govendor
 	go get github.com/maxbrunsfeld/counterfeiter
 	go get github.com/yvasiyarov/swagger
 	go get github.com/rakyll/statik
+
+installnode: ## Used by TravisCI
+	rm -rf ~/.nvm && \
+	git clone https://github.com/creationix/nvm.git ~/.nvm && \
+	(cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && \
+	. ~/.nvm/nvm.sh && \
+	nvm install 6
 
 generate: ## Run generate for non-vendor packages only
 	go list ./... | grep -v vendor | xargs go generate
@@ -91,6 +91,8 @@ build/release: semvercheck build/linux build/darwin ## Prepare a build
 	cd $(OUTPUT_DIR) && tar -czvf 9volt-$(SEMVER)-darwin.tgz 9volt-$(SEMVER)-darwin/
 	cd $(OUTPUT_DIR) && tar -czvf 9volt-$(SEMVER)-linux.tgz 9volt-$(SEMVER)-linux/
 	@echo "A new release has been created!"
+
+build/release-travis: installnode installtools build/release ## Install node, tools, build
 
 build/release-docker: semvercheck build/linux ## Build, tag and push a docker image to dockerhubs
 	docker build -t "9corp/9volt:$(SEMVER)" -t "9corp/9volt:latest" . && \

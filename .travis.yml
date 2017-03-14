@@ -13,11 +13,7 @@ env:
 script:
   - make test
 
-# Install a recent version of node && install go tools && build
-before_deploy:
-  - make installnode \
-    && make installtools \
-    && SEMVER=$TRAVIS_TAG make build/release
+before_deploy: SEMVER=$TRAVIS_TAG make build/release-travis
 
 deploy:
   provider: releases
