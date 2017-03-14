@@ -54,7 +54,7 @@ installnode: ## Used by TravisCI
 	git clone https://github.com/creationix/nvm.git ~/.nvm && \
 	(cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && \
 	. ~/.nvm/nvm.sh && \
-	nvm install 6
+	nvm install 6 && \
 
 generate: ## Run generate for non-vendor packages only
 	go list ./... | grep -v vendor | xargs go generate
@@ -77,8 +77,8 @@ build/docker-compose: semvercheck build/linux ## Build and start 9volt (and etcd
 build/docs: ## Build markdown docs from swagger comments
 	swagger -apiPackage="github.com/9corp/9volt" -format=markdown -output=docs/api/README.md
 
-build/ui: ui
-	(cd ui && npm install && npm run build)
+build/ui: ui ## Build the UI (use nvm if available)
+	(if [ -e ~/.nvm/nvm.sh ]; then echo "yep, executing"; . ~/.nvm/nvm.sh; fi; cd ui && npm install && npm run build)
 	statik -src=./ui/dist
 
 build/release: semvercheck build/linux build/darwin ## Prepare a build
