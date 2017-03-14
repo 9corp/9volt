@@ -9,6 +9,7 @@ env:
   global:
   - GOARCH=amd64
   - SEMVER=test
+  - TRAVIS_NODE_VERSION=6
 
 script:
 - make test
