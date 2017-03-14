@@ -100,7 +100,7 @@ type MemberJSON struct {
 }
 
 func New(cfg *config.Config, stateChan, distributeChan chan<- bool) (ICluster, error) {
-	dalClient, err := dal.New(cfg.EtcdPrefix, cfg.EtcdMembers)
+	dalClient, err := dal.New(cfg.EtcdPrefix, cfg.EtcdMembers, false, false, false)
 	if err != nil {
 		return nil, err
 	}

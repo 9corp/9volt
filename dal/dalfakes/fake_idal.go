@@ -231,7 +231,28 @@ type FakeIDal struct {
 		result1 string
 		result2 error
 	}
-	invocations map[string][][]interface{}
+	PushConfigsStub        func(string, map[string][]byte) (int, int, error)
+	pushConfigsMutex       sync.RWMutex
+	pushConfigsArgsForCall []struct {
+		arg1 string
+		arg2 map[string][]byte
+	}
+	pushConfigsReturns struct {
+		result1 int
+		result2 int
+		result3 error
+	}
+	PushFullConfigsStub        func(*dal.FullConfigs) (*dal.CfgUtilPushStats, []string)
+	pushFullConfigsMutex       sync.RWMutex
+	pushFullConfigsArgsForCall []struct {
+		arg1 *dal.FullConfigs
+	}
+	pushFullConfigsReturns struct {
+		result1 *dal.CfgUtilPushStats
+		result2 []string
+	}
+	invocations      map[string][][]interface{}
+	invocationsMutex sync.RWMutex
 }
 
 func (fake *FakeIDal) Get(arg1 string, arg2 *dal.GetOptions) (map[string]string, error) {
@@ -240,8 +261,7 @@ func (fake *FakeIDal) Get(arg1 string, arg2 *dal.GetOptions) (map[string]string,
 		arg1 string
 		arg2 *dal.GetOptions
 	}{arg1, arg2})
-	fake.guard("Get")
-	fake.invocations["Get"] = append(fake.invocations["Get"], []interface{}{arg1, arg2})
+	fake.recordInvocation("Get", []interface{}{arg1, arg2})
 	fake.getMutex.Unlock()
 	if fake.GetStub != nil {
 		return fake.GetStub(arg1, arg2)
@@ -279,8 +299,7 @@ func (fake *FakeIDal) Set(arg1 string, arg2 string, arg3 bool, arg4 int, arg5 st
 		arg4 int
 		arg5 string
 	}{arg1, arg2, arg3, arg4, arg5})
-	fake.guard("Set")
-	fake.invocations["Set"] = append(fake.invocations["Set"], []interface{}{arg1, arg2, arg3, arg4, arg5})
+	fake.recordInvocation("Set", []interface{}{arg1, arg2, arg3, arg4, arg5})
 	fake.setMutex.Unlock()
 	if fake.SetStub != nil {
 		return fake.SetStub(arg1, arg2, arg3, arg4, arg5)
@@ -314,8 +333,7 @@ func (fake *FakeIDal) Delete(arg1 string, arg2 bool) error {
 		arg1 string
 		arg2 bool
 	}{arg1, arg2})
-	fake.guard("Delete")
-	fake.invocations["Delete"] = append(fake.invocations["Delete"], []interface{}{arg1, arg2})
+	fake.recordInvocation("Delete", []interface{}{arg1, arg2})
 	fake.deleteMutex.Unlock()
 	if fake.DeleteStub != nil {
 		return fake.DeleteStub(arg1, arg2)
@@ -349,8 +367,7 @@ func (fake *FakeIDal) Refresh(arg1 string, arg2 int) error {
 		arg1 string
 		arg2 int
 	}{arg1, arg2})
-	fake.guard("Refresh")
-	fake.invocations["Refresh"] = append(fake.invocations["Refresh"], []interface{}{arg1, arg2})
+	fake.recordInvocation("Refresh", []interface{}{arg1, arg2})
 	fake.refreshMutex.Unlock()
 	if fake.RefreshStub != nil {
 		return fake.RefreshStub(arg1, arg2)
@@ -383,8 +400,7 @@ func (fake *FakeIDal) KeyExists(arg1 string) (bool, bool, error) {
 	fake.keyExistsArgsForCall = append(fake.keyExistsArgsForCall, struct {
 		arg1 string
 	}{arg1})
-	fake.guard("KeyExists")
-	fake.invocations["KeyExists"] = append(fake.invocations["KeyExists"], []interface{}{arg1})
+	fake.recordInvocation("KeyExists", []interface{}{arg1})
 	fake.keyExistsMutex.Unlock()
 	if fake.KeyExistsStub != nil {
 		return fake.KeyExistsStub(arg1)
@@ -419,8 +435,7 @@ func (fake *FakeIDal) IsKeyNotFound(arg1 error) bool {
 	fake.isKeyNotFoundArgsForCall = append(fake.isKeyNotFoundArgsForCall, struct {
 		arg1 error
 	}{arg1})
-	fake.guard("IsKeyNotFound")
-	fake.invocations["IsKeyNotFound"] = append(fake.invocations["IsKeyNotFound"], []interface{}{arg1})
+	fake.recordInvocation("IsKeyNotFound", []interface{}{arg1})
 	fake.isKeyNotFoundMutex.Unlock()
 	if fake.IsKeyNotFoundStub != nil {
 		return fake.IsKeyNotFoundStub(arg1)
@@ -453,8 +468,7 @@ func (fake *FakeIDal) CreateDirectorState(arg1 string) error {
 	fake.createDirectorStateArgsForCall = append(fake.createDirectorStateArgsForCall, struct {
 		arg1 string
 	}{arg1})
-	fake.guard("CreateDirectorState")
-	fake.invocations["CreateDirectorState"] = append(fake.invocations["CreateDirectorState"], []interface{}{arg1})
+	fake.recordInvocation("CreateDirectorState", []interface{}{arg1})
 	fake.createDirectorStateMutex.Unlock()
 	if fake.CreateDirectorStateStub != nil {
 		return fake.CreateDirectorStateStub(arg1)
@@ -489,8 +503,7 @@ func (fake *FakeIDal) UpdateDirectorState(arg1 string, arg2 string, arg3 bool) e
 		arg2 string
 		arg3 bool
 	}{arg1, arg2, arg3})
-	fake.guard("UpdateDirectorState")
-	fake.invocations["UpdateDirectorState"] = append(fake.invocations["UpdateDirectorState"], []interface{}{arg1, arg2, arg3})
+	fake.recordInvocation("UpdateDirectorState", []interface{}{arg1, arg2, arg3})
 	fake.updateDirectorStateMutex.Unlock()
 	if fake.UpdateDirectorStateStub != nil {
 		return fake.UpdateDirectorStateStub(arg1, arg2, arg3)
@@ -524,8 +537,7 @@ func (fake *FakeIDal) NewWatcher(arg1 string, arg2 bool) client.Watcher {
 		arg1 string
 		arg2 bool
 	}{arg1, arg2})
-	fake.guard("NewWatcher")
-	fake.invocations["NewWatcher"] = append(fake.invocations["NewWatcher"], []interface{}{arg1, arg2})
+	fake.recordInvocation("NewWatcher", []interface{}{arg1, arg2})
 	fake.newWatcherMutex.Unlock()
 	if fake.NewWatcherStub != nil {
 		return fake.NewWatcherStub(arg1, arg2)
@@ -556,8 +568,7 @@ func (fake *FakeIDal) NewWatcherReturns(result1 client.Watcher) {
 func (fake *FakeIDal) GetClusterMembers() ([]string, error) {
 	fake.getClusterMembersMutex.Lock()
 	fake.getClusterMembersArgsForCall = append(fake.getClusterMembersArgsForCall, struct{}{})
-	fake.guard("GetClusterMembers")
-	fake.invocations["GetClusterMembers"] = append(fake.invocations["GetClusterMembers"], []interface{}{})
+	fake.recordInvocation("GetClusterMembers", []interface{}{})
 	fake.getClusterMembersMutex.Unlock()
 	if fake.GetClusterMembersStub != nil {
 		return fake.GetClusterMembersStub()
@@ -583,8 +594,7 @@ func (fake *FakeIDal) GetClusterMembersReturns(result1 []string, result2 error) 
 func (fake *FakeIDal) GetCheckKeys() ([]string, error) {
 	fake.getCheckKeysMutex.Lock()
 	fake.getCheckKeysArgsForCall = append(fake.getCheckKeysArgsForCall, struct{}{})
-	fake.guard("GetCheckKeys")
-	fake.invocations["GetCheckKeys"] = append(fake.invocations["GetCheckKeys"], []interface{}{})
+	fake.recordInvocation("GetCheckKeys", []interface{}{})
 	fake.getCheckKeysMutex.Unlock()
 	if fake.GetCheckKeysStub != nil {
 		return fake.GetCheckKeysStub()
@@ -610,8 +620,7 @@ func (fake *FakeIDal) GetCheckKeysReturns(result1 []string, result2 error) {
 func (fake *FakeIDal) GetCheckKeysWithMemberTag() (map[string]string, error) {
 	fake.getCheckKeysWithMemberTagMutex.Lock()
 	fake.getCheckKeysWithMemberTagArgsForCall = append(fake.getCheckKeysWithMemberTagArgsForCall, struct{}{})
-	fake.guard("GetCheckKeysWithMemberTag")
-	fake.invocations["GetCheckKeysWithMemberTag"] = append(fake.invocations["GetCheckKeysWithMemberTag"], []interface{}{})
+	fake.recordInvocation("GetCheckKeysWithMemberTag", []interface{}{})
 	fake.getCheckKeysWithMemberTagMutex.Unlock()
 	if fake.GetCheckKeysWithMemberTagStub != nil {
 		return fake.GetCheckKeysWithMemberTagStub()
@@ -640,8 +649,7 @@ func (fake *FakeIDal) CreateCheckReference(arg1 string, arg2 string) error {
 		arg1 string
 		arg2 string
 	}{arg1, arg2})
-	fake.guard("CreateCheckReference")
-	fake.invocations["CreateCheckReference"] = append(fake.invocations["CreateCheckReference"], []interface{}{arg1, arg2})
+	fake.recordInvocation("CreateCheckReference", []interface{}{arg1, arg2})
 	fake.createCheckReferenceMutex.Unlock()
 	if fake.CreateCheckReferenceStub != nil {
 		return fake.CreateCheckReferenceStub(arg1, arg2)
@@ -675,8 +683,7 @@ func (fake *FakeIDal) ClearCheckReference(arg1 string, arg2 string) error {
 		arg1 string
 		arg2 string
 	}{arg1, arg2})
-	fake.guard("ClearCheckReference")
-	fake.invocations["ClearCheckReference"] = append(fake.invocations["ClearCheckReference"], []interface{}{arg1, arg2})
+	fake.recordInvocation("ClearCheckReference", []interface{}{arg1, arg2})
 	fake.clearCheckReferenceMutex.Unlock()
 	if fake.ClearCheckReferenceStub != nil {
 		return fake.ClearCheckReferenceStub(arg1, arg2)
@@ -709,8 +716,7 @@ func (fake *FakeIDal) ClearCheckReferences(arg1 string) error {
 	fake.clearCheckReferencesArgsForCall = append(fake.clearCheckReferencesArgsForCall, struct {
 		arg1 string
 	}{arg1})
-	fake.guard("ClearCheckReferences")
-	fake.invocations["ClearCheckReferences"] = append(fake.invocations["ClearCheckReferences"], []interface{}{arg1})
+	fake.recordInvocation("ClearCheckReferences", []interface{}{arg1})
 	fake.clearCheckReferencesMutex.Unlock()
 	if fake.ClearCheckReferencesStub != nil {
 		return fake.ClearCheckReferencesStub(arg1)
@@ -741,8 +747,7 @@ func (fake *FakeIDal) ClearCheckReferencesReturns(result1 error) {
 func (fake *FakeIDal) FetchAllMemberRefs() (map[string]string, []string, error) {
 	fake.fetchAllMemberRefsMutex.Lock()
 	fake.fetchAllMemberRefsArgsForCall = append(fake.fetchAllMemberRefsArgsForCall, struct{}{})
-	fake.guard("FetchAllMemberRefs")
-	fake.invocations["FetchAllMemberRefs"] = append(fake.invocations["FetchAllMemberRefs"], []interface{}{})
+	fake.recordInvocation("FetchAllMemberRefs", []interface{}{})
 	fake.fetchAllMemberRefsMutex.Unlock()
 	if fake.FetchAllMemberRefsStub != nil {
 		return fake.FetchAllMemberRefsStub()
@@ -769,8 +774,7 @@ func (fake *FakeIDal) FetchAllMemberRefsReturns(result1 map[string]string, resul
 func (fake *FakeIDal) FetchCheckStats() (map[string]*dal.MemberStat, error) {
 	fake.fetchCheckStatsMutex.Lock()
 	fake.fetchCheckStatsArgsForCall = append(fake.fetchCheckStatsArgsForCall, struct{}{})
-	fake.guard("FetchCheckStats")
-	fake.invocations["FetchCheckStats"] = append(fake.invocations["FetchCheckStats"], []interface{}{})
+	fake.recordInvocation("FetchCheckStats", []interface{}{})
 	fake.fetchCheckStatsMutex.Unlock()
 	if fake.FetchCheckStatsStub != nil {
 		return fake.FetchCheckStatsStub()
@@ -798,8 +802,7 @@ func (fake *FakeIDal) FetchAlerterConfig(arg1 string) (string, error) {
 	fake.fetchAlerterConfigArgsForCall = append(fake.fetchAlerterConfigArgsForCall, struct {
 		arg1 string
 	}{arg1})
-	fake.guard("FetchAlerterConfig")
-	fake.invocations["FetchAlerterConfig"] = append(fake.invocations["FetchAlerterConfig"], []interface{}{arg1})
+	fake.recordInvocation("FetchAlerterConfig", []interface{}{arg1})
 	fake.fetchAlerterConfigMutex.Unlock()
 	if fake.FetchAlerterConfigStub != nil {
 		return fake.FetchAlerterConfigStub(arg1)
@@ -831,8 +834,7 @@ func (fake *FakeIDal) FetchAlerterConfigReturns(result1 string, result2 error) {
 func (fake *FakeIDal) FetchState() ([]byte, error) {
 	fake.fetchStateMutex.Lock()
 	fake.fetchStateArgsForCall = append(fake.fetchStateArgsForCall, struct{}{})
-	fake.guard("FetchState")
-	fake.invocations["FetchState"] = append(fake.invocations["FetchState"], []interface{}{})
+	fake.recordInvocation("FetchState", []interface{}{})
 	fake.fetchStateMutex.Unlock()
 	if fake.FetchStateStub != nil {
 		return fake.FetchStateStub()
@@ -865,8 +867,7 @@ func (fake *FakeIDal) FetchStateWithTags(arg1 []string) ([]byte, error) {
 	fake.fetchStateWithTagsArgsForCall = append(fake.fetchStateWithTagsArgsForCall, struct {
 		arg1 []string
 	}{arg1Copy})
-	fake.guard("FetchStateWithTags")
-	fake.invocations["FetchStateWithTags"] = append(fake.invocations["FetchStateWithTags"], []interface{}{arg1Copy})
+	fake.recordInvocation("FetchStateWithTags", []interface{}{arg1Copy})
 	fake.fetchStateWithTagsMutex.Unlock()
 	if fake.FetchStateWithTagsStub != nil {
 		return fake.FetchStateWithTagsStub(arg1)
@@ -901,8 +902,7 @@ func (fake *FakeIDal) UpdateCheckState(arg1 bool, arg2 string) error {
 		arg1 bool
 		arg2 string
 	}{arg1, arg2})
-	fake.guard("UpdateCheckState")
-	fake.invocations["UpdateCheckState"] = append(fake.invocations["UpdateCheckState"], []interface{}{arg1, arg2})
+	fake.recordInvocation("UpdateCheckState", []interface{}{arg1, arg2})
 	fake.updateCheckStateMutex.Unlock()
 	if fake.UpdateCheckStateStub != nil {
 		return fake.UpdateCheckStateStub(arg1, arg2)
@@ -933,8 +933,7 @@ func (fake *FakeIDal) UpdateCheckStateReturns(result1 error) {
 func (fake *FakeIDal) GetClusterStats() (*dal.ClusterStats, error) {
 	fake.getClusterStatsMutex.Lock()
 	fake.getClusterStatsArgsForCall = append(fake.getClusterStatsArgsForCall, struct{}{})
-	fake.guard("GetClusterStats")
-	fake.invocations["GetClusterStats"] = append(fake.invocations["GetClusterStats"], []interface{}{})
+	fake.recordInvocation("GetClusterStats", []interface{}{})
 	fake.getClusterStatsMutex.Unlock()
 	if fake.GetClusterStatsStub != nil {
 		return fake.GetClusterStatsStub()
@@ -967,8 +966,7 @@ func (fake *FakeIDal) FetchEvents(arg1 []string) ([]byte, error) {
 	fake.fetchEventsArgsForCall = append(fake.fetchEventsArgsForCall, struct {
 		arg1 []string
 	}{arg1Copy})
-	fake.guard("FetchEvents")
-	fake.invocations["FetchEvents"] = append(fake.invocations["FetchEvents"], []interface{}{arg1Copy})
+	fake.recordInvocation("FetchEvents", []interface{}{arg1Copy})
 	fake.fetchEventsMutex.Unlock()
 	if fake.FetchEventsStub != nil {
 		return fake.FetchEventsStub(arg1)
@@ -1000,8 +998,7 @@ func (fake *FakeIDal) FetchEventsReturns(result1 []byte, result2 error) {
 func (fake *FakeIDal) GetClusterMembersWithTags() (map[string][]string, error) {
 	fake.getClusterMembersWithTagsMutex.Lock()
 	fake.getClusterMembersWithTagsArgsForCall = append(fake.getClusterMembersWithTagsArgsForCall, struct{}{})
-	fake.guard("GetClusterMembersWithTags")
-	fake.invocations["GetClusterMembersWithTags"] = append(fake.invocations["GetClusterMembersWithTags"], []interface{}{})
+	fake.recordInvocation("GetClusterMembersWithTags", []interface{}{})
 	fake.getClusterMembersWithTagsMutex.Unlock()
 	if fake.GetClusterMembersWithTagsStub != nil {
 		return fake.GetClusterMembersWithTagsStub()
@@ -1029,8 +1026,7 @@ func (fake *FakeIDal) GetClusterMemberTags(arg1 string) ([]string, error) {
 	fake.getClusterMemberTagsArgsForCall = append(fake.getClusterMemberTagsArgsForCall, struct {
 		arg1 string
 	}{arg1})
-	fake.guard("GetClusterMemberTags")
-	fake.invocations["GetClusterMemberTags"] = append(fake.invocations["GetClusterMemberTags"], []interface{}{arg1})
+	fake.recordInvocation("GetClusterMemberTags", []interface{}{arg1})
 	fake.getClusterMemberTagsMutex.Unlock()
 	if fake.GetClusterMemberTagsStub != nil {
 		return fake.GetClusterMemberTagsStub(arg1)
@@ -1064,8 +1060,7 @@ func (fake *FakeIDal) GetCheckMemberTag(arg1 string) (string, error) {
 	fake.getCheckMemberTagArgsForCall = append(fake.getCheckMemberTagArgsForCall, struct {
 		arg1 string
 	}{arg1})
-	fake.guard("GetCheckMemberTag")
-	fake.invocations["GetCheckMemberTag"] = append(fake.invocations["GetCheckMemberTag"], []interface{}{arg1})
+	fake.recordInvocation("GetCheckMemberTag", []interface{}{arg1})
 	fake.getCheckMemberTagMutex.Unlock()
 	if fake.GetCheckMemberTagStub != nil {
 		return fake.GetCheckMemberTagStub(arg1)
@@ -1094,17 +1089,148 @@ func (fake *FakeIDal) GetCheckMemberTagReturns(result1 string, result2 error) {
 	}{result1, result2}
 }
 
+func (fake *FakeIDal) PushConfigs(arg1 string, arg2 map[string][]byte) (int, int, error) {
+	fake.pushConfigsMutex.Lock()
+	fake.pushConfigsArgsForCall = append(fake.pushConfigsArgsForCall, struct {
+		arg1 string
+		arg2 map[string][]byte
+	}{arg1, arg2})
+	fake.recordInvocation("PushConfigs", []interface{}{arg1, arg2})
+	fake.pushConfigsMutex.Unlock()
+	if fake.PushConfigsStub != nil {
+		return fake.PushConfigsStub(arg1, arg2)
+	} else {
+		return fake.pushConfigsReturns.result1, fake.pushConfigsReturns.result2, fake.pushConfigsReturns.result3
+	}
+}
+
+func (fake *FakeIDal) PushConfigsCallCount() int {
+	fake.pushConfigsMutex.RLock()
+	defer fake.pushConfigsMutex.RUnlock()
+	return len(fake.pushConfigsArgsForCall)
+}
+
+func (fake *FakeIDal) PushConfigsArgsForCall(i int) (string, map[string][]byte) {
+	fake.pushConfigsMutex.RLock()
+	defer fake.pushConfigsMutex.RUnlock()
+	return fake.pushConfigsArgsForCall[i].arg1, fake.pushConfigsArgsForCall[i].arg2
+}
+
+func (fake *FakeIDal) PushConfigsReturns(result1 int, result2 int, result3 error) {
+	fake.PushConfigsStub = nil
+	fake.pushConfigsReturns = struct {
+		result1 int
+		result2 int
+		result3 error
+	}{result1, result2, result3}
+}
+
+func (fake *FakeIDal) PushFullConfigs(arg1 *dal.FullConfigs) (*dal.CfgUtilPushStats, []string) {
+	fake.pushFullConfigsMutex.Lock()
+	fake.pushFullConfigsArgsForCall = append(fake.pushFullConfigsArgsForCall, struct {
+		arg1 *dal.FullConfigs
+	}{arg1})
+	fake.recordInvocation("PushFullConfigs", []interface{}{arg1})
+	fake.pushFullConfigsMutex.Unlock()
+	if fake.PushFullConfigsStub != nil {
+		return fake.PushFullConfigsStub(arg1)
+	} else {
+		return fake.pushFullConfigsReturns.result1, fake.pushFullConfigsReturns.result2
+	}
+}
+
+func (fake *FakeIDal) PushFullConfigsCallCount() int {
+	fake.pushFullConfigsMutex.RLock()
+	defer fake.pushFullConfigsMutex.RUnlock()
+	return len(fake.pushFullConfigsArgsForCall)
+}
+
+func (fake *FakeIDal) PushFullConfigsArgsForCall(i int) *dal.FullConfigs {
+	fake.pushFullConfigsMutex.RLock()
+	defer fake.pushFullConfigsMutex.RUnlock()
+	return fake.pushFullConfigsArgsForCall[i].arg1
+}
+
+func (fake *FakeIDal) PushFullConfigsReturns(result1 *dal.CfgUtilPushStats, result2 []string) {
+	fake.PushFullConfigsStub = nil
+	fake.pushFullConfigsReturns = struct {
+		result1 *dal.CfgUtilPushStats
+		result2 []string
+	}{result1, result2}
+}
+
 func (fake *FakeIDal) Invocations() map[string][][]interface{} {
+	fake.invocationsMutex.RLock()
+	defer fake.invocationsMutex.RUnlock()
+	fake.getMutex.RLock()
+	defer fake.getMutex.RUnlock()
+	fake.setMutex.RLock()
+	defer fake.setMutex.RUnlock()
+	fake.deleteMutex.RLock()
+	defer fake.deleteMutex.RUnlock()
+	fake.refreshMutex.RLock()
+	defer fake.refreshMutex.RUnlock()
+	fake.keyExistsMutex.RLock()
+	defer fake.keyExistsMutex.RUnlock()
+	fake.isKeyNotFoundMutex.RLock()
+	defer fake.isKeyNotFoundMutex.RUnlock()
+	fake.createDirectorStateMutex.RLock()
+	defer fake.createDirectorStateMutex.RUnlock()
+	fake.updateDirectorStateMutex.RLock()
+	defer fake.updateDirectorStateMutex.RUnlock()
+	fake.newWatcherMutex.RLock()
+	defer fake.newWatcherMutex.RUnlock()
+	fake.getClusterMembersMutex.RLock()
+	defer fake.getClusterMembersMutex.RUnlock()
+	fake.getCheckKeysMutex.RLock()
+	defer fake.getCheckKeysMutex.RUnlock()
+	fake.getCheckKeysWithMemberTagMutex.RLock()
+	defer fake.getCheckKeysWithMemberTagMutex.RUnlock()
+	fake.createCheckReferenceMutex.RLock()
+	defer fake.createCheckReferenceMutex.RUnlock()
+	fake.clearCheckReferenceMutex.RLock()
+	defer fake.clearCheckReferenceMutex.RUnlock()
+	fake.clearCheckReferencesMutex.RLock()
+	defer fake.clearCheckReferencesMutex.RUnlock()
+	fake.fetchAllMemberRefsMutex.RLock()
+	defer fake.fetchAllMemberRefsMutex.RUnlock()
+	fake.fetchCheckStatsMutex.RLock()
+	defer fake.fetchCheckStatsMutex.RUnlock()
+	fake.fetchAlerterConfigMutex.RLock()
+	defer fake.fetchAlerterConfigMutex.RUnlock()
+	fake.fetchStateMutex.RLock()
+	defer fake.fetchStateMutex.RUnlock()
+	fake.fetchStateWithTagsMutex.RLock()
+	defer fake.fetchStateWithTagsMutex.RUnlock()
+	fake.updateCheckStateMutex.RLock()
+	defer fake.updateCheckStateMutex.RUnlock()
+	fake.getClusterStatsMutex.RLock()
+	defer fake.getClusterStatsMutex.RUnlock()
+	fake.fetchEventsMutex.RLock()
+	defer fake.fetchEventsMutex.RUnlock()
+	fake.getClusterMembersWithTagsMutex.RLock()
+	defer fake.getClusterMembersWithTagsMutex.RUnlock()
+	fake.getClusterMemberTagsMutex.RLock()
+	defer fake.getClusterMemberTagsMutex.RUnlock()
+	fake.getCheckMemberTagMutex.RLock()
+	defer fake.getCheckMemberTagMutex.RUnlock()
+	fake.pushConfigsMutex.RLock()
+	defer fake.pushConfigsMutex.RUnlock()
+	fake.pushFullConfigsMutex.RLock()
+	defer fake.pushFullConfigsMutex.RUnlock()
 	return fake.invocations
 }
 
-func (fake *FakeIDal) guard(key string) {
+func (fake *FakeIDal) recordInvocation(key string, args []interface{}) {
+	fake.invocationsMutex.Lock()
+	defer fake.invocationsMutex.Unlock()
 	if fake.invocations == nil {
 		fake.invocations = map[string][][]interface{}{}
 	}
 	if fake.invocations[key] == nil {
 		fake.invocations[key] = [][]interface{}{}
 	}
+	fake.invocations[key] = append(fake.invocations[key], args)
 }
 
 var _ dal.IDal = new(FakeIDal)

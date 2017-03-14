@@ -11,7 +11,9 @@ import (
 	"github.com/coreos/etcd/client"
 	"github.com/gorilla/mux"
 
+	"github.com/9corp/9volt/cfgutil"
 	"github.com/9corp/9volt/dal"
+	"github.com/9corp/9volt/monitor"
 )
 
 type fullMonitorConfig map[string]*json.RawMessage
@@ -94,6 +96,79 @@ func (a *Api) MonitorDisableHandler(rw http.ResponseWriter, r *http.Request) *ry
 
 	rye.WriteJSONStatus(rw, "ok", fmt.Sprintf("Successfully updated disable check state to '%v' for check '%v'",
 		disableAction, checkName), http.StatusOK)
+
+	return nil
+}
+
+// Add/Update monitor config
+func (a *Api) MonitorAddHandler(rw http.ResponseWriter, r *http.Request) *rye.Response {
+	defer r.Body.Close()
+
+	dec := json.NewDecoder(r.Body)
+
+	var monitors = map[string]monitor.MonitorConfig{}
+	if err := dec.Decode(&monitors); err != nil {
+		return &rye.Response{
+			Err:        fmt.Errorf("Unable to complete config parsing: %v", err),
+			StatusCode: http.StatusBadRequest,
+		}
+	}
+
+	finalMonitors := map[string][]byte{}
+
+	for k, v := range monitors {
+		mon, err := json.Marshal(v)
+		if err != nil {
+			return &rye.Response{
+				Err:        fmt.Errorf("Unable to complete config parsing: %v", err),
+				StatusCode: http.StatusBadRequest,
+			}
+		}
+
+		finalMonitors[k] = mon
+	}
+
+	pushed, skipped, err := a.Config.DalClient.PushConfigs(cfgutil.MONITOR_TYPE, finalMonitors)
+	if err != nil {
+		return &rye.Response{
+			Err:        fmt.Errorf("Unable to complete config push: %v", err),
+			StatusCode: http.StatusInternalServerError,
+		}
+	}
+
+	rye.WriteJSONStatus(rw, "ok", fmt.Sprintf("Pushed %v configs; skipped %v configs", pushed, skipped), http.StatusOK)
+
+	return nil
+}
+
+// Delete monitor config
+func (a *Api) MonitorDeleteHandler(rw http.ResponseWriter, r *http.Request) *rye.Response {
+	checkName := mux.Vars(r)["check"]
+
+	if checkName == "" {
+		return &rye.Response{
+			Err:        errors.New("Check name not found. Bug?"),
+			StatusCode: http.StatusInternalServerError,
+		}
+	}
+
+	fullPath := fmt.Sprintf("monitor/%v", checkName)
+
+	if err := a.Config.DalClient.Delete(fullPath, false); err != nil {
+		if client.IsKeyNotFound(err) {
+			return &rye.Response{
+				Err:        fmt.Errorf("Unable to find any check named '%v'", checkName),
+				StatusCode: http.StatusNotFound,
+			}
+		}
+
+		return &rye.Response{
+			Err:        fmt.Errorf("Unexpected etcd error: %v", err),
+			StatusCode: http.StatusInternalServerError,
+		}
+	}
+
+	rye.WriteJSONStatus(rw, "ok", fmt.Sprintf("Successfully removed check '%v'", checkName), http.StatusOK)
 
 	return nil
 }

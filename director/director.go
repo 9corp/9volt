@@ -39,7 +39,7 @@ type Director struct {
 }
 
 func New(cfg *config.Config, stateChan <-chan bool, distributeChan <-chan bool) (IDirector, error) {
-	dalClient, err := dal.New(cfg.EtcdPrefix, cfg.EtcdMembers)
+	dalClient, err := dal.New(cfg.EtcdPrefix, cfg.EtcdMembers, false, false, false)
 	if err != nil {
 		return nil, err
 	}

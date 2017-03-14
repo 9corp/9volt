@@ -63,47 +63,47 @@ monitor:
       - dbservers
       - mysql
 
-  exec-check2:
-    type: exec
-    description: exec check test
-    timeout: 5s
-    command: echo
-    args:
-      - hello
-      - world
-    interval: 10s
-    return-code: 0
-    expect: world
-    warning-threshold: 1
-    critical-threshold: 3
-    warning-alerter:
-      - primary-slack
-    critical-alerter:
-      - primary-email
-    tags:
-      - dbservers
-      - mysql
+  # exec-check2:
+  #   type: exec
+  #   description: exec check test
+  #   timeout: 5s
+  #   command: echo
+  #   args:
+  #     - hello
+  #     - world
+  #   interval: 10s
+  #   return-code: 0
+  #   expect: world
+  #   warning-threshold: 1
+  #   critical-threshold: 3
+  #   warning-alerter:
+  #     - primary-slack
+  #   critical-alerter:
+  #     - primary-email
+  #   tags:
+  #     - dbservers
+  #     - mysql
 
-  exec-check3:
-    type: exec
-    description: exec check test
-    timeout: 5s
-    command: echo
-    args:
-      - hello
-      - world
-    interval: 10s
-    return-code: 0
-    expect: world
-    warning-threshold: 1
-    critical-threshold: 3
-    warning-alerter:
-      - primary-slack
-    critical-alerter:
-      - primary-email
-    tags:
-      - dbservers
-      - mysql
+  # exec-check3:
+  #   type: exec
+  #   description: exec check test
+  #   timeout: 5s
+  #   command: echo
+  #   args:
+  #     - hello
+  #     - world
+  #   interval: 10s
+  #   return-code: 0
+  #   expect: world
+  #   warning-threshold: 1
+  #   critical-threshold: 3
+  #   warning-alerter:
+  #     - primary-slack
+  #   critical-alerter:
+  #     - primary-email
+  #   tags:
+  #     - dbservers
+  #     - mysql
 
   exec-check4:
     type: exec

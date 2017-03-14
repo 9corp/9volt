@@ -11,15 +11,17 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/ghodss/yaml"
+
+	"github.com/9corp/9volt/dal"
+)
+
+const (
+	MONITOR_TYPE = "monitor"
+	ALERTER_TYPE = "alerter"
 )
 
 type CfgUtil struct {
 	Dir string
-}
-
-type FullConfigs struct {
-	AlerterConfigs map[string][]byte // alerter name : json blob
-	MonitorConfigs map[string][]byte // monitor name : json blob
 }
 
 type YAMLFileBlob map[string]map[string]interface{}
@@ -80,8 +82,8 @@ func (c *CfgUtil) Fetch() ([]string, error) {
 //
 // Structure for MonitorConfigs and AlerterConfigs is a map where the key is the
 // keyname for the config and the vaue is the JSON blob as a byte slice.
-func (c *CfgUtil) Parse(files []string) (*FullConfigs, error) {
-	fullConfigs := &FullConfigs{
+func (c *CfgUtil) Parse(files []string) (*dal.FullConfigs, error) {
+	fullConfigs := &dal.FullConfigs{
 		AlerterConfigs: make(map[string][]byte, 0),
 		MonitorConfigs: make(map[string][]byte, 0),
 	}
