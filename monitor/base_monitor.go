@@ -133,24 +133,14 @@ func (b *Base) sendMessage(curState int, titleMessage, alertMessage, errorDetail
 	for _, alert := range alertKey[curState] {
 		if _, exists := b.resolveFuncs[alert]; !exists {
 			b.resolveFuncs[alert] = func() {
-				msg := &alerter.Message{
-					Type:   alertType[OK],
-					Key:    []string{alert},
-					Title:  titleMessage,
-					Text:   alertMessage,
-					Count:  b.attemptCount,
-					Source: b.RMC.ConfigName, // should be unique per check (used as incident key for PD)
+				resolvMsg := &alerter.Message{}
+				*resolvMsg = *msg
 
-					// Let's set some additional (potentially) useful info in the message
-					Contents: map[string]string{
-						"WarningThreshold":  fmt.Sprint(b.RMC.Config.WarningThreshold),
-						"CriticalThreshold": fmt.Sprint(b.RMC.Config.CriticalThreshold),
-						"ErrorDetails":      errorDetails,
-					},
-				}
+				resolvMsg.Type = alertType[OK]
+				resolvMsg.Key = []string{alert}
 
 				// Send the message
-				b.RMC.MessageChannel <- msg
+				b.RMC.MessageChannel <- resolvMsg
 
 				delete(b.resolveFuncs, alert)
 			}
