@@ -9,17 +9,15 @@ env:
   global:
     - GOARCH=amd64
     - SEMVER=test
-    - TRAVIS_NODE_VERSION=6
 
 script:
   - make test
 
 # Install a recent version of node && install go tools && build
 before_deploy:
-  - rm -rf ~/.nvm && git clone https://github.com/creationix/nvm.git ~/.nvm && (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && source ~/.nvm/nvm.sh && nvm install $TRAVIS_NODE_VERSION && \
-    cd $TRAVIS_BUILD_DIR && \
-    make installtools && \
-    SEMVER=$TRAVIS_TAG make build/release
+  - make installnode \
+    && make installtools \
+    && SEMVER=$TRAVIS_TAG make build/release
 
 deploy:
   provider: releases
