@@ -78,7 +78,7 @@ build/docs: ## Build markdown docs from swagger comments
 	swagger -apiPackage="github.com/9corp/9volt" -format=markdown -output=docs/api/README.md
 
 build/ui: ui ## Build the UI (use nvm if available)
-	(if [ -e ~/.nvm/nvm.sh ]; then echo "yep, executing"; . ~/.nvm/nvm.sh; fi; cd ui && npm install && npm run build)
+	(if [ -e ~/.nvm/nvm.sh ]; then . ~/.nvm/nvm.sh; fi; cd ui && npm install && npm run build)
 	statik -src=./ui/dist
 
 build/release: semvercheck build/linux build/darwin ## Prepare a build
