@@ -1,5 +1,10 @@
 language: go
-sudo: false
+
+sudo: required
+
+services:
+  - docker
+
 go:
   - 1.7.3
   - 1.8.x
@@ -27,4 +32,8 @@ deploy:
   on:
     tags: true
 
-after_deploy: make build/release-travis-docker
+after_deploy:
+  - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
+  - docker build -t "9corp/9volt:$SEMVER" -t "9corp/9volt:latest" .
+  - docker push 9corp/9volt:$SEMVER
+  - docker push 9corp/9volt:latest
