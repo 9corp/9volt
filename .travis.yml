@@ -31,9 +31,3 @@ deploy:
     - "build/9volt-$TRAVIS_TAG-linux.tgz"
   on:
     tags: true
-
-after_deploy:
-  - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
-  - docker build -t "9corp/9volt:$SEMVER" -t "9corp/9volt:latest" .
-  - docker push 9corp/9volt:$SEMVER
-  - docker push 9corp/9volt:latest
