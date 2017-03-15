@@ -92,10 +92,13 @@ build/release: semvercheck build/linux build/darwin ## Prepare a build
 	cd $(OUTPUT_DIR) && tar -czvf 9volt-$(SEMVER)-linux.tgz 9volt-$(SEMVER)-linux/
 	@echo "A new release has been created!"
 
-build/release-travis: installnode installtools build/release build/docker-login-travis build/release-docker ## Install node, tools, build, build + push docker image
+build/release-travis: installnode installtools build/release ## Install node, tools, build
 
-build/docker-login-travis: dockercheck ## Used by Travis
+build/release-travis-docker: semvercheck dockercheck ## Used by Travis
 	docker login -e $(DOCKER_EMAIL) -u $(DOCKER_USER) -p $(DOCKER_PASS)
+	docker build -t "9corp/9volt:$(SEMVER)" -t "9corp/9volt:latest" . && \
+	docker push 9corp/9volt:$(SEMVER)
+	docker push 9corp/9volt:latest
 
 build/release-docker: semvercheck build/linux ## Build, tag and push a docker image to dockerhubs
 	docker build -t "9corp/9volt:$(SEMVER)" -t "9corp/9volt:latest" . && \
