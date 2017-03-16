@@ -188,7 +188,7 @@ func (d *Dal) setAndCreateParents(
 		if depth != 0 && etcdErr.Code == client.ErrorCodeKeyNotFound {
 			// recursively create its parent first
 			parent := key[:strings.LastIndex(key, "/")] //TODO should use path lib to manipulate this
-			if err := d.setAndCreateParents(parent, "", true, depth-1, ttl, client.PrevNoExist); err != nil {
+			if err := d.setAndCreateParents(parent, "", true, depth-1, ttl, client.PrevIgnore); err != nil {
 				return err
 			}
 

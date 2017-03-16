@@ -328,7 +328,7 @@ func (c *Cluster) runMemberHeartbeat() {
 			&dal.SetOptions{
 				Dir:           false,
 				TTLSec:        0,
-				PrevExist:     "true",
+				PrevExist:     "",
 				CreateParents: true,
 				Depth:         1,
 			},
