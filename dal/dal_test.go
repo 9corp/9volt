@@ -136,6 +136,10 @@ var _ = Describe("dal", func() {
 						ContainElement(testDAL.Prefix+testKey[:strings.LastIndex(testKey, "/")]),
 					))
 				})
+
+				Context("depth > actual path length", func() {
+					//TODO this will probably error currently, so definitely need to do it
+				})
 			})
 
 			Context("depth is < 0", func() {

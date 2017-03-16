@@ -147,6 +147,8 @@ func (d *Dal) Set(key, value string, opt *SetOptions) error {
 		opt.Depth = 0
 	}
 
+	//TODO handle the case that depth is lager than the num of path elements
+
 	err := d.setAndCreateParents(
 		d.Prefix+key,
 		value,
@@ -185,7 +187,7 @@ func (d *Dal) setAndCreateParents(
 		// parent creation is enabled, and error is a key not found
 		if depth != 0 && etcdErr.Code == client.ErrorCodeKeyNotFound {
 			// recursively create its parent first
-			parent := key[:strings.LastIndex(key, "/")]
+			parent := key[:strings.LastIndex(key, "/")] //TODO should use path lib to manipulate this
 			if err := d.setAndCreateParents(parent, "", true, depth-1, ttl, client.PrevNoExist); err != nil {
 				return err
 			}
