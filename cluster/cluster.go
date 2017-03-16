@@ -323,13 +323,20 @@ func (c *Cluster) runMemberHeartbeat() {
 		}
 
 		// set status key
-		go func(memberDir, memberJSON string) {
-			if err := c.DalClient.Set(memberDir+"/status", memberJSON, &dal.SetOptions{Dir: false, TTLSec: 0, PrevExist: "true"}); err != nil {
-				c.Config.EQClient.AddWithErrorLog("error",
-					fmt.Sprintf("%v-memberHeartbeat: Unable to save member JSON status (retrying in %v): %v",
-						c.Identifier, c.Config.HeartbeatInterval.String(), err.Error()))
-			}
-		}(memberDir, memberJSON)
+		if err := c.DalClient.Set(
+			memberDir+"/status", memberJSON,
+			&dal.SetOptions{
+				Dir:           false,
+				TTLSec:        0,
+				PrevExist:     "true",
+				CreateParents: true,
+				Depth:         1,
+			},
+		); err != nil {
+			c.Config.EQClient.AddWithErrorLog("error",
+				fmt.Sprintf("%v-memberHeartbeat: Unable to save member JSON status (retrying in %v): %v",
+					c.Identifier, c.Config.HeartbeatInterval.String(), err.Error()))
+		}
 
 		// refresh dir
 		go func(memberDir string, ttl int) {
