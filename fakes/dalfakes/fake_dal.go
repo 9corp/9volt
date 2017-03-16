@@ -19,14 +19,12 @@ type FakeIDal struct {
 		result1 map[string]string
 		result2 error
 	}
-	SetStub        func(string, string, bool, int, string) error
+	SetStub        func(string, string, *dal.SetOptions) error
 	setMutex       sync.RWMutex
 	setArgsForCall []struct {
 		arg1 string
 		arg2 string
-		arg3 bool
-		arg4 int
-		arg5 string
+		arg3 *dal.SetOptions
 	}
 	setReturns struct {
 		result1 error
@@ -290,19 +288,17 @@ func (fake *FakeIDal) GetReturns(result1 map[string]string, result2 error) {
 	}{result1, result2}
 }
 
-func (fake *FakeIDal) Set(arg1 string, arg2 string, arg3 bool, arg4 int, arg5 string) error {
+func (fake *FakeIDal) Set(arg1 string, arg2 string, arg3 *dal.SetOptions) error {
 	fake.setMutex.Lock()
 	fake.setArgsForCall = append(fake.setArgsForCall, struct {
 		arg1 string
 		arg2 string
-		arg3 bool
-		arg4 int
-		arg5 string
-	}{arg1, arg2, arg3, arg4, arg5})
-	fake.recordInvocation("Set", []interface{}{arg1, arg2, arg3, arg4, arg5})
+		arg3 *dal.SetOptions
+	}{arg1, arg2, arg3})
+	fake.recordInvocation("Set", []interface{}{arg1, arg2, arg3})
 	fake.setMutex.Unlock()
 	if fake.SetStub != nil {
-		return fake.SetStub(arg1, arg2, arg3, arg4, arg5)
+		return fake.SetStub(arg1, arg2, arg3)
 	} else {
 		return fake.setReturns.result1
 	}
@@ -314,10 +310,10 @@ func (fake *FakeIDal) SetCallCount() int {
 	return len(fake.setArgsForCall)
 }
 
-func (fake *FakeIDal) SetArgsForCall(i int) (string, string, bool, int, string) {
+func (fake *FakeIDal) SetArgsForCall(i int) (string, string, *dal.SetOptions) {
 	fake.setMutex.RLock()
 	defer fake.setMutex.RUnlock()
-	return fake.setArgsForCall[i].arg1, fake.setArgsForCall[i].arg2, fake.setArgsForCall[i].arg3, fake.setArgsForCall[i].arg4, fake.setArgsForCall[i].arg5
+	return fake.setArgsForCall[i].arg1, fake.setArgsForCall[i].arg2, fake.setArgsForCall[i].arg3
 }
 
 func (fake *FakeIDal) SetReturns(result1 error) {
