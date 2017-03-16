@@ -211,46 +211,67 @@ func (c *Cluster) runMemberMonitor() {
 	log.Debugf("%v: Launching member monitor...", c.Identifier)
 
 	membersDir := "cluster/members/"
-
-	// Create a watcher for cluster members
-	watcher := c.DalClient.NewWatcher(membersDir, true)
+	watcherAttemptNum := 0
+	watcherAttemptMax := 10 // max outage duration == 1 sec
+	watcherSleepInterval := time.Duration(100 * time.Millisecond)
 
 	for {
-		if !c.amDirector() {
-			time.Sleep(time.Duration(c.Config.HeartbeatInterval))
-			continue
-		}
-
-		// watch all dirs under /9volt/cluster/members/; alert if someone joins
-		// or leaves
-		resp, err := watcher.Next(context.Background())
-		if err != nil {
+		if watcherAttemptNum >= watcherAttemptMax {
 			c.Config.EQClient.AddWithErrorLog("error",
-				fmt.Sprintf("%v-memberMonitor: Unexpected watcher error: %v", c.Identifier, err.Error()))
+				fmt.Sprintf("%v-runMemberMonitor: Giving up creating watchers (attempts %v); shutting down", c.Identifier, watcherAttemptNum))
+			log.Fatalf("Self-destructing - reached max number of watcher connection attempts (%v)", watcherAttemptMax)
+		}
+
+		log.Debugf("%v-runMemberMonitor: Attempting to create a new watcher (attempt #%v)", watcherAttemptNum)
+
+		// Create a watcher for cluster members
+		watcher, err := c.DalClient.NewWatcher(membersDir, true, true)
+		if err != nil {
+			c.Config.EQClient.AddWithErrorLog("error", fmt.Sprintf("%v-runMemberMonitor: Unable to create watcher: %v", c.Identifier, err))
+			watcherAttemptNum++
+			time.Sleep(watcherSleepInterval)
 			continue
 		}
 
-		switch resp.Action {
-		case "set":
-			// Only care about set's on base dir and 'config'
-			if !resp.Node.Dir || path.Base(resp.Node.Key) == "config" {
-				log.Debugf("%v-memberMonitor: Ignoring watcher action on key %v",
-					c.Identifier, resp.Node.Key)
+		for {
+			if !c.amDirector() {
+				time.Sleep(time.Duration(c.Config.HeartbeatInterval))
 				continue
 			}
 
-			newMemberID := path.Base(resp.Node.Key)
-			log.Infof("%v-memberMonitor: New member '%v' has joined the cluster",
-				c.Identifier, newMemberID)
-			c.DistributeChan <- true
-		case "expire":
-			// only dirs expire under /cluster/members/; don't need to do anything fancy
-			oldMemberID := path.Base(resp.Node.Key)
-			log.Infof("%v-memberMonitor: Detected an expire for old member '%v'",
-				c.Identifier, oldMemberID)
-			c.DistributeChan <- true
-		default:
-			continue
+			// watch all dirs under /9volt/cluster/members/; alert if someone joins
+			// or leaves
+			resp, err := watcher.Next(context.Background())
+			if err != nil {
+				c.Config.EQClient.AddWithErrorLog("error",
+					fmt.Sprintf("%v-memberMonitor: Unexpected watcher error: %v", c.Identifier, err.Error()))
+				watcherAttemptNum++
+				time.Sleep(watcherSleepInterval)
+				break
+			}
+
+			switch resp.Action {
+			case "set":
+				// Only care about set's on base dir and 'config'
+				if !resp.Node.Dir || path.Base(resp.Node.Key) == "config" {
+					log.Debugf("%v-memberMonitor: Ignoring watcher action on key %v",
+						c.Identifier, resp.Node.Key)
+					continue
+				}
+
+				newMemberID := path.Base(resp.Node.Key)
+				log.Infof("%v-memberMonitor: New member '%v' has joined the cluster",
+					c.Identifier, newMemberID)
+				c.DistributeChan <- true
+			case "expire":
+				// only dirs expire under /cluster/members/; don't need to do anything fancy
+				oldMemberID := path.Base(resp.Node.Key)
+				log.Infof("%v-memberMonitor: Detected an expire for old member '%v'",
+					c.Identifier, oldMemberID)
+				c.DistributeChan <- true
+			default:
+				continue
+			}
 		}
 	}
 }
@@ -272,7 +293,7 @@ func (c *Cluster) createInitialMemberStructure(memberDir string, heartbeatTimeou
 	}
 
 	// create initial dir
-	if err := c.DalClient.Set(memberDir, "", true, heartbeatTimeoutInt, ""); err != nil {
+	if err := c.DalClient.Set(memberDir, "", true, heartbeatTimeoutInt, "", false); err != nil {
 		return fmt.Errorf("First member dir Set() failed: %v", err.Error())
 	}
 
@@ -282,12 +303,12 @@ func (c *Cluster) createInitialMemberStructure(memberDir string, heartbeatTimeou
 		return fmt.Errorf("Unable to generate initial member JSON: %v", err.Error())
 	}
 
-	if err := c.DalClient.Set(memberDir+"/status", memberJSON, false, 0, ""); err != nil {
+	if err := c.DalClient.Set(memberDir+"/status", memberJSON, false, 0, "", false); err != nil {
 		return fmt.Errorf("Unable to create initial state: %v", err.Error())
 	}
 
 	// create member config dir
-	if err := c.DalClient.Set(memberDir+"/config", "", true, 0, ""); err != nil {
+	if err := c.DalClient.Set(memberDir+"/config", "", true, 0, "", false); err != nil {
 		return fmt.Errorf("Creating member config dir failed: %v", err.Error())
 	}
 
@@ -324,7 +345,7 @@ func (c *Cluster) runMemberHeartbeat() {
 
 		// set status key
 		go func(memberDir, memberJSON string) {
-			if err := c.DalClient.Set(memberDir+"/status", memberJSON, false, 0, "true"); err != nil {
+			if err := c.DalClient.Set(memberDir+"/status", memberJSON, false, 0, "true", true); err != nil {
 				c.Config.EQClient.AddWithErrorLog("error",
 					fmt.Sprintf("%v-memberHeartbeat: Unable to save member JSON status (retrying in %v): %v",
 						c.Identifier, c.Config.HeartbeatInterval.String(), err.Error()))

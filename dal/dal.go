@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -21,14 +22,14 @@ import (
 
 type IDal interface {
 	Get(string, *GetOptions) (map[string]string, error)
-	Set(string, string, bool, int, string) error
+	Set(string, string, bool, int, string, bool) error
 	Delete(string, bool) error
 	Refresh(string, int) error
 	KeyExists(string) (bool, bool, error)
 	IsKeyNotFound(error) bool
 	CreateDirectorState(string) error
 	UpdateDirectorState(string, string, bool) error
-	NewWatcher(string, bool) client.Watcher
+	NewWatcher(string, bool, bool) (client.Watcher, error)
 	GetClusterMembers() ([]string, error)
 	GetCheckKeys() ([]string, error)
 	GetCheckKeysWithMemberTag() (map[string]string, error)
@@ -117,8 +118,26 @@ func (d *Dal) KeyExists(key string) (bool, bool, error) {
 }
 
 // An unwieldy wrapper for setting a new key
-func (d *Dal) Set(key, value string, dir bool, ttl int, prevExist string) error {
+func (d *Dal) Set(key, value string, dir bool, ttl int, prevExist string, createDirs bool) error {
 	existState := client.PrevExistType(prevExist)
+
+	// Pre-create dirs if needed (ie. mkdir -p)
+	if createDirs {
+		dir := path.Dir(key)
+		dirs := strings.Split(dir, "/")
+
+		log.Infof("THESE ARE OUR DIRS: %v", dirs)
+
+		for _, v := range dirs {
+			if err := d.Set(v, "", true, 0, "", false); err != nil {
+				if strings.Contains(err.Error(), "Not a file") {
+					continue
+				}
+
+				return fmt.Errorf("Unable to pre-create dir '%v' for key '%v': %v", v, key, err)
+			}
+		}
+	}
 
 	_, err := d.KeysAPI.Set(
 		context.Background(),
@@ -276,10 +295,25 @@ func (d *Dal) Delete(key string, recursive bool) error {
 	return err
 }
 
-func (d *Dal) NewWatcher(key string, recursive bool) client.Watcher {
-	return d.KeysAPI.Watcher(d.Prefix+"/"+key, &client.WatcherOptions{
+// Create a watcher (optionally using a new etcd client)
+func (d *Dal) NewWatcher(key string, recursive bool, newClient bool) (client.Watcher, error) {
+	keysAPI := d.KeysAPI
+
+	if newClient {
+		etcdClient, err := client.New(client.Config{
+			Endpoints: d.Members,
+			Transport: client.DefaultTransport,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		keysAPI = client.NewKeysAPI(etcdClient)
+	}
+
+	return keysAPI.Watcher(d.Prefix+"/"+key, &client.WatcherOptions{
 		Recursive: recursive,
-	})
+	}), nil
 }
 
 // Update director state entry (expecting previous director state to match 'prevValue')
