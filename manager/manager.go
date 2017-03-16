@@ -54,6 +54,7 @@ func (m *Manager) run() error {
 		if err != nil {
 			m.Config.EQClient.AddWithErrorLog("error",
 				fmt.Sprintf("%v: Unexpected watcher error: %v", m.Identifier, err.Error()))
+			m.Config.Health.Write(false, fmt.Sprintf("Manager engine watcher encountering errors: %v", err.Error()))
 			return err
 		}
 

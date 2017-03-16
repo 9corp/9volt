@@ -39,7 +39,7 @@ type Director struct {
 }
 
 func New(cfg *config.Config, stateChan <-chan bool, distributeChan <-chan bool) (IDirector, error) {
-	dalClient, err := dal.New(cfg.EtcdPrefix, cfg.EtcdMembers, false, false, false)
+	dalClient, err := dal.New(cfg.EtcdPrefix, cfg.EtcdMembers, cfg.EtcdUserPass, false, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -368,6 +368,7 @@ func (d *Director) runCheckConfigWatcher(ctx context.Context) {
 			break
 		} else if err != nil {
 			log.Errorf("%v-checkConfigWatcher: Unexpected error: %v", d.Identifier, err.Error())
+			d.Config.Health.Write(false, fmt.Sprintf("Director engine watcher encountering errors: %v", err.Error()))
 			continue
 		}
 
