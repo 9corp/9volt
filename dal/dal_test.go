@@ -5,6 +5,8 @@ import (
 	"github.com/coreos/etcd/client"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"golang.org/x/net/context"
+	"strings"
 	"time"
 )
 
@@ -12,10 +14,6 @@ var _ = Describe("dal", func() {
 	var (
 		testDAL     *Dal
 		fakeKeysAPI *etcdclientfakes.FakeKeysAPI
-
-		testKey, testVal, testPrevExists string
-		testTTL                          int
-		testDir                          bool
 	)
 
 	BeforeEach(func() {
@@ -24,13 +22,27 @@ var _ = Describe("dal", func() {
 			KeysAPI: fakeKeysAPI,
 			Prefix:  "testpre",
 		}
-
-		testKey, testVal, testDir, testTTL, testPrevExists =
-			"foo/bar/path", "baz", false, 5, ""
-
 	})
 
 	Describe("Set", func() {
+		var (
+			testKey, testVal string
+			testOpts         *SetOptions
+			err              error
+		)
+
+		BeforeEach(func() {
+			testKey, testVal = "foo/bar/path", "baz"
+			testOpts = &SetOptions{
+				Dir:       false,
+				TTLSec:    5,
+				PrevExist: "",
+			}
+		})
+
+		JustBeforeEach(func() {
+			err = testDAL.Set(testKey, testVal, testOpts)
+		})
 
 		Context("happy path", func() {
 			BeforeEach(func() {
@@ -38,15 +50,14 @@ var _ = Describe("dal", func() {
 			})
 
 			It("does not error", func() {
-				err := testDAL.Set(testKey, testVal, &SetOptions{Dir: testDir, TTLSec: testTTL, PrevExist: testPrevExists})
 				Expect(err).ToNot(HaveOccurred())
 
 				_, gotKey, gotVal, gotOpts := fakeKeysAPI.SetArgsForCall(0)
 				Expect(gotKey).To(Equal(testDAL.Prefix + "/" + testKey))
 				Expect(gotVal).To(Equal(testVal))
-				Expect(gotOpts.Dir).To(Equal(testDir))
-				Expect(gotOpts.TTL).To(Equal(time.Duration(testTTL) * time.Second))
-				Expect(gotOpts.PrevExist).To(Equal(client.PrevExistType(testPrevExists)))
+				Expect(gotOpts.Dir).To(Equal(testOpts.Dir))
+				Expect(gotOpts.TTL).To(Equal(time.Duration(testOpts.TTLSec) * time.Second))
+				Expect(gotOpts.PrevExist).To(Equal(client.PrevExistType(testOpts.PrevExist)))
 			})
 
 			Context("key has leading slash", func() {
@@ -55,7 +66,6 @@ var _ = Describe("dal", func() {
 				})
 
 				It("handles properly", func() {
-					err := testDAL.Set(testKey, testVal, &SetOptions{Dir: testDir, TTLSec: testTTL, PrevExist: testPrevExists})
 					Expect(err).ToNot(HaveOccurred())
 
 					_, gotKey, _, _ := fakeKeysAPI.SetArgsForCall(0)
@@ -70,11 +80,72 @@ var _ = Describe("dal", func() {
 			})
 
 			It("returns error unmodified", func() {
-				err := testDAL.Set(testKey, testVal, &SetOptions{Dir: testDir, TTLSec: testTTL, PrevExist: testPrevExists})
 				Expect(err).To(HaveOccurred())
 				etcdErr, ok := err.(client.Error)
 				Expect(ok).To(BeTrue())
 				Expect(etcdErr.Code).To(Equal(client.ErrorCodeKeyNotFound))
+			})
+		})
+
+		Context("create parents is set", func() {
+			BeforeEach(func() {
+				testOpts.CreateParents = true
+			})
+
+			Context("depth is 0", func() {
+				BeforeEach(func() {
+					fakeKeysAPI.SetReturns(&client.Response{}, nil)
+					testOpts.Depth = 0
+				})
+
+				It("sets single item only", func() {
+					Expect(err).ToNot(HaveOccurred())
+					Expect(fakeKeysAPI.SetCallCount()).To(Equal(1))
+				})
+			})
+
+			Context("depth is > 0", func() {
+				var (
+					setPaths []string
+				)
+
+				BeforeEach(func() {
+					testKey = "/one/two"
+					setPaths = []string{testDAL.Prefix}
+
+					fakeKeysAPI.SetStub = func(ctx context.Context, key, value string, opts *client.SetOptions) (*client.Response, error) {
+						parent := key[:strings.LastIndex(key, "/")]
+						for _, p := range setPaths {
+							if p == parent {
+								setPaths = append(setPaths, key)
+								return &client.Response{}, nil
+							}
+						}
+
+						return nil, client.Error{Code: client.ErrorCodeKeyNotFound}
+					}
+
+					testOpts.Depth = 1
+				})
+
+				It("creates depth number of dirs", func() {
+					Expect(err).ToNot(HaveOccurred())
+					Expect(fakeKeysAPI.SetCallCount()).To(Equal(3))
+					Expect(setPaths).To(And(
+						ContainElement(testDAL.Prefix+testKey),
+						ContainElement(testDAL.Prefix+testKey[:strings.LastIndex(testKey, "/")]),
+					))
+				})
+			})
+
+			Context("depth is < 0", func() {
+				BeforeEach(func() {
+					testOpts.Depth = -1
+				})
+
+				It("creates all dirs", func() {
+					//TODO
+				})
 			})
 		})
 	})

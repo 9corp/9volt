@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -120,31 +121,98 @@ func (d *Dal) KeyExists(key string) (bool, bool, error) {
 }
 
 type SetOptions struct {
+	// If SetOptions.Dir=true then value is ignored.
 	Dir       bool
 	TTLSec    int
 	PrevExist string
+
+	// Create parents will recursively create parent directories as needed.
+	CreateParents bool
+
+	// To be used with create parents.
+	// If depth > 0 it will only create depth number of parents.
+	// If depth < 0 it will try to create as many parents as necessary.
+	// If depth == 0 it will not create any parents. This behaves the same as Set().
+	Depth int
 }
 
 // A wrapper for setting a new key
-// If SetOptions.Dir=true then value is ignored.
 func (d *Dal) Set(key, value string, opt *SetOptions) error {
-	existState := client.PrevExistType(opt.PrevExist)
-
 	if key[0] != '/' {
 		key = "/" + key
 	}
-	_, err := d.KeysAPI.Set(
-		context.Background(),
+
+	// enforce this just in case
+	if !opt.CreateParents {
+		opt.Depth = 0
+	}
+
+	err := d.setAndCreateParents(
 		d.Prefix+key,
 		value,
-		&client.SetOptions{
-			Dir:       opt.Dir,
-			TTL:       time.Duration(opt.TTLSec) * time.Second,
-			PrevExist: existState,
-		},
+		opt.Dir,
+		opt.Depth,
+		time.Duration(opt.TTLSec)*time.Second,
+		client.PrevExistType(opt.PrevExist),
 	)
 
 	return err
+}
+
+// Helper method for set to recursively create its parents if they do not exist.
+// It will create up to `depth` number of parents.
+func (d *Dal) setAndCreateParents(
+	key, value string, dir bool, depth int, ttl time.Duration, pExist client.PrevExistType) error {
+
+	_, err := d.KeysAPI.Set(
+		context.Background(),
+		key,
+		value,
+		&client.SetOptions{
+			Dir:       dir,
+			TTL:       ttl,
+			PrevExist: pExist,
+		},
+	)
+
+	if err != nil {
+		// is an etcd error
+		etcdErr, ok := err.(client.Error)
+		if !ok {
+			return err
+		}
+
+		// parent creation is enabled, and error is a key not found
+		if depth != 0 && etcdErr.Code == client.ErrorCodeKeyNotFound {
+			// recursively create its parent first
+			parent := key[:strings.LastIndex(key, "/")]
+			if err := d.setAndCreateParents(parent, "", true, depth-1, ttl, client.PrevNoExist); err != nil {
+				return err
+			}
+
+			// now try to set it again
+			if _, err := d.KeysAPI.Set(
+				context.Background(),
+				key,
+				value,
+				&client.SetOptions{
+					Dir:       dir,
+					TTL:       ttl,
+					PrevExist: pExist,
+				},
+			); err != nil {
+				// give up if that didnt work
+				return err
+			}
+
+			return nil
+		}
+
+		// depth == 0 or got etcd error other than key not found
+		return err
+	}
+
+	return nil
 }
 
 // Set TTL for a given key
