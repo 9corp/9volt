@@ -324,7 +324,10 @@ func (d *Director) verifyMemberExistence() error {
 	// Let's wait a `heartbeatInterval`*2 to ensure that at least 1 active member
 	// is in the cluster (if not - there's either a bug or the system is *massively* overloaded)
 	tmpCtx, _ := context.WithTimeout(context.Background(), time.Duration(d.Config.HeartbeatInterval)*2)
-	tmpWatcher := d.DalClient.NewWatcher("cluster/members/", true)
+	tmpWatcher, err := d.DalClient.NewWatcher("cluster/members/", true, true)
+	if err != nil {
+		return fmt.Errorf("Unable to create a new watcher: %v", err)
+	}
 
 	for {
 		resp, err := tmpWatcher.Next(tmpCtx)
@@ -351,7 +354,10 @@ func (d *Director) verifyMemberExistence() error {
 func (d *Director) runCheckConfigWatcher(ctx context.Context) {
 	log.Debugf("%v-checkConfigWatcher: Launching...", d.Identifier)
 
-	watcher := d.DalClient.NewWatcher("monitor/", true)
+	watcher, err := d.DalClient.NewWatcher("monitor/", true, true)
+	if err != nil {
+		log.Fatalf("Unable to start initial monitor/ watcher: %v", err)
+	}
 
 	// TODO: Needs to be turned into a looper
 	for {

@@ -47,7 +47,10 @@ func (m *Manager) Start() error {
 func (m *Manager) run() error {
 	memberConfigDir := fmt.Sprintf("cluster/members/%v/config", m.MemberID)
 
-	watcher := m.Config.DalClient.NewWatcher(memberConfigDir, true)
+	watcher, err := m.Config.DalClient.NewWatcher(memberConfigDir, true, true)
+	if err != nil {
+		log.Fatalf("%v: Unable to start initial member config watcher: %v", m.Identifier, err)
+	}
 
 	m.Looper.Loop(func() error {
 		resp, err := watcher.Next(context.Background())

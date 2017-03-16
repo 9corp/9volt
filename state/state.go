@@ -102,7 +102,7 @@ func (s *State) runDumper() error {
 				continue
 			}
 
-			if err := s.Config.DalClient.Set(fullKey, string(messageBlob), false, 0, ""); err != nil {
+			if err := s.Config.DalClient.Set(fullKey, string(messageBlob), false, 0, "", false); err != nil {
 				s.Config.EQClient.AddWithErrorLog("error",
 					fmt.Sprintf("%v: Unable to dump state for key %v: %v", s.Identifier, k, err))
 				continue

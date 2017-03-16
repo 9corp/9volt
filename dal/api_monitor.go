@@ -29,7 +29,7 @@ func (d *Dal) UpdateCheckState(state bool, checkName string) error {
 	}
 
 	// push updated config to etcd
-	if err := d.Set(fullPath, string(newData), false, 0, ""); err != nil {
+	if err := d.Set(fullPath, string(newData), false, 0, "", false); err != nil {
 		return fmt.Errorf("Unable to update config '%v' in etcd: %v", checkName, err)
 	}
 
