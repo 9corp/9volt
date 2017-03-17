@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -79,13 +80,28 @@ type FullConfigs struct {
 	MonitorConfigs map[string][]byte // monitor name : json blob
 }
 
-func New(prefix string, members []string, replace, dryrun, nosync bool) (*Dal, error) {
+func New(prefix string, members []string, userpass string, replace, dryrun, nosync bool) (*Dal, error) {
 	log.Debugf("Connecting to etcd cluster with members: %v", members) //needs to be before any errs
 
-	etcdClient, err := client.New(client.Config{
+	clientConf := client.Config{
 		Endpoints: members,
 		Transport: client.DefaultTransport,
-	})
+	}
+
+	if len(userpass) > 0 {
+		creds := strings.Split(userpass, ":")
+
+		if len(creds) != 2 {
+			return nil, fmt.Errorf("Bad username/password passed, must be of format 'username:password'")
+		}
+
+		log.Debugf("Using authentication with etcd. Username is '%v'", creds[0])
+
+		clientConf.Username = creds[0]
+		clientConf.Password = creds[1]
+	}
+
+	etcdClient, err := client.New(clientConf)
 	if err != nil {
 		return nil, err
 	}

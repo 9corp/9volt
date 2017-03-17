@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
 
 	"github.com/9corp/9volt/dal"
 	"github.com/9corp/9volt/event"
@@ -18,14 +19,22 @@ type Config struct {
 	ListenAddress string
 	EtcdPrefix    string
 	EtcdMembers   []string
+	EtcdUserPass  string
 	Tags          []string
 	DalClient     dal.IDal
 	EQClient      event.IClient
+	Health        *Health
 
 	Version string
 	SemVer  string
 
 	serverConfig
+}
+
+type Health struct {
+	Ok      bool
+	Message string
+	lock    *sync.Mutex
 }
 
 type serverConfig struct {
@@ -35,16 +44,23 @@ type serverConfig struct {
 }
 
 // Pass in the dal client in order to facilitate better/easier testing story
-func New(memberID, listenAddress, etcdPrefix string, etcdMembers, tags []string,
+func New(memberID, listenAddress, etcdPrefix, etcdUserPass string, etcdMembers, tags []string,
 	dalClient dal.IDal, eqClient *event.Client, version, semver string) *Config {
 
 	if tags == nil {
 		tags = make([]string, 0)
 	}
 
+	health := &Health{
+		Ok:      true,
+		Message: "OK",
+		lock:    &sync.Mutex{},
+	}
+
 	cfg := &Config{
 		ListenAddress: listenAddress,
 		EtcdPrefix:    etcdPrefix,
+		EtcdUserPass:  etcdUserPass,
 		EtcdMembers:   etcdMembers,
 		DalClient:     dalClient,
 		EQClient:      eqClient,
@@ -52,6 +68,7 @@ func New(memberID, listenAddress, etcdPrefix string, etcdMembers, tags []string,
 		Tags:          tags,
 		Version:       version,
 		SemVer:        semver,
+		Health:        health,
 	}
 
 	return cfg
@@ -151,4 +168,19 @@ func (c *Config) validate(sc *serverConfig) error {
 	}
 
 	return nil
+}
+
+func (h *Health) Write(ok bool, message string) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
+	h.Ok = ok
+	h.Message = message
+}
+
+func (h *Health) Read() (bool, string) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
+	return h.Ok, h.Message
 }

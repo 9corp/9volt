@@ -38,10 +38,11 @@ var (
 	nosyncFlag  = cfg.Flag("nosync", "Do NOT remove any entries in etcd that do not have a corresponding local config").Short('n').Bool()
 	dryrunFlag  = cfg.Flag("dryrun", "Do NOT push any changes, just show me what you'd do").Bool()
 
-	etcdPrefix  = kingpin.Flag("etcd-prefix", "Prefix that 9volt's configuration is stored under in etcd").Short('p').Default("9volt").Envar("NINEV_ETCD_PREFIX").String()
-	etcdMembers = kingpin.Flag("etcd-members", "List of etcd cluster members").Short('e').Default("http://localhost:2379").Envar("NINEV_ETCD_MEMBERS").String()
-	debugUI     = kingpin.Flag("debug-ui", "Debug the user interface locally").Short('u').Bool()
-	debug       = kingpin.Flag("debug", "Enable debug mode").Short('d').Envar("NINEV_DEBUG").Bool()
+	etcdPrefix   = kingpin.Flag("etcd-prefix", "Prefix that 9volt's configuration is stored under in etcd").Short('p').Default("9volt").Envar("NINEV_ETCD_PREFIX").String()
+	etcdMembers  = kingpin.Flag("etcd-members", "List of etcd cluster members").Short('e').Default("http://localhost:2379").Envar("NINEV_ETCD_MEMBERS").String()
+	etcdUserPass = kingpin.Flag("etcd-userpass", "Username/Password for authenticated etcd user").Short('U').PlaceHolder("\"username:password\"").Envar("NINEV_ETCD_USERPASS").String()
+	debugUI      = kingpin.Flag("debug-ui", "Debug the user interface locally").Short('u').Bool()
+	debug        = kingpin.Flag("debug", "Enable debug mode").Short('d').Envar("NINEV_DEBUG").Bool()
 
 	version string
 	semver  string
@@ -89,7 +90,7 @@ func runServer() {
 	log.Infof("Starting 9volt server ID:%s Tags:%v", memberID, memberTags)
 
 	// Create an initial dal client
-	dalClient, err := dal.New(*etcdPrefix, etcdMemberList, false, false, false)
+	dalClient, err := dal.New(*etcdPrefix, etcdMemberList, *etcdUserPass, false, false, false)
 	if err != nil {
 		log.Fatalf("Unable to start initial etcd client: %v", err.Error())
 	}
@@ -99,7 +100,7 @@ func runServer() {
 	eqClient := eventQueue.NewClient()
 
 	// Load our configuration
-	cfg := config.New(memberID, *listenAddress, *etcdPrefix, etcdMemberList,
+	cfg := config.New(memberID, *listenAddress, *etcdPrefix, *etcdUserPass, etcdMemberList,
 		memberTags, dalClient, eqClient, version, semver)
 
 	if err := cfg.Load(); err != nil {
@@ -188,7 +189,7 @@ func runServer() {
 func runCfgUtil() {
 	etcdMemberList := util.SplitTags(*etcdMembers)
 
-	etcdClient, err := dal.New(*etcdPrefix, etcdMemberList, *replaceFlag, *dryrunFlag, *nosyncFlag)
+	etcdClient, err := dal.New(*etcdPrefix, etcdMemberList, *etcdUserPass, *replaceFlag, *dryrunFlag, *nosyncFlag)
 	if err != nil {
 		log.Fatalf("Unable to create initial etcd client: %v", err.Error())
 	}

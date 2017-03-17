@@ -13,7 +13,15 @@ func (a *Api) HomeHandler(rw http.ResponseWriter, r *http.Request) *rye.Response
 }
 
 func (a *Api) StatusHandler(rw http.ResponseWriter, r *http.Request) *rye.Response {
-	rye.WriteJSONStatus(rw, "OK", fmt.Sprintf("MemberID %v", a.MemberID), http.StatusOK)
+	ok, msg := a.Config.Health.Read()
+	memberID := fmt.Sprintf("MemberID %v", a.MemberID)
+
+	if ok {
+		rye.WriteJSONStatus(rw, msg, memberID, http.StatusOK)
+	} else {
+		rye.WriteJSONStatus(rw, msg, memberID, http.StatusInternalServerError)
+	}
+
 	return nil
 }
 
