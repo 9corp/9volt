@@ -40,7 +40,7 @@ type Base struct {
 	criticalAlertSent bool
 	warningAlertSent  bool
 	currentState      int
-	resolveFuncs      map[string]func()
+	resolveMessages   map[string]*alerter.Message
 }
 
 // Stop the monitor
@@ -59,7 +59,7 @@ func (b *Base) Run() error {
 
 	defer b.RMC.Ticker.Stop()
 
-	b.resolveFuncs = make(map[string]func())
+	b.resolveMessages = make(map[string]*alerter.Message)
 
 Mainloop:
 	for {
@@ -136,22 +136,16 @@ func (b *Base) sendMessage(curState int, titleMessage, alertMessage, errorDetail
 
 	// Get resolve functions ready
 	for _, alert := range alertKey[curState] {
-		// If we don't have a resolution func for the check then let's add it
-		if _, exists := b.resolveFuncs[alert]; !exists {
-			b.resolveFuncs[alert] = func() {
-				resolvMsg := &alerter.Message{}
-				// Copy the previous message
-				*resolvMsg = *msg
+		// If we don't have a resolution message for the check then let's add it
+		if _, exists := b.resolveMessages[alert]; !exists {
+			resolvMsg := &alerter.Message{}
+			// Copy the previous message
+			*resolvMsg = *msg
 
-				resolvMsg.Type = alertType[OK]
-				resolvMsg.Key = []string{alert}
+			resolvMsg.Type = alertType[OK]
+			resolvMsg.Key = []string{alert}
 
-				// Send the message
-				b.RMC.MessageChannel <- resolvMsg
-
-				// Delete this call from the map
-				delete(b.resolveFuncs, alert)
-			}
+			b.resolveMessages[alert] = resolvMsg
 		}
 	}
 
@@ -192,14 +186,20 @@ func (b *Base) updateState(monitorErr error) error {
 }
 
 func (b *Base) stateEvent(curState int, monitorErr string) {
+	var stateStr = [3]string{"", "warning", "critical"}
 	if curState == OK {
-		for _, resolve := range b.resolveFuncs {
-			// If we've resolved then let's call all those resolve funcs
-			resolve()
+		for alert, resolve := range b.resolveMessages {
+			// If we've resolved then let's send all those resolve messages
+			resolve.Text = fmt.Sprintf("Check has recovered from %s after %v checks", stateStr[b.currentState], b.attemptCount)
+
+			// Send the message
+			b.RMC.MessageChannel <- resolve
+
+			// Delete this call from the map
+			delete(b.resolveMessages, alert)
 		}
 		return
 	}
-	var stateStr = [3]string{"", "warning", "critical"}
 	titleMessage := fmt.Sprintf("%v check '%v' failure", strings.ToUpper(b.Identify()), b.RMC.ConfigName)
 	alertMessage := fmt.Sprintf("Check has entered into %s state after %v checks", stateStr[curState], b.attemptCount)
 	b.sendMessage(curState, titleMessage, alertMessage, monitorErr)
@@ -214,10 +214,15 @@ func (b *Base) transitionStateTo(state int, monitorErr string) error {
 	for _, potentialNextState := range stateTransition[b.currentState] {
 		// Is the state I want to transition to a valid next state
 		if potentialNextState == state {
-			b.currentState = state
 			b.stateEvent(state, monitorErr)
+			b.currentState = state
 			return nil
 		}
 	}
 	return fmt.Errorf("Failed to transition from state %d to %d", b.currentState, state)
+}
+
+// setStateTransition is really only meant to be used in tests
+func setStateTransition(idx int, transition [2]int) {
+	stateTransition[idx] = transition
 }
