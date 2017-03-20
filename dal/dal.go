@@ -127,6 +127,8 @@ type SetOptions struct {
 	PrevExist string
 
 	// Create parents will recursively create parent directories as needed.
+	// The overall prefix defined as Dal.Prefix can not be set this way. This will create any
+	// parents up to but not including that prefix.
 	CreateParents bool
 
 	// To be used with create parents.
@@ -138,19 +140,16 @@ type SetOptions struct {
 
 // A wrapper for setting a new key
 func (d *Dal) Set(key, value string, opt *SetOptions) error {
-	if key[0] != '/' {
-		key = "/" + key
-	}
+	fullKey := path.Clean(d.Prefix + "/" + key) // strip extraneous slashes
 
-	// enforce this just in case
-	if !opt.CreateParents {
-		opt.Depth = 0
+	if opt.CreateParents {
+		opt.Depth = fixDepth(opt.Depth, key[1:])
+	} else {
+		opt.Depth = 0 // enforce this
 	}
-
-	//TODO handle the case that depth is lager than the num of path elements
 
 	err := d.setAndCreateParents(
-		d.Prefix+key,
+		fullKey,
 		value,
 		opt.Dir,
 		opt.Depth,
@@ -161,11 +160,26 @@ func (d *Dal) Set(key, value string, opt *SetOptions) error {
 	return err
 }
 
+// Determine the proper number of parents to create. Prevent depth from going past the number of parents
+// specified in the path. If a path has no parents, it returns 0.
+// Does not work with a trailing slash. That should be handled before calling this.
+func fixDepth(d int, p string) int {
+	//length of segments minus the key itself. Will always be >= 0.
+	pLen := len(strings.Split(p, "/")) - 1
+
+	if d < 0 || d > pLen {
+		return pLen
+	}
+
+	return d
+}
+
 // Helper method for set to recursively create its parents if they do not exist.
 // It will create up to `depth` number of parents.
 func (d *Dal) setAndCreateParents(
 	key, value string, dir bool, depth int, ttl time.Duration, pExist client.PrevExistType) error {
 
+	// attempt to set the main key in question
 	_, err := d.KeysAPI.Set(
 		context.Background(),
 		key,
@@ -181,13 +195,14 @@ func (d *Dal) setAndCreateParents(
 		// is an etcd error
 		etcdErr, ok := err.(client.Error)
 		if !ok {
-			return err
+			return err // some unknown error. return unchanged
 		}
 
 		// parent creation is enabled, and error is a key not found
 		if depth != 0 && etcdErr.Code == client.ErrorCodeKeyNotFound {
 			// recursively create its parent first
-			parent := key[:strings.LastIndex(key, "/")] //TODO should use path lib to manipulate this
+			parent := key[:strings.LastIndex(key, "/")] // trim off the last path item to get the parent
+			// a parent is always a dir. Decrement the depth, and at this point ignore the previous.
 			if err := d.setAndCreateParents(parent, "", true, depth-1, ttl, client.PrevIgnore); err != nil {
 				return err
 			}
@@ -204,9 +219,10 @@ func (d *Dal) setAndCreateParents(
 				},
 			); err != nil {
 				// give up if that didnt work
-				return err
+				return fmt.Errorf("attempted recursive set, but failed: %v", err)
 			}
 
+			// at this point, parents got created and key was set
 			return nil
 		}
 
@@ -214,6 +230,7 @@ func (d *Dal) setAndCreateParents(
 		return err
 	}
 
+	// key was set on first attempt. parent creation not needed
 	return nil
 }
 
