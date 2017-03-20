@@ -88,6 +88,16 @@ var _ = Describe("dal", func() {
 					Expect(gotKey).To(Equal(testDAL.Prefix + testKey))
 				})
 			})
+
+			Context("nil options", func() {
+				BeforeEach(func() {
+					testOpts = nil
+				})
+
+				It("does not error", func() {
+					Expect(err).ToNot(HaveOccurred())
+				})
+			})
 		})
 
 		Context("set returns error", func() {

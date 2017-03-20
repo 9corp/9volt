@@ -94,7 +94,7 @@ func (c *Config) Load() error {
 	}
 
 	if !exists {
-		if err := c.DalClient.Set("config", DEFAULT_CONFIG, &dal.SetOptions{Dir: false, TTLSec: 0, PrevExist: ""}); err != nil {
+		if err := c.DalClient.Set("config", DEFAULT_CONFIG, nil); err != nil {
 			return fmt.Errorf("unable to create initial config: %v", err)
 		}
 

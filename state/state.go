@@ -12,7 +12,6 @@ import (
 	"github.com/relistan/go-director"
 
 	"github.com/9corp/9volt/config"
-	"github.com/9corp/9volt/dal"
 )
 
 const (
@@ -103,7 +102,7 @@ func (s *State) runDumper() error {
 				continue
 			}
 
-			if err := s.Config.DalClient.Set(fullKey, string(messageBlob), &dal.SetOptions{Dir: false, TTLSec: 0, PrevExist: ""}); err != nil {
+			if err := s.Config.DalClient.Set(fullKey, string(messageBlob), nil); err != nil {
 				s.Config.EQClient.AddWithErrorLog("error",
 					fmt.Sprintf("%v: Unable to dump state for key %v: %v", s.Identifier, k, err))
 				continue

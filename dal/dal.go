@@ -140,6 +140,11 @@ type SetOptions struct {
 
 // A wrapper for setting a new key
 func (d *Dal) Set(key, value string, opt *SetOptions) error {
+	// accept a nil opt
+	if opt == nil {
+		opt = &SetOptions{}
+	}
+
 	fullKey := path.Clean(d.Prefix + "/" + key) // strip extraneous slashes
 
 	if opt.CreateParents {

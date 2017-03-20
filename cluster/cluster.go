@@ -282,7 +282,7 @@ func (c *Cluster) createInitialMemberStructure(memberDir string, heartbeatTimeou
 		return fmt.Errorf("Unable to generate initial member JSON: %v", err.Error())
 	}
 
-	if err := c.DalClient.Set(memberDir+"/status", memberJSON, &dal.SetOptions{Dir: false, TTLSec: 0, PrevExist: ""}); err != nil {
+	if err := c.DalClient.Set(memberDir+"/status", memberJSON, nil); err != nil {
 		return fmt.Errorf("Unable to create initial state: %v", err.Error())
 	}
 
