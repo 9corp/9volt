@@ -4,7 +4,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/9corp/9volt/dal/dalfakes"
+	"github.com/9corp/9volt/fakes/dalfakes"
 )
 
 var _ = Describe("config", func() {

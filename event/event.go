@@ -84,7 +84,7 @@ func (q *Queue) runWorker(id int) {
 		// write it to etcd
 		fullKey := fmt.Sprintf("event/%v-%v", e.Type, util.RandomString(6, true))
 
-		if err := q.DalClient.Set(fullKey, string(eventBlob), false, MAX_EVENT_AGE, ""); err != nil {
+		if err := q.DalClient.Set(fullKey, string(eventBlob), &dal.SetOptions{Dir: false, TTLSec: MAX_EVENT_AGE, PrevExist: ""}); err != nil {
 			log.Errorf("%v: Unable to save event blob '%v' to path '%v' to etcd (worker: #%v): %v",
 				q.Identifier, e, fullKey, id, err)
 		}

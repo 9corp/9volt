@@ -87,7 +87,7 @@ func (c *Config) ValidateDirs() []string {
 		}
 
 		if !exists {
-			if err := c.DalClient.Set(d, "", true, 0, ""); err != nil {
+			if err := c.DalClient.Set(d, "", &dal.SetOptions{Dir: true, TTLSec: 0, PrevExist: ""}); err != nil {
 				errorList = append(errorList, fmt.Sprintf("unable to auto-create missing dir '%v': %v", d, err))
 				continue
 			}
@@ -111,7 +111,7 @@ func (c *Config) Load() error {
 	}
 
 	if !exists {
-		if err := c.DalClient.Set("config", DEFAULT_CONFIG, false, 0, ""); err != nil {
+		if err := c.DalClient.Set("config", DEFAULT_CONFIG, nil); err != nil {
 			return fmt.Errorf("unable to create initial config: %v", err)
 		}
 

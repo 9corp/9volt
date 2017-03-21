@@ -273,7 +273,7 @@ func (c *Cluster) createInitialMemberStructure(memberDir string, heartbeatTimeou
 	}
 
 	// create initial dir
-	if err := c.DalClient.Set(memberDir, "", true, heartbeatTimeoutInt, ""); err != nil {
+	if err := c.DalClient.Set(memberDir, "", &dal.SetOptions{Dir: true, TTLSec: heartbeatTimeoutInt, PrevExist: ""}); err != nil {
 		return fmt.Errorf("First member dir Set() failed: %v", err.Error())
 	}
 
@@ -283,12 +283,12 @@ func (c *Cluster) createInitialMemberStructure(memberDir string, heartbeatTimeou
 		return fmt.Errorf("Unable to generate initial member JSON: %v", err.Error())
 	}
 
-	if err := c.DalClient.Set(memberDir+"/status", memberJSON, false, 0, ""); err != nil {
+	if err := c.DalClient.Set(memberDir+"/status", memberJSON, nil); err != nil {
 		return fmt.Errorf("Unable to create initial state: %v", err.Error())
 	}
 
 	// create member config dir
-	if err := c.DalClient.Set(memberDir+"/config", "", true, 0, ""); err != nil {
+	if err := c.DalClient.Set(memberDir+"/config", "", &dal.SetOptions{Dir: true, TTLSec: 0, PrevExist: ""}); err != nil {
 		return fmt.Errorf("Creating member config dir failed: %v", err.Error())
 	}
 
@@ -324,13 +324,20 @@ func (c *Cluster) runMemberHeartbeat() {
 		}
 
 		// set status key
-		go func(memberDir, memberJSON string) {
-			if err := c.DalClient.Set(memberDir+"/status", memberJSON, false, 0, "true"); err != nil {
-				c.Config.EQClient.AddWithErrorLog("error",
-					fmt.Sprintf("%v-memberHeartbeat: Unable to save member JSON status (retrying in %v): %v",
-						c.Identifier, c.Config.HeartbeatInterval.String(), err.Error()))
-			}
-		}(memberDir, memberJSON)
+		if err := c.DalClient.Set(
+			memberDir+"/status", memberJSON,
+			&dal.SetOptions{
+				Dir:           false,
+				TTLSec:        0,
+				PrevExist:     "",
+				CreateParents: true,
+				Depth:         1,
+			},
+		); err != nil {
+			c.Config.EQClient.AddWithErrorLog("error",
+				fmt.Sprintf("%v-memberHeartbeat: Unable to save member JSON status (retrying in %v): %v",
+					c.Identifier, c.Config.HeartbeatInterval.String(), err.Error()))
+		}
 
 		// refresh dir
 		go func(memberDir string, ttl int) {
