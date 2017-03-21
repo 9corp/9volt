@@ -44,6 +44,12 @@ var _ = Describe("base_monitor", func() {
 			Config: &MonitorConfig{
 				CriticalThreshold: CriticalMessages,
 				WarningThreshold:  WarningMessages,
+				WarningAlerter: []string{
+					"warning_alerter",
+				},
+				CriticalAlerter: []string{
+					"critical_alerter",
+				},
 			},
 		}
 		monitor = &Base{
@@ -69,6 +75,16 @@ var _ = Describe("base_monitor", func() {
 			monitor.Stop()
 			Expect(monitor.Run()).To(BeNil())
 		})
+
+		It("returns an error if an invalid state transition is attempted", func() {
+			setStateTransition(0, [2]int{WARNING, WARNING})
+			monitor.resolveMessages = make(map[string]*alerter.Message)
+			transitionErr := monitor.transitionStateTo(CRITICAL, "")
+			setStateTransition(0, [2]int{WARNING, CRITICAL})
+			Expect(transitionErr).ToNot(BeNil())
+			Expect(transitionErr.Error()).To(ContainSubstring("Failed to transition from state 0 to 2"))
+		})
+
 		Context("successful check", func() {
 			var successfulCheck func() error
 			BeforeEach(func() {
@@ -202,13 +218,20 @@ var _ = Describe("base_monitor", func() {
 				Expect(receivedAlert.Type).To(Equal("resolve"))
 			})
 
+			It("changes resolve message", func() {
+				var receivedAlert *alerter.Message
+				for i := 0; i < WarningMessages+1; i++ {
+					Eventually(monitor.RMC.MessageChannel).Should(Receive(&receivedAlert))
+				}
+				Expect(receivedAlert.Text).To(ContainSubstring("Check has recovered from warning after 1 checks"))
+			})
+
 			It("logs state as ok", func() {
 				var receivedState *state.Message
 				for i := 0; i < WarningMessages+1; i++ {
 					Eventually(monitor.RMC.StateChannel).Should(Receive(&receivedState))
 				}
 				Expect(receivedState.Status).To(Equal("ok"))
-
 			})
 
 		})
@@ -251,7 +274,53 @@ var _ = Describe("base_monitor", func() {
 					Eventually(monitor.RMC.StateChannel).Should(Receive(&receivedState))
 				}
 				Expect(receivedState.Status).To(Equal("ok"))
+			})
+		})
 
+		Context("duplicate alerters", func() {
+			BeforeEach(func() {
+				loops := 0
+				warnCritResolveFunc := func() error {
+					loops++
+					if loops >= ResolveMessages {
+						monitor.Stop()
+					}
+
+					if loops <= CriticalMessages {
+						return errors.New("failed check")
+					}
+					return nil
+				}
+				cfg := &MonitorConfig{
+					CriticalThreshold: CriticalMessages,
+					WarningThreshold:  WarningMessages,
+					WarningAlerter: []string{
+						"dupe_alerter",
+					},
+					CriticalAlerter: []string{
+						"dupe_alerter",
+					},
+				}
+
+				monitor.RMC.Name = "dupe_monitor"
+				monitor.RMC.Config = cfg
+				monitor.MonitorFunc = warnCritResolveFunc
+				for i := 0; i < ResolveMessages; i++ {
+					tickerChan <- time.Now()
+				}
+				monitor.Run()
+			})
+
+			It("will only resolve once", func() {
+				var receivedAlert *alerter.Message
+				for i := 0; i < ResolveMessages; i++ {
+					Eventually(monitor.RMC.MessageChannel).Should(Receive(&receivedAlert))
+					if i < ResolveMessages-1 { // the -1 is because there's no dupes
+						Expect(receivedAlert.Type).ToNot(Equal("resolve"))
+					} else {
+						Expect(receivedAlert.Type).To(Equal("resolve"))
+					}
+				}
 			})
 		})
 	})

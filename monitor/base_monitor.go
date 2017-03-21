@@ -13,11 +13,24 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
+// States of a monitor
 const (
-	WARNING int = iota
+	// OK when the alerts have resolved and everything is peachy
+	OK int = iota
+	// WARNING when the number of failed attempts passes the WarningThreshold
+	WARNING
+	// CRITICAL when the number of failed attempts passes the CriticalThreshold
 	CRITICAL
 )
 
+var (
+	okNextStates       = [2]int{WARNING, CRITICAL}
+	warningNextStates  = [2]int{CRITICAL, OK}
+	criticalNextStates = [2]int{WARNING, OK}
+	stateTransition    = [3][2]int{okNextStates, warningNextStates, criticalNextStates}
+)
+
+// Base monitor to embed into monitors that do real work
 type Base struct {
 	RMC         *RootMonitorConfig
 	Identifier  string
@@ -26,12 +39,16 @@ type Base struct {
 	attemptCount      int
 	criticalAlertSent bool
 	warningAlertSent  bool
+	currentState      int
+	resolveMessages   map[string]*alerter.Message
 }
 
+// Stop the monitor
 func (b *Base) Stop() {
 	b.RMC.StopChannel <- true
 }
 
+// Identify the monitor by a string
 func (b *Base) Identify() string {
 	return b.Identifier
 }
@@ -41,6 +58,8 @@ func (b *Base) Run() error {
 	log.Debugf("%v-%v: Starting work for monitor %v...", b.Identify(), b.RMC.GID, b.RMC.Name)
 
 	defer b.RMC.Ticker.Stop()
+
+	b.resolveMessages = make(map[string]*alerter.Message)
 
 Mainloop:
 	for {
@@ -61,62 +80,41 @@ Mainloop:
 
 // Handle triggering/resolving alerts based on check results
 func (b *Base) handle(monitorErr error) error {
+	var err error
 	// Update state every run
 	defer b.updateState(monitorErr)
 
-	// Increase attempt count
-	b.attemptCount++
-
-	// TCP check 'ssh-check' failure
-	titleMessage := fmt.Sprintf("%v check '%v' failure", strings.ToUpper(b.Identify()), b.RMC.ConfigName)
-
 	// No problems, reset counter
 	if monitorErr == nil {
-		// Send critical+warning resolve if critical threshold was exceed
-		// Send warning resolve if warning threshold was exceeded but critical threshold was not exceeded
-		if b.attemptCount > b.RMC.Config.CriticalThreshold {
-			// Not digging any of this, but it's better than identical messages
-			b.sendMessage(CRITICAL, titleMessage, fmt.Sprintf("Check has recovered from critical state after %v attempts", b.attemptCount), "", true)
-			b.sendMessage(WARNING, titleMessage, fmt.Sprintf("Check has recovered from warning state after %v attempts", b.attemptCount), "", true)
-		} else if b.attemptCount > b.RMC.Config.WarningThreshold {
-			b.sendMessage(WARNING, titleMessage, fmt.Sprintf("Check has recovered from warning state after %v attempts", b.attemptCount), "", true)
-		}
-
+		err = b.transitionStateTo(OK, "")
 		b.attemptCount = 0
-
 		return nil
 	}
 
-	// Got an error; do we need to send any alerts?
-	if b.criticalAlertSent {
-		log.Debugf("Critical alert for %v already sent; skipping alerting", b.RMC.Name)
-		return nil
+	// Increase attempt count
+	b.attemptCount++
+	if b.attemptCount >= b.RMC.Config.CriticalThreshold {
+		err = b.transitionStateTo(CRITICAL, monitorErr.Error())
+	} else if b.attemptCount >= b.RMC.Config.WarningThreshold {
+		err = b.transitionStateTo(WARNING, monitorErr.Error())
 	}
 
-	// Only return if we haven't reached critical threshold
-	if b.warningAlertSent && b.attemptCount < b.RMC.Config.CriticalThreshold {
-		log.Debugf("Warning alert for %v already sent; skipping alerting", b.RMC.Name)
-		return nil
+	if err != nil {
+		return err
 	}
-
-	// Okay, this must be the first time
-	if b.attemptCount == b.RMC.Config.CriticalThreshold {
-		// TCP check 'some-check' failure! Host: some-host.com Port: N/A
-		alertMessage := fmt.Sprintf("Check has entered into critical state after %v checks", b.attemptCount)
-		b.sendMessage(CRITICAL, titleMessage, alertMessage, monitorErr.Error(), false)
-	} else if b.attemptCount == b.RMC.Config.WarningThreshold {
-		alertMessage := fmt.Sprintf("Check has entered into warning state after %v checks", b.attemptCount)
-		b.sendMessage(WARNING, titleMessage, alertMessage, monitorErr.Error(), false)
-	}
-
 	return nil
 }
 
 // Construct a new alert message, send down the message channel and update alert state
-func (b *Base) sendMessage(alertType int, titleMessage, alertMessage, errorDetails string, resolve bool) error {
+func (b *Base) sendMessage(curState int, titleMessage, alertMessage, errorDetails string) error {
+	var alertType = [3]string{"resolve", "warning", "critical"}
+	var alertKey = [3][]string{[]string{}, b.RMC.Config.WarningAlerter, b.RMC.Config.CriticalAlerter}
+
 	log.Warningf("%v-%v: (%v) %v", b.Identifier, b.RMC.GID, b.RMC.Name, alertMessage)
 
 	msg := &alerter.Message{
+		Type:   alertType[curState],
+		Key:    alertKey[curState],
 		Title:  titleMessage,
 		Text:   alertMessage,
 		Count:  b.attemptCount,
@@ -130,30 +128,26 @@ func (b *Base) sendMessage(alertType int, titleMessage, alertMessage, errorDetai
 		},
 	}
 
-	switch alertType {
-	case CRITICAL:
-		msg.Type = "critical"
-		msg.Key = b.RMC.Config.CriticalAlerter
-
-		// This is .. funky. To avoid having to set state in different places
-		// and potentially requiring additional if/else||switch blocks, we set
-		// the state to the reverse of the `resolve` bool
-		b.criticalAlertSent = !resolve
-	case WARNING:
-		msg.Type = "warning"
-		msg.Key = b.RMC.Config.WarningAlerter
-		b.warningAlertSent = !resolve
-	}
-
-	if resolve {
-		msg.Type = "resolve"
-	}
-
 	// Send the message
 	b.RMC.MessageChannel <- msg
 
 	log.Debugf("%v-%v: Successfully sent '%v' message for %v (%v)",
 		b.Identifier, b.RMC.GID, msg.Type, b.RMC.ConfigName, b.RMC.Name)
+
+	// Get resolve functions ready
+	for _, alert := range alertKey[curState] {
+		// If we don't have a resolution message for the check then let's add it
+		if _, exists := b.resolveMessages[alert]; !exists {
+			resolvMsg := &alerter.Message{}
+			// Copy the previous message
+			*resolvMsg = *msg
+
+			resolvMsg.Type = alertType[OK]
+			resolvMsg.Key = []string{alert}
+
+			b.resolveMessages[alert] = resolvMsg
+		}
+	}
 
 	return nil
 }
@@ -163,19 +157,12 @@ func (b *Base) sendMessage(alertType int, titleMessage, alertMessage, errorDetai
 // `updateState()` is intended to be ran *every* time `handle()` is ran; raw config
 // is included for convenience.
 func (b *Base) updateState(monitorErr error) error {
+	var status = [3]string{"ok", "warning", "critical"}
 	jsonConfig, err := json.Marshal(b.RMC.Config)
 	if err != nil {
 		errorMessage := fmt.Sprintf("Unable to marshal monitor config to JSON: %v", err.Error())
 		jsonConfig = []byte(fmt.Sprintf(`{"error": "%v"}`, errorMessage))
 		log.Error(errorMessage)
-	}
-
-	status := "ok"
-
-	if b.criticalAlertSent {
-		status = "critical"
-	} else if b.warningAlertSent {
-		status = "warning"
 	}
 
 	// If no error is set, set it to N/A for display purposes
@@ -186,7 +173,7 @@ func (b *Base) updateState(monitorErr error) error {
 	b.RMC.StateChannel <- &state.Message{
 		Check:   b.RMC.ConfigName,
 		Owner:   b.RMC.MemberID,
-		Status:  status,
+		Status:  status[b.currentState],
 		Count:   b.attemptCount,
 		Message: monitorErr.Error(),
 		Date:    time.Now(),
@@ -196,4 +183,46 @@ func (b *Base) updateState(monitorErr error) error {
 	log.Debugf("%v: Successfully sent state message for '%v' to state reader", b.Identifier, b.RMC.ConfigName)
 
 	return nil
+}
+
+func (b *Base) stateEvent(curState int, monitorErr string) {
+	var stateStr = [3]string{"", "warning", "critical"}
+	if curState == OK {
+		for alert, resolve := range b.resolveMessages {
+			// If we've resolved then let's send all those resolve messages
+			resolve.Text = fmt.Sprintf("Check has recovered from %s after %v checks", stateStr[b.currentState], b.attemptCount)
+
+			// Send the message
+			b.RMC.MessageChannel <- resolve
+
+			// Delete this call from the map
+			delete(b.resolveMessages, alert)
+		}
+		return
+	}
+	titleMessage := fmt.Sprintf("%v check '%v' failure", strings.ToUpper(b.Identify()), b.RMC.ConfigName)
+	alertMessage := fmt.Sprintf("Check has entered into %s state after %v checks", stateStr[curState], b.attemptCount)
+	b.sendMessage(curState, titleMessage, alertMessage, monitorErr)
+}
+
+func (b *Base) transitionStateTo(state int, monitorErr string) error {
+	// If the state is the same, then we don't want to trigger the events
+	if state == b.currentState {
+		return nil
+	}
+
+	for _, potentialNextState := range stateTransition[b.currentState] {
+		// Is the state I want to transition to a valid next state
+		if potentialNextState == state {
+			b.stateEvent(state, monitorErr)
+			b.currentState = state
+			return nil
+		}
+	}
+	return fmt.Errorf("Failed to transition from state %d to %d", b.currentState, state)
+}
+
+// setStateTransition is really only meant to be used in tests
+func setStateTransition(idx int, transition [2]int) {
+	stateTransition[idx] = transition
 }
