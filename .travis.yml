@@ -6,9 +6,9 @@ services:
   - docker
 
 go:
-  - 1.7.3
+  # - 1.7.3
   - 1.8.x
-  - tip
+  # - tip
 
 env:
   global:
@@ -31,6 +31,7 @@ deploy:
     - "build/9volt-$SEMVER-linux.tgz"
   on:
     tags: true
+  skip_cleanup: true
 
 after_deploy: docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS && \
   make build/release-travis-docker
