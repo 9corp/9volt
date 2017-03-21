@@ -33,5 +33,4 @@ deploy:
     tags: true
   skip_cleanup: true
 
-after_deploy: docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS && \
-  make build/release-travis-docker
+after_deploy: docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS && make build/release-travis-docker
