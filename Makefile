@@ -84,20 +84,29 @@ build/ui: ui ## Build the UI (use nvm if available)
 build/release: semvercheck build/linux build/darwin ## Prepare a build
 	mkdir $(OUTPUT_DIR)/9volt-$(SEMVER)-darwin
 	mkdir $(OUTPUT_DIR)/9volt-$(SEMVER)-linux
-	mv $(OUTPUT_DIR)/$(BIN)-darwin $(OUTPUT_DIR)/9volt-$(SEMVER)-darwin/$(BIN)
-	mv $(OUTPUT_DIR)/$(BIN)-linux $(OUTPUT_DIR)/9volt-$(SEMVER)-linux/$(BIN)
+	cp $(OUTPUT_DIR)/$(BIN)-darwin $(OUTPUT_DIR)/9volt-$(SEMVER)-darwin/$(BIN)
+	cp $(OUTPUT_DIR)/$(BIN)-linux $(OUTPUT_DIR)/9volt-$(SEMVER)-linux/$(BIN)
 	cp -prf docs/example-configs $(OUTPUT_DIR)/9volt-$(SEMVER)-darwin/
 	cp -prf docs/example-configs $(OUTPUT_DIR)/9volt-$(SEMVER)-linux/
 	cd $(OUTPUT_DIR) && tar -czvf 9volt-$(SEMVER)-darwin.tgz 9volt-$(SEMVER)-darwin/
 	cd $(OUTPUT_DIR) && tar -czvf 9volt-$(SEMVER)-linux.tgz 9volt-$(SEMVER)-linux/
 	@echo "A new release has been created!"
 
-build/release-travis: installnode installtools build/release ## Install node, tools, build
-
-build/release-docker: semvercheck build/linux ## Build, tag and push a docker image to dockerhubs
+build/release-docker: semvercheck build/linux ## Build, tag and push a docker image to dockerhub (assumes you are logged in)
 	docker build -t "9corp/9volt:$(SEMVER)" -t "9corp/9volt:latest" . && \
 	docker push 9corp/9volt:$(SEMVER)
 	docker push 9corp/9volt:latest
+
+### Begin travis related targets
+
+build/release-travis: installnode installtools build/release ## Install node, tools, build
+
+build/release-travis-docker: semvercheck ## Same as release-docker, except no dep targets (assumes login is handled externally)
+	docker build -t "9corp/9volt:$(SEMVER)" -t "9corp/9volt:latest" . && \
+	docker push 9corp/9volt:$(SEMVER)
+	docker push 9corp/9volt:latest
+
+### End travis related targets
 
 semvercheck:
 ifeq ($(SEMVER),)
