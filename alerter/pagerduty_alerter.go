@@ -61,6 +61,7 @@ func (p *Pagerduty) generateEvent(msg *Message, alertConfig *AlerterConfig) *pag
 		Details: map[string]string{
 			"error details":    msg.Contents["ErrorDetails"],
 			"detailed message": msg.Text,
+			"description":      msg.Description,
 		},
 		// ClientURL:   "https://url-to-9volt-ui?",
 	}

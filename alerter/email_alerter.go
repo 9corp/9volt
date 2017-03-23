@@ -56,8 +56,9 @@ func (e *Email) generateMessage(msg *Message, alerterConfig *AlerterConfig) []by
 	emailMessage := fmt.Sprintf("To: %v\r\n"+
 		"Subject: %v\r\n"+
 		"\r\n"+
+		"Check Description: %v\r\n"+
 		"Detailed Message: %v\r\n"+
-		"Error Details: %v\r\n", alerterConfig.Options["to"], msg.Title, msg.Text, msg.Contents["ErrorDetails"],
+		"Error Details: %v\r\n", alerterConfig.Options["to"], msg.Title, msg.Description, msg.Text, msg.Contents["ErrorDetails"],
 	)
 
 	return []byte(emailMessage)
