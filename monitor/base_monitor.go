@@ -113,12 +113,13 @@ func (b *Base) sendMessage(curState int, titleMessage, alertMessage, errorDetail
 	log.Warningf("%v-%v: (%v) %v", b.Identifier, b.RMC.GID, b.RMC.Name, alertMessage)
 
 	msg := &alerter.Message{
-		Type:   alertType[curState],
-		Key:    alertKey[curState],
-		Title:  titleMessage,
-		Text:   alertMessage,
-		Count:  b.attemptCount,
-		Source: b.RMC.ConfigName, // should be unique per check (used as incident key for PD)
+		Type:        alertType[curState],
+		Key:         alertKey[curState],
+		Title:       titleMessage,
+		Text:        alertMessage,
+		Count:       b.attemptCount,
+		Source:      b.RMC.ConfigName, // should be unique per check (used as incident key for PD)
+		Description: b.RMC.Config.Description,
 
 		// Let's set some additional (potentially) useful info in the message
 		Contents: map[string]string{

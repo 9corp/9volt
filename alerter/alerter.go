@@ -36,14 +36,15 @@ type Alerter struct {
 }
 
 type Message struct {
-	Type     string            // "resolve", "warning", "critical"
-	Key      []string          // Keys coming from the monitor config for Critical or WarningAlerters
-	Title    string            // Short description of the alert
-	Text     string            // In-depth description of the alert state
-	Source   string            // Origin of the alert
-	Count    int               // How many check attempts were made
-	Contents map[string]string // Set checker-specific data (ensuring alerters know how to use the data)
-	uuid     string            // For private use within the alerter
+	Type        string            // "resolve", "warning", "critical"
+	Key         []string          // Keys coming from the monitor config for Critical or WarningAlerters
+	Title       string            // Short description of the alert
+	Text        string            // In-depth description of the alert state
+	Source      string            // Origin of the alert
+	Description string            // Original check description so we can be verbose about what we are alerting on
+	Count       int               // How many check attempts were made
+	Contents    map[string]string // Set checker-specific data (ensuring alerters know how to use the data)
+	uuid        string            // For private use within the alerter
 }
 
 func New(cfg *config.Config, messageChannel <-chan *Message) *Alerter {
