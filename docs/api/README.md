@@ -164,10 +164,60 @@ Fetch event data (optionally filtered by one or more event types)
 
 | Resource Path | Operation | Description |
 |-----|-----|-----|
+| /monitor | [POST](#Add Monitor Configuration) | Add/Update monitor config |
 | /monitor/\{check\} | [GET](#Fetch Monitor Configuration) | Fetch all (or specific) monitor configuration(s) from etcd |
 | /monitor/\{check\} | [GET](#Set Disabled State for Given Monitor) | Enable or disable a specific monitor configuration (changes are immediate) |
+| /monitor/\{check\} | [DELETE](#Delete existing monitor configuration) | Delete monitor config |
 
 
+<a name="Add Monitor Configuration"></a>
+
+#### API: /monitor (POST)
+
+Add/Update monitor config
+
+| Param Name | Param Type | Data Type | Description | Required? |
+|-----|-----|-----|-----|-----|
+| N/A | POST | object (map[string][MonitorConfig](#https://github.com/9corp/9volt/blob/master/docs/MONITOR_CONFIGS.md)) | Collection of monitors to add | Yes |
+
+
+Example payload:
+```json
+{
+	"exec-check1": {
+		  "type": "exec",
+		  "description": "exec check test",
+		  "timeout": "5s",
+		  "command": "echo",
+		  "args": [
+		    "hello",
+		    "world"
+		  ],
+		  "interval": "10s",
+		  "return-code": 0,
+		  "expect": "world",
+		  "warning-threshold": 1,
+		  "critical-threshold": 3,
+		  "warning-alerter": [
+		    "primary-slack"
+		  ],
+		  "critical-alerter": [
+		    "primary-email"
+		  ],
+		  "tags": [
+		    "dbservers",
+		    "mysql"
+		]
+	}
+}
+```
+
+
+| Code | Type | Model | Message |
+|-----|-----|-----|-----|
+| 200 | array | [JSONStatus](#github.com.InVisionApp.rye.JSONStatus) |  |
+| 400 | object | [JSONStatus](#github.com.InVisionApp.rye.JSONStatus) |  |
+| 500 | object | [JSONStatus](#github.com.InVisionApp.rye.JSONStatus) |  |
 
 <a name="Fetch Monitor Configuration"></a>
 
@@ -210,6 +260,21 @@ Enable or disable a specific monitor configuration (changes are immediate)
 | 500 | object | [JSONStatus](#github.com.InVisionApp.rye.JSONStatus) |  |
 
 
+<a name="Delete existing monitor configuration"></a>
+
+#### API: /monitor/\{check\} (DELETE)
+
+Delete existing monitor config
+
+| Param Name | Param Type | Data Type | Description | Required? |
+|-----|-----|-----|-----|-----|
+| check | path | string | Specific check name | Yes |
+
+| Code | Type | Model | Message |
+|-----|-----|-----|-----|
+| 200 | array | [JSONStatus](#github.com.InVisionApp.rye.JSONStatus) |  |
+| 404 | object | [JSONStatus](#github.com.InVisionApp.rye.JSONStatus) |  |
+| 500 | object | [JSONStatus](#github.com.InVisionApp.rye.JSONStatus) |  |
 
 
 ### Models
@@ -233,6 +298,103 @@ Enable or disable a specific monitor configuration (changes are immediate)
 
 <a name="state"></a>
 
+## alerter
+
+| Specification | Value |
+|-----|-----|
+| Resource Path | /alerter |
+| API Version |  |
+| BasePath for the API | {{.}} |
+| Consumes | application/json |
+| Produces |  |
+
+
+### Operations
+
+| Resource Path | Operation | Description |
+|-----|-----|-----|
+| /alerter | [POST](#Add Alerter Configuration) | Add/Update alerter config |
+| /alerter/\{alerterName\} | [GET](#Fetch Alerter Configuration) | Fetch all (or specific) alerter configuration(s) from etcd |
+| /alerter/\{alerterName\} | [DELETE](#Delete existing alerter configuration) | Delete alerter config |
+
+<a name="Add Alerter Configuration"></a>
+
+#### API: /alerter (POST)
+
+Add/Update alerter config
+
+| Param Name | Param Type | Data Type | Description | Required? |
+|-----|-----|-----|-----|-----|
+| N/A | POST | object (map[string][AlerterConfig](#https://github.com/9corp/9volt/blob/master/docs/ALERTER_CONFIGS.md)) | Collection of alerters to add | Yes |
+
+
+Example payload:
+```json
+{
+	"test-alerter": {
+		"type": "slack",
+		"description": "foobar",
+		"options": {
+			"channel": "some-team",
+			"icon-url": "https://pbs.twimg.com/profile_images/593893225045200896/r9uL4jWU.png",
+			"token": "asdfasdfasdfasdfasdf",
+			"username": "monit"
+		}
+	}
+}
+```
+
+
+| Code | Type | Model | Message |
+|-----|-----|-----|-----|
+| 200 | array | [JSONStatus](#github.com.InVisionApp.rye.JSONStatus) |  |
+| 400 | object | [JSONStatus](#github.com.InVisionApp.rye.JSONStatus) |  |
+| 500 | object | [JSONStatus](#github.com.InVisionApp.rye.JSONStatus) |  |
+
+
+<a name="Fetch Alerter Configuration"></a>
+
+#### API: /alerter/\{alerterName\} (GET)
+
+
+Fetch all (or specific) alerter configuration(s) from etcd
+
+
+| Param Name | Param Type | Data Type | Description | Required? |
+|-----|-----|-----|-----|-----|
+| alerterName | path | string | Specific alerter name |  |
+
+
+| Code | Type | Model | Message |
+|-----|-----|-----|-----|
+| 200 | array | [fullAlerterConfig](#github.com.9corp.9volt.api.fullAlerterConfig) |  |
+| 500 | object | [JSONStatus](#github.com.InVisionApp.rye.JSONStatus) |  |
+
+<a name="Delete existing alerter configuration"></a>
+
+#### API: /alerter/\{alerterName\} (DELETE)
+
+Delete existing alerter config
+
+| Param Name | Param Type | Data Type | Description | Required? |
+|-----|-----|-----|-----|-----|
+| alerterName | path | string | Specific check name | Yes |
+
+| Code | Type | Model | Message |
+|-----|-----|-----|-----|
+| 200 | array | [JSONStatus](#github.com.InVisionApp.rye.JSONStatus) |  |
+| 404 | object | [JSONStatus](#github.com.InVisionApp.rye.JSONStatus) |  |
+| 500 | object | [JSONStatus](#github.com.InVisionApp.rye.JSONStatus) |  |
+
+### Models
+
+<a name="github.com.9corp.9volt.api.fullAlerterConfig"></a>
+
+#### fullAlerterConfig
+
+| Field Name (alphabetical) | Field Type | Description |
+|-----|-----|-----|
+
 ## state
 
 | Specification | Value |
@@ -246,7 +408,6 @@ Enable or disable a specific monitor configuration (changes are immediate)
 
 
 ### Operations
-
 
 | Resource Path | Operation | Description |
 |-----|-----|-----|
