@@ -178,7 +178,7 @@ Add/Update monitor config
 
 | Param Name | Param Type | Data Type | Description | Required? |
 |-----|-----|-----|-----|-----|
-| N/A | POST | object (map[string][MonitorConfig](#https://github.com/9corp/9volt/blob/master/docs/MONITOR_CONFIGS.md)) | Collection of monitors to add | Yes |
+| N/A | POST | object (map[string][MonitorConfig](https://github.com/9corp/9volt/blob/master/docs/MONITOR_CONFIGS.md)) | Collection of monitors to add | Yes |
 
 
 Example payload:
@@ -325,7 +325,7 @@ Add/Update alerter config
 
 | Param Name | Param Type | Data Type | Description | Required? |
 |-----|-----|-----|-----|-----|
-| N/A | POST | object (map[string][AlerterConfig](#https://github.com/9corp/9volt/blob/master/docs/ALERTER_CONFIGS.md)) | Collection of alerters to add | Yes |
+| N/A | POST | object (map[string][AlerterConfig](https://github.com/9corp/9volt/blob/master/docs/ALERTER_CONFIGS.md)) | Collection of alerters to add | Yes |
 
 
 Example payload:
