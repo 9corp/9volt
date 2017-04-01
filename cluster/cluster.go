@@ -35,6 +35,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	d "github.com/relistan/go-director"
 
+	"github.com/9corp/9volt/base"
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/dal"
 )
@@ -73,7 +74,6 @@ type ICluster interface {
 
 type Cluster struct {
 	Config         *config.Config
-	Identifier     string
 	DirectorState  bool
 	DirectorLock   *sync.Mutex
 	MemberID       string
@@ -82,6 +82,8 @@ type Cluster struct {
 	StateChan      chan<- bool
 	DistributeChan chan<- bool
 	initFinished   chan bool
+
+	base.Component
 }
 
 type DirectorJSON struct {
@@ -99,7 +101,7 @@ type MemberJSON struct {
 	SemVer        string
 }
 
-func New(cfg *config.Config, stateChan, distributeChan chan<- bool) (ICluster, error) {
+func New(cfg *config.Config, stateChan, distributeChan chan<- bool) (*Cluster, error) {
 	dalClient, err := dal.New(cfg.EtcdPrefix, cfg.EtcdMembers, cfg.EtcdUserPass, false, false, false)
 	if err != nil {
 		return nil, err
@@ -112,7 +114,6 @@ func New(cfg *config.Config, stateChan, distributeChan chan<- bool) (ICluster, e
 
 	return &Cluster{
 		Config:         cfg,
-		Identifier:     "cluster",
 		DirectorState:  false,
 		DirectorLock:   new(sync.Mutex),
 		MemberID:       cfg.MemberID,
@@ -121,6 +122,9 @@ func New(cfg *config.Config, stateChan, distributeChan chan<- bool) (ICluster, e
 		StateChan:      stateChan,
 		DistributeChan: distributeChan,
 		initFinished:   make(chan bool, 1),
+		Component: base.Component{
+			Identifier: "cluster",
+		},
 	}, nil
 }
 
@@ -140,6 +144,10 @@ func (c *Cluster) Start() error {
 
 	go c.runMemberMonitor()
 
+	return nil
+}
+
+func (c *Cluster) Stop() error {
 	return nil
 }
 

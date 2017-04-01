@@ -11,6 +11,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/relistan/go-director"
 
+	"github.com/9corp/9volt/base"
 	"github.com/9corp/9volt/config"
 )
 
@@ -31,24 +32,28 @@ type Message struct {
 type State struct {
 	Config       *config.Config
 	StateChannel chan *Message
-	Identifier   string
 	Mutex        *sync.Mutex
 	Data         map[string]*Message
 
 	ReaderLooper director.Looper
 	DumperLooper director.Looper
+
+	base.Component
 }
 
 func New(cfg *config.Config, stateChannel chan *Message) *State {
 	return &State{
 		Config:       cfg,
 		StateChannel: stateChannel,
-		Identifier:   "state",
 		Mutex:        &sync.Mutex{},
 		Data:         make(map[string]*Message, 0),
 
 		ReaderLooper: director.NewFreeLooper(director.FOREVER, make(chan error)),
 		DumperLooper: director.NewTimedLooper(director.FOREVER, time.Duration(cfg.StateDumpInterval), make(chan error)),
+
+		Component: base.Component{
+			Identifier: "state",
+		},
 	}
 }
 
@@ -58,6 +63,11 @@ func (s *State) Start() error {
 	go s.runReader()
 	go s.runDumper()
 
+	return nil
+}
+
+// TODO
+func (s *State) Stop() error {
 	return nil
 }
 

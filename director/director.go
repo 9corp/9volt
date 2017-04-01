@@ -10,6 +10,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	etcd "github.com/coreos/etcd/client"
 
+	"github.com/9corp/9volt/base"
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/dal"
 	"github.com/9corp/9volt/util"
@@ -25,7 +26,6 @@ type IDirector interface {
 }
 
 type Director struct {
-	Identifier     string
 	MemberID       string
 	Config         *config.Config
 	State          bool
@@ -36,16 +36,17 @@ type Director struct {
 
 	CheckStats      map[string]*dal.MemberStat
 	CheckStatsMutex *sync.Mutex
+
+	base.Component
 }
 
-func New(cfg *config.Config, stateChan <-chan bool, distributeChan <-chan bool) (IDirector, error) {
+func New(cfg *config.Config, stateChan <-chan bool, distributeChan <-chan bool) (*Director, error) {
 	dalClient, err := dal.New(cfg.EtcdPrefix, cfg.EtcdMembers, cfg.EtcdUserPass, false, false, false)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Director{
-		Identifier:      "director",
 		Config:          cfg,
 		MemberID:        cfg.MemberID,
 		StateChan:       stateChan,
@@ -54,6 +55,9 @@ func New(cfg *config.Config, stateChan <-chan bool, distributeChan <-chan bool) 
 		DalClient:       dalClient,
 		CheckStats:      make(map[string]*dal.MemberStat, 0),
 		CheckStatsMutex: &sync.Mutex{},
+		Component: base.Component{
+			Identifier: "director",
+		},
 	}, nil
 }
 
@@ -64,6 +68,10 @@ func (d *Director) Start() error {
 	go d.runStateListener()
 	go d.collectCheckStats()
 
+	return nil
+}
+
+func (d *Director) Stop() error {
 	return nil
 }
 

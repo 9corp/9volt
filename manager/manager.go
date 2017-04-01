@@ -13,26 +13,30 @@ import (
 	"github.com/relistan/go-director"
 
 	"github.com/9corp/9volt/alerter"
+	"github.com/9corp/9volt/base"
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/monitor"
 	"github.com/9corp/9volt/state"
 )
 
 type Manager struct {
-	MemberID   string
-	Identifier string
-	Config     *config.Config
-	Looper     director.Looper
-	Monitor    *monitor.Monitor
+	MemberID string
+	Config   *config.Config
+	Looper   director.Looper
+	Monitor  *monitor.Monitor
+
+	base.Component
 }
 
 func New(cfg *config.Config, messageChannel chan *alerter.Message, stateChannel chan *state.Message) (*Manager, error) {
 	return &Manager{
-		Identifier: "manager",
-		MemberID:   cfg.MemberID,
-		Config:     cfg,
-		Looper:     director.NewFreeLooper(director.FOREVER, make(chan error)),
-		Monitor:    monitor.New(cfg, messageChannel, stateChannel),
+		MemberID: cfg.MemberID,
+		Config:   cfg,
+		Looper:   director.NewFreeLooper(director.FOREVER, make(chan error)),
+		Monitor:  monitor.New(cfg, messageChannel, stateChannel),
+		Component: base.Component{
+			Identifier: "manager",
+		},
 	}, nil
 }
 
@@ -41,6 +45,11 @@ func (m *Manager) Start() error {
 
 	go m.run()
 
+	return nil
+}
+
+// TODO
+func (m *Manager) Stop() error {
 	return nil
 }
 

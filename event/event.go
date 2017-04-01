@@ -8,6 +8,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 
+	"github.com/9corp/9volt/base"
 	"github.com/9corp/9volt/dal"
 	"github.com/9corp/9volt/util"
 )
@@ -20,10 +21,11 @@ const (
 )
 
 type Queue struct {
-	Identifier string
-	DalClient  dal.IDal
-	MemberID   string
-	channel    chan *Event
+	DalClient dal.IDal
+	MemberID  string
+	channel   chan *Event
+
+	base.Component
 }
 
 //go:generate counterfeiter -o ../fakes/eventfakes/fake_client.go event.go IClient
@@ -46,10 +48,12 @@ type Event struct {
 
 func NewQueue(memberID string, dalClient dal.IDal) *Queue {
 	return &Queue{
-		Identifier: "event",
-		DalClient:  dalClient,
-		MemberID:   memberID,
-		channel:    make(chan *Event, BUFFER_LEN),
+		DalClient: dalClient,
+		MemberID:  memberID,
+		channel:   make(chan *Event, BUFFER_LEN),
+		Component: base.Component{
+			Identifier: "event",
+		},
 	}
 }
 
@@ -61,6 +65,11 @@ func (q *Queue) Start() error {
 		go q.runWorker(i)
 	}
 
+	return nil
+}
+
+// TODO
+func (q *Queue) Stop() error {
 	return nil
 }
 

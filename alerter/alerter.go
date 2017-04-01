@@ -10,6 +10,7 @@ import (
 	"github.com/relistan/go-director"
 	gouuid "github.com/satori/go.uuid"
 
+	"github.com/9corp/9volt/base"
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/util"
 )
@@ -27,12 +28,13 @@ type AlerterConfig struct {
 }
 
 type Alerter struct {
-	Identifier     string
 	MemberID       string
 	Config         *config.Config
 	Alerters       map[string]IAlerter
 	MessageChannel <-chan *Message
 	Looper         director.Looper
+
+	base.Component
 }
 
 type Message struct {
@@ -49,11 +51,13 @@ type Message struct {
 
 func New(cfg *config.Config, messageChannel <-chan *Message) *Alerter {
 	return &Alerter{
-		Identifier:     "alerter",
 		MemberID:       cfg.MemberID,
 		Config:         cfg,
 		MessageChannel: messageChannel,
 		Looper:         director.NewFreeLooper(director.FOREVER, make(chan error)),
+		Component: base.Component{
+			Identifier: "string",
+		},
 	}
 }
 
@@ -74,6 +78,11 @@ func (a *Alerter) Start() error {
 	// Launch our alerter message handler
 	go a.run()
 
+	return nil
+}
+
+// TODO
+func (a *Alerter) Stop() error {
 	return nil
 }
 
