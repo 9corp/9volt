@@ -19,6 +19,7 @@ import (
 	"github.com/9corp/9volt/director"
 	"github.com/9corp/9volt/event"
 	"github.com/9corp/9volt/manager"
+	"github.com/9corp/9volt/overwatch"
 	"github.com/9corp/9volt/state"
 	"github.com/9corp/9volt/util"
 )
@@ -118,6 +119,7 @@ func runServer() {
 	distributeChannel := make(chan bool)
 	messageChannel := make(chan *alerter.Message)
 	monitorStateChannel := make(chan *state.Message)
+	overwatchChannel := make(chan *overwatch.Message)
 
 	// Instantiate all of the components
 	cluster, err := cluster.New(cfg, clusterStateChannel, distributeChannel)
@@ -140,6 +142,11 @@ func runServer() {
 
 	// Start all of the components
 	components := []base.IComponent{cluster, director, manager, alerter, state, eventQueue}
+
+	watcher := overwatch.New(cfg, overwatchChannel, components)
+	if err := watcher.Start(); err != nil {
+		log.Fatalf("Unable to start overwatch component: %v", err)
+	}
 
 	for _, cmp := range components {
 		log.Infof("Starting component '%v'", cmp.Identify())
