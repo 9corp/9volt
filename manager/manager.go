@@ -43,13 +43,24 @@ func New(cfg *config.Config, messageChannel chan *alerter.Message, stateChannel 
 func (m *Manager) Start() error {
 	log.Infof("%v: Starting manager components...", m.Identifier)
 
+	m.Component.Ctx, m.Component.Cancel = context.WithCancel(context.Background())
+
 	go m.run()
 
 	return nil
 }
 
-// TODO
 func (m *Manager) Stop() error {
+	log.Warningf("%v: Stopping all subcomponents", m.Identifier)
+
+	if m.Component.Cancel == nil {
+		log.Warningf("%v: Looks like .Cancel is nil; is this expected?", m.Identifier)
+	} else {
+		m.Component.Cancel()
+	}
+
+	m.Monitor.StopAll()
+
 	return nil
 }
 
@@ -58,19 +69,26 @@ func (m *Manager) run() error {
 
 	watcher := m.Config.DalClient.NewWatcher(memberConfigDir, true)
 
-	m.Looper.Loop(func() error {
-		resp, err := watcher.Next(context.Background())
+	for {
+		resp, err := watcher.Next(m.Component.Ctx)
 		if err != nil {
+			if err.Error() == "context canceled" {
+				log.Warningf("%v: Received a notice to shutdown", m.Identifier)
+				break
+			}
+
 			m.Config.EQClient.AddWithErrorLog("error",
 				fmt.Sprintf("%v: Unexpected watcher error: %v", m.Identifier, err.Error()))
+
+			// TODO: What do we do with the healthcheck bits?
 			m.Config.Health.Write(false, fmt.Sprintf("Manager engine watcher encountering errors: %v", err.Error()))
-			return err
+			continue
 		}
 
 		if m.ignorableWatcherEvent(resp) {
 			log.Debugf("%v: Received an ignorable watcher '%v' event for key '%v'",
 				m.Identifier, resp.Action, resp.Node.Key)
-			return nil
+			continue
 		}
 
 		log.Debugf("%v: Received a '%v' watcher event for '%v' (value: '%v')",
@@ -84,11 +102,10 @@ func (m *Manager) run() error {
 		default:
 			m.Config.EQClient.AddWithErrorLog("error",
 				fmt.Sprintf("%v: Received an unrecognized action '%v' - skipping", m.Identifier, resp.Action))
-			return fmt.Errorf("Unrecognized action '%v' on key %v", resp.Action, resp.Node.Key)
 		}
+	}
 
-		return nil
-	})
+	log.Warningf("%v: Exiting", m.Identifier)
 
 	return nil
 }

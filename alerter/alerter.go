@@ -92,7 +92,6 @@ func (a *Alerter) Start() error {
 	return nil
 }
 
-// TODO
 func (a *Alerter) Stop() error {
 	log.Warningf("%v: Stopping all subcomponents", a.Identifier)
 
