@@ -10,7 +10,7 @@ package overwatch
 import (
 	"context"
 	"fmt"
-	// "strings"
+	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -18,6 +18,7 @@ import (
 
 	"github.com/9corp/9volt/base"
 	"github.com/9corp/9volt/config"
+	"github.com/9corp/9volt/util"
 )
 
 const (
@@ -198,20 +199,27 @@ func (o *Overwatch) beginEtcdWatch() error {
 }
 
 func (o *Overwatch) startTheWorld() error {
-	log.Infof("%v: Starting the world!", o.Identifier)
-	// errorList := make([]string, 0)
+	errorList := make([]string, 0)
 
-	// for _, v := range o.Components {
-	// 	log.Warningf("%v: Starting up '%v' component", o.Identifier, v.Identify())
-	// 	if err := v.Start(); err != nil {
-	// 		errorList = append(errorList, err.Error())
-	// 		log.Errorf("%v: Unable to start '%v' component: %v", o.Identifier, v.Identify(), err)
-	// 	}
-	// }
+	// temporary
+	allowedList := []string{"director", "alerter"}
 
-	// if len(errorList) != 0 {
-	// 	return fmt.Errorf("Ran into one or more errors during component startup: %v", strings.Join(errorList, "; "))
-	// }
+	for _, v := range o.Components {
+		if !util.StringSliceContains(allowedList, v.Identify()) {
+			log.Debugf("%v: Skipping start of %v", o.Identifier, v.Identify())
+			continue
+		}
+
+		log.Warningf("%v: Starting up '%v' component", o.Identifier, v.Identify())
+		if err := v.Start(); err != nil {
+			errorList = append(errorList, err.Error())
+			log.Errorf("%v: Unable to start '%v' component: %v", o.Identifier, v.Identify(), err)
+		}
+	}
+
+	if len(errorList) != 0 {
+		return fmt.Errorf("Ran into one or more errors during component startup: %v", strings.Join(errorList, "; "))
+	}
 
 	return nil
 }
