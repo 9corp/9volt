@@ -1,3 +1,15 @@
+// Event package is responsible for receiving events from 9volt components and
+// dumping them to etcd. The event queue is powered by WORKER_COUNT workers and
+// has a BUFFER_LEN buffer.
+//
+// Unlike other components, the event queue does NOT get shutdown in the event
+// of a backend failure - it gets *paused*. In the *pause* state, the event queue
+// will simply discard any inbound messages and will NOT attempt to save them to
+// the backend.
+//
+// This is done in order to avoid potential race conditions where lagging/slower
+// components continue to write to the event queue even though they've been asked
+// to shutdown.
 package event
 
 import (
@@ -24,6 +36,8 @@ type Queue struct {
 	DalClient dal.IDal
 	MemberID  string
 	channel   chan *Event
+	Running   bool // do not allow more than one Start() to be issued; resets Pause
+	Pause     bool // Pause set via Stop(); causes messages to be discarded
 
 	base.Component
 }
@@ -58,6 +72,15 @@ func NewQueue(memberID string, dalClient dal.IDal) *Queue {
 }
 
 func (q *Queue) Start() error {
+	q.Pause = false
+
+	if q.Running {
+		log.Warningf("%v: Already running - nothing to do", q.Identifier)
+		return nil
+	}
+
+	q.Running = true
+
 	// launch worker pool
 	log.Debugf("%v: Launching %v queue workers", q.Identifier, WORKER_COUNT)
 
@@ -68,8 +91,11 @@ func (q *Queue) Start() error {
 	return nil
 }
 
-// TODO
 func (q *Queue) Stop() error {
+	log.Warningf("%v: Workers are paused", q.Identifier)
+
+	q.Pause = true
+
 	return nil
 }
 
@@ -78,6 +104,11 @@ func (q *Queue) runWorker(id int) {
 
 	for {
 		e := <-q.channel
+
+		if q.Pause {
+			log.Debugf("%v: In pause state; dropping inbound message(s)", q.Identifier)
+			continue
+		}
 
 		log.Debugf("%v: Worker #%v received new event! Type: %v Message: %v", q.Identifier,
 			id, e.Type, e.Message)
