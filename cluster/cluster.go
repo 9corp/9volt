@@ -33,7 +33,7 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	d "github.com/relistan/go-director"
+	looper "github.com/relistan/go-director"
 
 	"github.com/9corp/9volt/base"
 	"github.com/9corp/9volt/config"
@@ -73,15 +73,17 @@ type ICluster interface {
 }
 
 type Cluster struct {
-	Config         *config.Config
-	DirectorState  bool
-	DirectorLock   *sync.Mutex
-	MemberID       string
-	DalClient      dal.IDal // etcd client is/should-be thread safe
-	Hostname       string
-	StateChan      chan<- bool
-	DistributeChan chan<- bool
-	initFinished   chan bool
+	Config                  *config.Config
+	DirectorState           bool
+	DirectorLock            *sync.Mutex
+	MemberID                string
+	DalClient               dal.IDal // etcd client is/should-be thread safe
+	Hostname                string
+	StateChan               chan<- bool
+	DistributeChan          chan<- bool
+	initFinished            chan bool
+	DirectorMonitorLooper   looper.Looper
+	DirectorHeartbeatLooper looper.Looper
 
 	base.Component
 }
@@ -113,15 +115,17 @@ func New(cfg *config.Config, stateChan, distributeChan chan<- bool) (*Cluster, e
 	}
 
 	return &Cluster{
-		Config:         cfg,
-		DirectorState:  false,
-		DirectorLock:   new(sync.Mutex),
-		MemberID:       cfg.MemberID,
-		DalClient:      dalClient,
-		Hostname:       hostname,
-		StateChan:      stateChan,
-		DistributeChan: distributeChan,
-		initFinished:   make(chan bool, 1),
+		Config:                  cfg,
+		DirectorState:           false,
+		DirectorLock:            new(sync.Mutex),
+		MemberID:                cfg.MemberID,
+		DalClient:               dalClient,
+		Hostname:                hostname,
+		StateChan:               stateChan,
+		DistributeChan:          distributeChan,
+		DirectorMonitorLooper:   d.NewImmediateTimedLooper(looper.FOREVER, time.Duration(c.Config.HeartbeatInterval), make(chan error, 1)),
+		DirectorHeartbeatLooper: d.NewImmediateTimedLooper(looper.FOREVER, time.Duration(c.Config.HeartbeatInterval), make(chan error, 1)),
+		initFinished:            make(chan bool, 1),
 		Component: base.Component{
 			Identifier: "cluster",
 		},
@@ -131,8 +135,7 @@ func New(cfg *config.Config, stateChan, distributeChan chan<- bool) (*Cluster, e
 func (c *Cluster) Start() error {
 	log.Debugf("%v: Launching cluster engine components...", c.Identifier)
 
-	go c.runDirectorMonitor(
-		d.NewImmediateTimedLooper(d.FOREVER, time.Duration(c.Config.HeartbeatInterval), nil))
+	go c.runDirectorMonitor()
 	go c.runDirectorHeartbeat()
 
 	// memberHeartbeat creates initial member structure; wait until that's
@@ -148,14 +151,19 @@ func (c *Cluster) Start() error {
 }
 
 func (c *Cluster) Stop() error {
-	return nil
+	// stop the director monitor
+	c.DirecotrMonitorLooper.Quit()
+
+	// stop the director heartbeat send
+	c.runDirectorHeartbeatLooper.Quit()
+
 }
 
 // ALWAYS: monitor /9volt/cluster/director to expire; become director
-func (c *Cluster) runDirectorMonitor(looper d.Looper) {
+func (c *Cluster) runDirectorMonitor() {
 	log.Debugf("%v: Launching director monitor...", c.Identifier)
 
-	looper.Loop(func() error {
+	c.DirectorMonitorLooper.Loop(func() error {
 		directorJSON, err := c.getState()
 		if err != nil {
 			c.Config.EQClient.AddWithErrorLog("error",
@@ -172,17 +180,18 @@ func (c *Cluster) runDirectorMonitor(looper d.Looper) {
 
 		return nil
 	})
+
+	log.Warningf("%v-directorMonitor: Exiting", c.Identifier)
 }
 
 // IF DIRECTOR: send periodic heartbeats to /9volt/cluster/director
 func (c *Cluster) runDirectorHeartbeat() {
 	log.Debugf("%v: Launching director heartbeat...", c.Identifier)
 
-	for {
+	c.DirectorHeartbeatLooper.Loop(func() error {
 		if !c.amDirector() {
 			// log.Debugf("%v-directorHeartbeat: Not a director - nothing to do", c.Identifier)
-			time.Sleep(time.Duration(c.Config.HeartbeatInterval))
-			continue
+			return nil
 		}
 
 		// update */director with current state data
@@ -192,8 +201,9 @@ func (c *Cluster) runDirectorHeartbeat() {
 			log.Debugf("%v-directorHeartbeat: Successfully sent periodic heartbeat (MemberID: %v)",
 				c.Identifier, c.MemberID)
 		}
-		time.Sleep(time.Duration(c.Config.HeartbeatInterval))
-	}
+	})
+
+	log.Warningf("%v-directorHeartbeat: Exiting", c.Identifier)
 }
 
 func (c *Cluster) sendDirectorHeartbeat() error {
