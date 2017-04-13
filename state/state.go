@@ -1,8 +1,8 @@
 // Periodic check state -> etcd dumper
-
 package state
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -34,8 +34,6 @@ type State struct {
 	StateChannel chan *Message
 	Mutex        *sync.Mutex
 	Data         map[string]*Message
-
-	ReaderLooper director.Looper
 	DumperLooper director.Looper
 
 	base.Component
@@ -47,10 +45,7 @@ func New(cfg *config.Config, stateChannel chan *Message) *State {
 		StateChannel: stateChannel,
 		Mutex:        &sync.Mutex{},
 		Data:         make(map[string]*Message, 0),
-
-		ReaderLooper: director.NewFreeLooper(director.FOREVER, make(chan error)),
-		DumperLooper: director.NewTimedLooper(director.FOREVER, time.Duration(cfg.StateDumpInterval), make(chan error)),
-
+		DumperLooper: director.NewTimedLooper(director.FOREVER, time.Duration(cfg.StateDumpInterval), make(chan error, 1)),
 		Component: base.Component{
 			Identifier: "state",
 		},
@@ -60,36 +55,57 @@ func New(cfg *config.Config, stateChannel chan *Message) *State {
 func (s *State) Start() error {
 	log.Infof("%v: Starting state components...", s.Identifier)
 
+	s.Component.Ctx, s.Component.Cancel = context.WithCancel(context.Background())
+
 	go s.runReader()
 	go s.runDumper()
 
 	return nil
 }
 
-// TODO
 func (s *State) Stop() error {
+	log.Warningf("%v: Stopping all subcomponents", s.Identifier)
+
+	if s.Component.Cancel == nil {
+		log.Warningf("%v: Looks like .Cancel is nil; is this expected?", s.Identifier)
+	} else {
+		log.Warningf("YOYO: Called context for state")
+		s.Component.Cancel()
+	}
+
+	// Shutdown dumper as well
+	s.DumperLooper.Quit()
+
 	return nil
 }
 
-// Read from state channel, update local state map
+// Read from state channel, update local state map; gets shutdown via context
 func (s *State) runReader() error {
-	s.ReaderLooper.Loop(func() error {
-		msg := <-s.StateChannel
+OUTER:
+	for {
+		select {
+		case msg := <-s.StateChannel:
 
-		// Safely write the message to the data map
-		s.Mutex.Lock()
-		s.Data[msg.Check] = msg
-		s.Mutex.Unlock()
+			// Safely write the message to the data map
+			s.Mutex.Lock()
+			s.Data[msg.Check] = msg
+			s.Mutex.Unlock()
 
-		log.Debugf("%v: Received state message for '%v'", s.Identifier, msg.Check)
+			log.Debugf("%v-runReader: Received state message for '%v'", s.Identifier, msg.Check)
 
-		return nil
-	})
+			return nil
+		case <-s.Component.Ctx.Done():
+			log.Warningf("%v-runReader: Asked to shutdown", s.Identifier)
+			break OUTER
+		}
+	}
+
+	log.Warningf("%v-runReader: Exiting", s.Identifier)
 
 	return nil
 }
 
-// Periodically dump state to etcd
+// Periodically dump state to etcd; gets shutdown via looper
 func (s *State) runDumper() error {
 	s.DumperLooper.Loop(func() error {
 		// log.Debugf("%v: Dumping state to etcd every %v", s.Identifier, s.Config.StateDumpInterval.String())
@@ -123,6 +139,8 @@ func (s *State) runDumper() error {
 
 		return nil
 	})
+
+	log.Warningf("%v-runDumper: Exiting", s.Identifier)
 
 	return nil
 }

@@ -202,7 +202,7 @@ func (o *Overwatch) startTheWorld() error {
 	errorList := make([]string, 0)
 
 	// temporary
-	allowedList := []string{"director", "alerter", "manager"}
+	allowedList := []string{"director", "alerter", "manager", "state"}
 
 	for _, v := range o.Components {
 		if !util.StringSliceContains(allowedList, v.Identify()) {
