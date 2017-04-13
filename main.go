@@ -122,7 +122,7 @@ func runServer() {
 	overwatchChannel := make(chan *overwatch.Message)
 
 	// Instantiate all of the components
-	cluster, err := cluster.New(cfg, clusterStateChannel, distributeChannel)
+	cluster, err := cluster.New(cfg, clusterStateChannel, distributeChannel, overwatchChannel)
 	if err != nil {
 		log.Fatalf("Unable to instantiate cluster engine: %v", err.Error())
 	}
@@ -132,7 +132,7 @@ func runServer() {
 		log.Fatalf("Unable to instantiate director: %v", err.Error())
 	}
 
-	manager, err := manager.New(cfg, messageChannel, monitorStateChannel)
+	manager, err := manager.New(cfg, messageChannel, monitorStateChannel, overwatchChannel)
 	if err != nil {
 		log.Fatalf("Unable to instantiate manager: %v", err.Error())
 	}

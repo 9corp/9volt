@@ -16,24 +16,27 @@ import (
 	"github.com/9corp/9volt/base"
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/monitor"
+	"github.com/9corp/9volt/overwatch"
 	"github.com/9corp/9volt/state"
 )
 
 type Manager struct {
-	MemberID string
-	Config   *config.Config
-	Looper   director.Looper
-	Monitor  *monitor.Monitor
+	MemberID      string
+	Config        *config.Config
+	Looper        director.Looper
+	Monitor       *monitor.Monitor
+	OverwatchChan chan<- *overwatch.Message
 
 	base.Component
 }
 
-func New(cfg *config.Config, messageChannel chan *alerter.Message, stateChannel chan *state.Message) (*Manager, error) {
+func New(cfg *config.Config, messageChannel chan *alerter.Message, stateChannel chan *state.Message, overwatchChan chan<- *overwatch.Message) (*Manager, error) {
 	return &Manager{
-		MemberID: cfg.MemberID,
-		Config:   cfg,
-		Looper:   director.NewFreeLooper(director.FOREVER, make(chan error)),
-		Monitor:  monitor.New(cfg, messageChannel, stateChannel),
+		MemberID:      cfg.MemberID,
+		Config:        cfg,
+		Looper:        director.NewFreeLooper(director.FOREVER, make(chan error)),
+		Monitor:       monitor.New(cfg, messageChannel, stateChannel),
+		OverwatchChan: overwatchChan,
 		Component: base.Component{
 			Identifier: "manager",
 		},
@@ -80,8 +83,16 @@ func (m *Manager) run() error {
 			m.Config.EQClient.AddWithErrorLog("error",
 				fmt.Sprintf("%v: Unexpected watcher error: %v", m.Identifier, err.Error()))
 
-			// TODO: What do we do with the healthcheck bits?
 			m.Config.Health.Write(false, fmt.Sprintf("Manager engine watcher encountering errors: %v", err.Error()))
+
+			// Tell overwatch that something bad just happened
+			m.OverwatchChan <- &overwatch.Message{
+				Error:     fmt.Errorf("Unexpected watcher error: %v", err),
+				Source:    fmt.Sprintf("%v.run", m.Identifier),
+				ErrorType: overwatch.ETCD_WATCHER_ERROR,
+			}
+
+			// Let overwatch determine whether to shut us down
 			continue
 		}
 

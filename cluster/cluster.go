@@ -38,6 +38,7 @@ import (
 	"github.com/9corp/9volt/base"
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/dal"
+	"github.com/9corp/9volt/overwatch"
 )
 
 const (
@@ -56,8 +57,7 @@ const (
 type ICluster interface {
 	Start() error
 
-	// TODO: Implement go-director for loop control
-	runDirectorMonitor(d.Looper)
+	runDirectorMonitor()
 	runDirectorHeartbeat()
 	runMemberHeartbeat()
 	runMemberMonitor()
@@ -81,9 +81,11 @@ type Cluster struct {
 	Hostname                string
 	StateChan               chan<- bool
 	DistributeChan          chan<- bool
+	OverwatchChan           chan<- *overwatch.Message
 	initFinished            chan bool
 	DirectorMonitorLooper   looper.Looper
 	DirectorHeartbeatLooper looper.Looper
+	MemberHeartbeatLooper   looper.Looper
 
 	base.Component
 }
@@ -103,7 +105,7 @@ type MemberJSON struct {
 	SemVer        string
 }
 
-func New(cfg *config.Config, stateChan, distributeChan chan<- bool) (*Cluster, error) {
+func New(cfg *config.Config, stateChan, distributeChan chan<- bool, overwatchChan chan<- *overwatch.Message) (*Cluster, error) {
 	dalClient, err := dal.New(cfg.EtcdPrefix, cfg.EtcdMembers, cfg.EtcdUserPass, false, false, false)
 	if err != nil {
 		return nil, err
@@ -123,8 +125,10 @@ func New(cfg *config.Config, stateChan, distributeChan chan<- bool) (*Cluster, e
 		Hostname:                hostname,
 		StateChan:               stateChan,
 		DistributeChan:          distributeChan,
-		DirectorMonitorLooper:   d.NewImmediateTimedLooper(looper.FOREVER, time.Duration(c.Config.HeartbeatInterval), make(chan error, 1)),
-		DirectorHeartbeatLooper: d.NewImmediateTimedLooper(looper.FOREVER, time.Duration(c.Config.HeartbeatInterval), make(chan error, 1)),
+		OverwatchChan:           overwatchChan,
+		DirectorMonitorLooper:   looper.NewImmediateTimedLooper(looper.FOREVER, time.Duration(cfg.HeartbeatInterval), make(chan error, 1)),
+		DirectorHeartbeatLooper: looper.NewImmediateTimedLooper(looper.FOREVER, time.Duration(cfg.HeartbeatInterval), make(chan error, 1)),
+		MemberHeartbeatLooper:   looper.NewImmediateTimedLooper(looper.FOREVER, time.Duration(cfg.HeartbeatInterval), make(chan error, 1)),
 		initFinished:            make(chan bool, 1),
 		Component: base.Component{
 			Identifier: "cluster",
@@ -134,6 +138,8 @@ func New(cfg *config.Config, stateChan, distributeChan chan<- bool) (*Cluster, e
 
 func (c *Cluster) Start() error {
 	log.Debugf("%v: Launching cluster engine components...", c.Identifier)
+
+	c.Component.Ctx, c.Component.Cancel = context.WithCancel(context.Background())
 
 	go c.runDirectorMonitor()
 	go c.runDirectorHeartbeat()
@@ -152,11 +158,22 @@ func (c *Cluster) Start() error {
 
 func (c *Cluster) Stop() error {
 	// stop the director monitor
-	c.DirecotrMonitorLooper.Quit()
+	c.DirectorMonitorLooper.Quit()
 
 	// stop the director heartbeat send
-	c.runDirectorHeartbeatLooper.Quit()
+	c.DirectorHeartbeatLooper.Quit()
 
+	// stop memberMonitor
+	if c.Component.Cancel == nil {
+		log.Warningf("%v: Looks like .Cancel is nil; is this expected?", c.Identifier)
+	} else {
+		c.Component.Cancel()
+	}
+
+	// stop memberHeartbeat
+	c.MemberHeartbeatLooper.Quit()
+
+	return nil
 }
 
 // ALWAYS: monitor /9volt/cluster/director to expire; become director
@@ -201,6 +218,8 @@ func (c *Cluster) runDirectorHeartbeat() {
 			log.Debugf("%v-directorHeartbeat: Successfully sent periodic heartbeat (MemberID: %v)",
 				c.Identifier, c.MemberID)
 		}
+
+		return nil
 	})
 
 	log.Warningf("%v-directorHeartbeat: Exiting", c.Identifier)
@@ -241,11 +260,25 @@ func (c *Cluster) runMemberMonitor() {
 
 		// watch all dirs under /9volt/cluster/members/; alert if someone joins
 		// or leaves
-		resp, err := watcher.Next(context.Background())
+		resp, err := watcher.Next(c.Component.Ctx)
 		if err != nil {
+			if err.Error() == "context canceled" {
+				log.Warningf("%v-runMemberMonitor: Received a notice to shutdown", c.Identifier)
+				break
+			}
+
 			c.Config.EQClient.AddWithErrorLog("error",
-				fmt.Sprintf("%v-memberMonitor: Unexpected watcher error: %v", c.Identifier, err.Error()))
+				fmt.Sprintf("%v-runMemberMonitor: Unexpected watcher error: %v", c.Identifier, err.Error()))
+
 			c.Config.Health.Write(false, fmt.Sprintf("Cluster engine watcher encountering errors: %v", err.Error()))
+
+			c.OverwatchChan <- &overwatch.Message{
+				Error:     fmt.Errorf("Unexpected watcher error: %v", err),
+				Source:    fmt.Sprintf("%v.runMemberMonitor", c.Identifier),
+				ErrorType: overwatch.ETCD_WATCHER_ERROR,
+			}
+
+			// Let overwatch determine if it should shut things down or not
 			continue
 		}
 
@@ -253,25 +286,27 @@ func (c *Cluster) runMemberMonitor() {
 		case "set":
 			// Only care about set's on base dir and 'config'
 			if !resp.Node.Dir || path.Base(resp.Node.Key) == "config" {
-				log.Debugf("%v-memberMonitor: Ignoring watcher action on key %v",
+				log.Debugf("%v-runMemberMonitor: Ignoring watcher action on key %v",
 					c.Identifier, resp.Node.Key)
 				continue
 			}
 
 			newMemberID := path.Base(resp.Node.Key)
-			log.Infof("%v-memberMonitor: New member '%v' has joined the cluster",
+			log.Infof("%v-runMemberMonitor: New member '%v' has joined the cluster",
 				c.Identifier, newMemberID)
 			c.DistributeChan <- true
 		case "expire":
 			// only dirs expire under /cluster/members/; don't need to do anything fancy
 			oldMemberID := path.Base(resp.Node.Key)
-			log.Infof("%v-memberMonitor: Detected an expire for old member '%v'",
+			log.Infof("%v-runMemberMonitor: Detected an expire for old member '%v'",
 				c.Identifier, oldMemberID)
 			c.DistributeChan <- true
 		default:
 			continue
 		}
 	}
+
+	log.Warningf("%v-runMemberMonitor: Exiting", c.Identifier)
 }
 
 // Re-create member dir structure, set initial state
@@ -314,8 +349,6 @@ func (c *Cluster) createInitialMemberStructure(memberDir string, heartbeatTimeou
 }
 
 // ALWAYS: send member heartbeat updates
-// TODO: If we are not able to set the heartbeat - we should probably alert the
-//       rest of 9volt components to shutdown or pause until we recover.
 func (c *Cluster) runMemberHeartbeat() {
 	log.Debugf("%v: Launching member heartbeat...", c.Identifier)
 
@@ -331,17 +364,17 @@ func (c *Cluster) runMemberHeartbeat() {
 	// Avoid data structure creation/existence race
 	c.initFinished <- true
 
-	for {
+	c.MemberHeartbeatLooper.Loop(func() error {
+		// Unlikely error, but let's check jic
 		memberJSON, err := c.generateMemberJSON()
 		if err != nil {
 			c.Config.EQClient.AddWithErrorLog("error",
-				fmt.Sprintf("%v-memberHeartbeat: Unable to generate member JSON (retrying in %v): %v",
+				fmt.Sprintf("%v-runMemberHeartbeat: Unable to generate member JSON (retrying in %v): %v",
 					c.Identifier, c.Config.HeartbeatInterval.String(), err.Error()))
-			time.Sleep(time.Duration(c.Config.HeartbeatInterval))
-			continue
+			return nil
 		}
 
-		// set status key
+		// set status key (could fail)
 		if err := c.DalClient.Set(
 			memberDir+"/status", memberJSON,
 			&dal.SetOptions{
@@ -353,8 +386,20 @@ func (c *Cluster) runMemberHeartbeat() {
 			},
 		); err != nil {
 			c.Config.EQClient.AddWithErrorLog("error",
-				fmt.Sprintf("%v-memberHeartbeat: Unable to save member JSON status (retrying in %v): %v",
+				fmt.Sprintf("%v-runMemberHeartbeat: Unable to save member JSON status (retrying in %v): %v",
 					c.Identifier, c.Config.HeartbeatInterval.String(), err.Error()))
+
+			// Let's tell overwatch that something bad happened with backend
+			c.Config.Health.Write(false, fmt.Sprintf("Cluster engine encountering etcd error(s) during set: %v", err.Error()))
+
+			c.OverwatchChan <- &overwatch.Message{
+				Error:     fmt.Errorf("Unable to save key to etcd: %v", err),
+				Source:    fmt.Sprintf("%v.runMemberHeartbeat", c.Identifier),
+				ErrorType: overwatch.ETCD_GENERIC_ERROR,
+			}
+
+			// Let overwatch determine if we should be shutdown or not
+			return nil
 		}
 
 		// refresh dir
@@ -362,13 +407,23 @@ func (c *Cluster) runMemberHeartbeat() {
 			if err := c.DalClient.Refresh(memberDir, heartbeatTimeoutInt); err != nil {
 				// Not sure if this should cause a member dropout
 				c.Config.EQClient.AddWithErrorLog("error",
-					fmt.Sprintf("%v-memberHeartbeat: Unable to refresh member dir '%v' (retrying in %v): %v",
+					fmt.Sprintf("%v-runMemberHeartbeat: Unable to refresh member dir '%v' (retrying in %v): %v",
 						c.Identifier, memberDir, c.Config.HeartbeatInterval.String(), err.Error()))
+
+				c.Config.Health.Write(false, fmt.Sprintf("Cluster engine encountering etcd error(s) during refresh: %v", err.Error()))
+
+				c.OverwatchChan <- &overwatch.Message{
+					Error:     fmt.Errorf("Unable to refresh key in etcd: %v", err),
+					Source:    fmt.Sprintf("%v.runMemberHeartbeat", c.Identifier),
+					ErrorType: overwatch.ETCD_GENERIC_ERROR,
+				}
 			}
 		}(memberDir, heartbeatTimeoutInt)
 
-		time.Sleep(time.Duration(c.Config.HeartbeatInterval))
-	}
+		return nil
+	})
+
+	log.Warningf("%v-runMemberHeartbeat: Exiting", c.Identifier)
 }
 
 func (c *Cluster) generateMemberJSON() (string, error) {

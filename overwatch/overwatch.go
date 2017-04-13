@@ -26,6 +26,7 @@ const (
 	HEALTH_WATCH_DURATION = time.Duration(30) * time.Second
 
 	ETCD_WATCHER_ERROR int = iota
+	ETCD_GENERIC_ERROR
 )
 
 type Overwatch struct {
@@ -119,6 +120,8 @@ func (o *Overwatch) handleWatch(msg *Message) error {
 	switch msg.ErrorType {
 	case ETCD_WATCHER_ERROR:
 		go o.beginEtcdWatch()
+	case ETCD_GENERIC_ERROR:
+		go o.beginEtcdWatch()
 	default:
 		log.Errorf("%v: Unknown error type '%v' - unable to complete handleWatch(); (error: %v)", o.Identifier, msg.ErrorType, msg.Error)
 		return fmt.Errorf("%v: Unknown error type '%v' - unable to complete handleWatch(); (error: %v)", o.Identifier, msg.ErrorType, msg.Error)
@@ -202,7 +205,7 @@ func (o *Overwatch) startTheWorld() error {
 	errorList := make([]string, 0)
 
 	// temporary
-	allowedList := []string{"director", "alerter", "manager", "state", "event"}
+	allowedList := []string{"director", "alerter", "manager", "state", "event", "cluster"}
 
 	for _, v := range o.Components {
 		if !util.StringSliceContains(allowedList, v.Identify()) {
