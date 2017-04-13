@@ -10,6 +10,7 @@ package overwatch
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -197,6 +198,20 @@ func (o *Overwatch) beginEtcdWatch() error {
 }
 
 func (o *Overwatch) startTheWorld() error {
-	log.Warning("OKAY, STARTING THE WORLD BACK UP!")
+	log.Infof("%v: Starting the world!", o.Identifier)
+	// errorList := make([]string, 0)
+
+	// for _, v := range o.Components {
+	// 	log.Warningf("%v: Starting up '%v' component", o.Identifier, v.Identify())
+	// 	if err := v.Start(); err != nil {
+	// 		errorList = append(errorList, err.Error())
+	// 		log.Errorf("%v: Unable to start '%v' component: %v", o.Identifier, v.Identify(), err)
+	// 	}
+	// }
+
+	// if len(errorList) != 0 {
+	// 	return fmt.Errorf("Ran into one or more errors during component startup: %v", strings.Join(errorList, "; "))
+	// }
+
 	return nil
 }
