@@ -10,7 +10,7 @@ package overwatch
 import (
 	"context"
 	"fmt"
-	"strings"
+	// "strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
