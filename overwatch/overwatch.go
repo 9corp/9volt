@@ -128,30 +128,31 @@ func (o *Overwatch) handleWatch(msg *Message) error {
 func (o *Overwatch) beginEtcdWatch() error {
 	// watch etcd for $time, start components back up if no errors present
 	tmpWatchChannel := make(chan bool, 1)
+	ctx, cancel := context.WithCancel(context.Background())
 
-	go func() {
+	go func(cancel context.CancelFunc) {
 		startTime := time.Now()
 
-	MainLoop:
+	OUTER:
 		for {
 			select {
 			case <-tmpWatchChannel:
 				// errors occurred, reset timer
-				log.Warning("An error occurred in the watcher; continue watching")
+				log.Warningf("%v: An error occurred in the watcher; continue watching", o.Identifier)
 				startTime = time.Now()
 			default:
 				if time.Now().Sub(startTime) >= HEALTH_WATCH_DURATION {
-					log.Warningf("Watcher has not reported errors for %v; starting everything back up", HEALTH_WATCH_DURATION)
+					log.Warningf("%v: Watcher has not reported errors for %v; starting everything back up", o.Identifier, HEALTH_WATCH_DURATION)
 
 					o.activeWatch = false
-					o.WatchLooper.Quit()
+					cancel()
 
 					if err := o.startTheWorld(); err != nil {
-						// TODO: What do we do here?
-						log.Errorf("Unable to start the world after recovery: %v", err)
+						// TODO: Starting the components failed, what now?
+						log.Errorf("%v: Unable to start the world after recovery: %v", o.Identifier, err)
 					}
 
-					break MainLoop
+					break OUTER
 				}
 
 				// either timer has not elapsed yet, or we've received errors
@@ -160,32 +161,37 @@ func (o *Overwatch) beginEtcdWatch() error {
 			time.Sleep(time.Duration(1) * time.Second)
 		}
 
-		log.Warningf("%v: Error watch goroutine exiting", o.Identifier)
-	}()
+		log.Warningf("%v: Primary watcher goroutine exiting", o.Identifier)
+	}(cancel)
 
 	// Start the actual watcher
-	go func() {
-		o.WatchLooper.Loop(func() error {
+	go func(ctx context.Context) {
+	OUTER:
+		for {
 			watcher, err := o.Config.DalClient.NewWatcherForOverwatch("/", true)
 			if err != nil {
-				log.Errorf("Unable to begin watching '/'; retrying in %v: %v", WATCH_RETRY_INTERVAL, err)
-				return nil
+				log.Errorf("%v: Unable to begin watching '/'; retrying in %v: %v", o.Identifier, WATCH_RETRY_INTERVAL, err)
+				time.Sleep(WATCH_RETRY_INTERVAL)
+				continue
 			}
 
 			for {
-				_, err := watcher.Next(context.Background())
+				_, err := watcher.Next(ctx)
 				if err != nil {
-					log.Errorf("Experienced error during watch, recreating watcher: %v", err)
-					tmpWatchChannel <- true
-					break
+					if err.Error() == "context canceled" {
+						log.Warningf("%v: Etcd watcher has been cancelled", o.Identifier)
+						break OUTER
+					} else {
+						log.Errorf("%v: Experienced error during watch, recreating watcher: %v", o.Identifier, err)
+						tmpWatchChannel <- true
+						break
+					}
 				}
 			}
+		}
 
-			return nil
-		})
-
-		log.Warningf("%v: Watcher goroutine exiting...", o.Identifier)
-	}()
+		log.Warningf("%v: Etcd watcher goroutine exiting...", o.Identifier)
+	}(ctx)
 
 	return nil
 }

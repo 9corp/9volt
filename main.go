@@ -127,7 +127,7 @@ func runServer() {
 		log.Fatalf("Unable to instantiate cluster engine: %v", err.Error())
 	}
 
-	director, err := director.New(cfg, clusterStateChannel, distributeChannel)
+	director, err := director.New(cfg, clusterStateChannel, distributeChannel, overwatchChannel)
 	if err != nil {
 		log.Fatalf("Unable to instantiate director: %v", err.Error())
 	}

@@ -1,5 +1,9 @@
 package base
 
+import (
+	"context"
+)
+
 type IComponent interface {
 	Start() error
 	Stop() error
@@ -8,6 +12,9 @@ type IComponent interface {
 
 type Component struct {
 	Identifier string
+
+	Ctx    context.Context
+	Cancel context.CancelFunc
 }
 
 func (c *Component) Identify() string {
