@@ -60,7 +60,7 @@ func New(cfg *config.Config, stateChan <-chan bool, distributeChan <-chan bool, 
 		DalClient:        dalClient,
 		CheckStats:       make(map[string]*dal.MemberStat, 0),
 		CheckStatsMutex:  &sync.Mutex{},
-		CheckStatsLooper: looper.NewTimedLooper(looper.FOREVER, COLLECT_CHECK_STATS_INTERVAL, make(chan error)),
+		CheckStatsLooper: looper.NewTimedLooper(looper.FOREVER, COLLECT_CHECK_STATS_INTERVAL, make(chan error, 1)),
 		Component: base.Component{
 			Identifier: "director",
 		},
