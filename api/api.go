@@ -13,6 +13,7 @@ package api
 import (
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/InVisionApp/rye"
 	log "github.com/Sirupsen/logrus"
@@ -23,11 +24,12 @@ import (
 )
 
 type Api struct {
-	Config     *config.Config
-	MemberID   string
-	Identifier string
-	MWHandler  *rye.MWHandler
-	DebugUI    bool
+	Config       *config.Config
+	MemberID     string
+	Identifier   string
+	MWHandler    *rye.MWHandler
+	DebugUI      bool
+	AccessTokens string
 }
 
 type JSONStatus struct {
@@ -35,13 +37,14 @@ type JSONStatus struct {
 	Message string
 }
 
-func New(cfg *config.Config, mwHandler *rye.MWHandler, debugUI bool) *Api {
+func New(cfg *config.Config, mwHandler *rye.MWHandler, debugUI bool, accessTokens string) *Api {
 	return &Api{
-		Config:     cfg,
-		MemberID:   cfg.MemberID,
-		Identifier: "api",
-		MWHandler:  mwHandler,
-		DebugUI:    debugUI,
+		Config:       cfg,
+		MemberID:     cfg.MemberID,
+		Identifier:   "api",
+		MWHandler:    mwHandler,
+		DebugUI:      debugUI,
+		AccessTokens: accessTokens,
 	}
 }
 
@@ -50,21 +53,32 @@ func (a *Api) Run() {
 
 	routes := mux.NewRouter().StrictSlash(true)
 
-	routes.Handle(a.setupHandler(
-		"/", []rye.Handler{
+	// Necessary so we do not put /version and
+	// /status/check behind access tokens
+	noAuthHandler := rye.NewMWHandler(rye.Config{})
+
+	routes.Handle(
+		"/", handlers.LoggingHandler(os.Stdout, noAuthHandler.Handle([]rye.Handler{
 			a.HomeHandler,
-		})).Methods("GET")
+		}))).Methods("GET")
 
 	// Common handlers
-	routes.Handle(a.setupHandler(
-		"/version", []rye.Handler{
+	routes.Handle(
+		"/version", handlers.LoggingHandler(os.Stdout, noAuthHandler.Handle([]rye.Handler{
 			a.VersionHandler,
-		})).Methods("GET")
+		}))).Methods("GET")
 
-	routes.Handle(a.setupHandler(
-		"/status/check", []rye.Handler{
+	routes.Handle(
+		"/status/check", handlers.LoggingHandler(os.Stdout, noAuthHandler.Handle([]rye.Handler{
 			a.StatusHandler,
-		})).Methods("GET")
+		}))).Methods("GET")
+
+	// Prepend the access token middleware to every /api endpoint if
+	// any access tokens were given
+	if a.AccessTokens != "" {
+		tokens := strings.Split(a.AccessTokens, ",")
+		a.MWHandler.Use(rye.NewMiddlewareAccessToken("X-Access-Token", tokens))
+	}
 
 	// State handlers (route order matters!)
 	routes.Handle(a.setupHandler(

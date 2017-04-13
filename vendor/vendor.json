@@ -3,10 +3,10 @@
 	"ignore": "test",
 	"package": [
 		{
-			"checksumSHA1": "VAhnoYns5+nMj3JIvCgt/4e282o=",
+			"checksumSHA1": "tN/UPbQTpSHFBi709jOXw9pkMhk=",
 			"path": "github.com/InVisionApp/rye",
-			"revision": "fa5dc681811bf7ae69eecc7f212b15aa9a5b1022",
-			"revisionTime": "2016-12-08T14:51:35Z"
+			"revision": "759e085a2d72acad8d125ebfca09f3d1125b92d7",
+			"revisionTime": "2017-03-22T17:36:45Z"
 		},
 		{
 			"checksumSHA1": "O9o5S7D0E1PaN5ARQ72xLfOrIa0=",
