@@ -64,8 +64,6 @@ func (s *State) Start() error {
 }
 
 func (s *State) Stop() error {
-	log.Warningf("%v: Stopping all subcomponents", s.Identifier)
-
 	if s.Component.Cancel == nil {
 		log.Warningf("%v: Looks like .Cancel is nil; is this expected?", s.Identifier)
 	} else {
@@ -91,15 +89,13 @@ OUTER:
 			s.Mutex.Unlock()
 
 			log.Debugf("%v-runReader: Received state message for '%v'", s.Identifier, msg.Check)
-
-			return nil
 		case <-s.Component.Ctx.Done():
-			log.Warningf("%v-runReader: Received a notice to shutdown", s.Identifier)
+			log.Debugf("%v-runReader: Received a notice to shutdown", s.Identifier)
 			break OUTER
 		}
 	}
 
-	log.Warningf("%v-runReader: Exiting", s.Identifier)
+	log.Debugf("%v-runReader: Exiting", s.Identifier)
 
 	return nil
 }
@@ -139,7 +135,7 @@ func (s *State) runDumper() error {
 		return nil
 	})
 
-	log.Warningf("%v-runDumper: Exiting", s.Identifier)
+	log.Debugf("%v-runDumper: Exiting", s.Identifier)
 
 	return nil
 }

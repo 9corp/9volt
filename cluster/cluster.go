@@ -202,7 +202,7 @@ func (c *Cluster) runDirectorMonitor() {
 		return nil
 	})
 
-	log.Warningf("%v-directorMonitor: Exiting", c.Identifier)
+	log.Debugf("%v-directorMonitor: Exiting", c.Identifier)
 }
 
 // IF DIRECTOR: send periodic heartbeats to /9volt/cluster/director
@@ -226,7 +226,7 @@ func (c *Cluster) runDirectorHeartbeat() {
 		return nil
 	})
 
-	log.Warningf("%v-directorHeartbeat: Exiting", c.Identifier)
+	log.Debugf("%v-directorHeartbeat: Exiting", c.Identifier)
 }
 
 func (c *Cluster) sendDirectorHeartbeat() error {
@@ -267,17 +267,15 @@ func (c *Cluster) runMemberMonitor() {
 		resp, err := watcher.Next(c.Component.Ctx)
 		if err != nil {
 			if err.Error() == "context canceled" {
-				log.Warningf("%v-runMemberMonitor: Received a notice to shutdown", c.Identifier)
+				log.Debugf("%v-runMemberMonitor: Received a notice to shutdown", c.Identifier)
 				break
 			}
 
 			c.Config.EQClient.AddWithErrorLog("error",
 				fmt.Sprintf("%v-runMemberMonitor: Unexpected watcher error: %v", c.Identifier, err.Error()))
 
-			c.Config.Health.Write(false, fmt.Sprintf("Cluster engine watcher encountering errors: %v", err.Error()))
-
 			c.OverwatchChan <- &overwatch.Message{
-				Error:     fmt.Errorf("Unexpected watcher error: %v", err),
+				Error:     fmt.Errorf("Watcher error: %v", err),
 				Source:    fmt.Sprintf("%v.runMemberMonitor", c.Identifier),
 				ErrorType: overwatch.ETCD_WATCHER_ERROR,
 			}
@@ -310,7 +308,7 @@ func (c *Cluster) runMemberMonitor() {
 		}
 	}
 
-	log.Warningf("%v-runMemberMonitor: Exiting", c.Identifier)
+	log.Debugf("%v-runMemberMonitor: Exiting", c.Identifier)
 }
 
 // Re-create member dir structure, set initial state
@@ -394,8 +392,6 @@ func (c *Cluster) runMemberHeartbeat() {
 					c.Identifier, c.Config.HeartbeatInterval.String(), err.Error()))
 
 			// Let's tell overwatch that something bad happened with backend
-			c.Config.Health.Write(false, fmt.Sprintf("Cluster engine encountering etcd error(s) during set: %v", err.Error()))
-
 			c.OverwatchChan <- &overwatch.Message{
 				Error:     fmt.Errorf("Unable to save key to etcd: %v", err),
 				Source:    fmt.Sprintf("%v.runMemberHeartbeat", c.Identifier),
@@ -414,22 +410,18 @@ func (c *Cluster) runMemberHeartbeat() {
 					fmt.Sprintf("%v-runMemberHeartbeat: Unable to refresh member dir '%v' (retrying in %v): %v",
 						c.Identifier, memberDir, c.Config.HeartbeatInterval.String(), err.Error()))
 
-				c.Config.Health.Write(false, fmt.Sprintf("Cluster engine encountering etcd error(s) during refresh: %v", err.Error()))
-
 				c.OverwatchChan <- &overwatch.Message{
 					Error:     fmt.Errorf("Unable to refresh key in etcd: %v", err),
 					Source:    fmt.Sprintf("%v.runMemberHeartbeat", c.Identifier),
 					ErrorType: overwatch.ETCD_GENERIC_ERROR,
 				}
 			}
-
-			log.Warningf("%v: Performing member %v refresh!!!!!!!", c.Identifier, memberDir)
 		}(memberDir, heartbeatTimeoutInt)
 
 		return nil
 	})
 
-	log.Warningf("%v-runMemberHeartbeat: Exiting", c.Identifier)
+	log.Debugf("%v-runMemberHeartbeat: Exiting", c.Identifier)
 }
 
 func (c *Cluster) generateMemberJSON() (string, error) {
@@ -562,7 +554,6 @@ func (c *Cluster) setDirectorState(newState bool) {
 	c.DirectorState = newState
 
 	// Update state channel to inform director to start watching etcd
-	log.Warningf("%v-setDirectorState: Got triggered!", c.Identifier)
 	c.StateChan <- newState
 }
 

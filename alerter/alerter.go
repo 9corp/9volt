@@ -93,8 +93,6 @@ func (a *Alerter) Start() error {
 }
 
 func (a *Alerter) Stop() error {
-	log.Warningf("%v: Stopping all subcomponents", a.Identifier)
-
 	if a.Component.Cancel == nil {
 		log.Warningf("%v: Looks like .Cancel is nil; is this expected?", a.Identifier)
 	} else {
@@ -118,12 +116,12 @@ OUTER:
 
 			return nil
 		case <-a.Component.Ctx.Done():
-			log.Warningf("%v-run: Asked to shutdown", a.Identifier)
+			log.Debugf("%v-run: Asked to shutdown", a.Identifier)
 			break OUTER
 		}
 	}
 
-	log.Warningf("%v-run: Exiting", a.Identifier)
+	log.Debugf("%v-run: Exiting", a.Identifier)
 	return nil
 }
 

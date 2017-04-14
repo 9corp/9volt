@@ -75,7 +75,7 @@ func (q *Queue) Start() error {
 	q.Pause = false
 
 	if q.Running {
-		log.Warningf("%v: Already running - nothing to do", q.Identifier)
+		log.Debugf("%v: Already running - nothing to do", q.Identifier)
 		return nil
 	}
 
@@ -92,7 +92,7 @@ func (q *Queue) Start() error {
 }
 
 func (q *Queue) Stop() error {
-	log.Warningf("%v: Workers are paused", q.Identifier)
+	log.Debugf("%v: Workers are paused", q.Identifier)
 
 	q.Pause = true
 

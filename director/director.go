@@ -81,8 +81,6 @@ func (d *Director) Start() error {
 }
 
 func (d *Director) Stop() error {
-	log.Warningf("%v: Stopping all subcomponents", d.Identifier)
-
 	if d.Component.Cancel == nil {
 		log.Warningf("%v: Looks like .Cancel is nil; is this expected?", d.Identifier)
 	} else {
@@ -117,7 +115,7 @@ func (d *Director) collectCheckStats() {
 		return nil
 	})
 
-	log.Warningf("%v-collectCheckStats: Exiting", d.Identifier)
+	log.Debugf("%v-collectCheckStats: Exiting", d.Identifier)
 }
 
 func (d *Director) runDistributeListener() {
@@ -138,12 +136,12 @@ OUTER:
 					fmt.Sprintf("%v-distributeListener: Unable to distribute checks: %v", d.Identifier, err.Error()))
 			}
 		case <-d.Component.Ctx.Done():
-			log.Warningf("%v-runDistributeListener: Received a notice to shutdown", d.Identifier)
+			log.Debugf("%v-runDistributeListener: Received a notice to shutdown", d.Identifier)
 			break OUTER
 		}
 	}
 
-	log.Warningf("%v-runDistributeListener: Exiting", d.Identifier)
+	log.Debugf("%v-runDistributeListener: Exiting", d.Identifier)
 }
 
 func (d *Director) distributeChecks() error {
@@ -333,8 +331,6 @@ OUTER:
 	for {
 		select {
 		case state := <-d.StateChan:
-			log.Warningf("%v-stateListener: Got triggered", d.Identifier)
-
 			d.setState(state)
 
 			if state {
@@ -355,7 +351,7 @@ OUTER:
 				cancel()
 			}
 		case <-d.Component.Ctx.Done():
-			log.Warningf("%v-runStateListener: Received a notice to shutdown", d.Identifier)
+			log.Debugf("%v-runStateListener: Received a notice to shutdown", d.Identifier)
 
 			// Shutdown potential checkConfigWatcher
 			if cancel != nil {
@@ -366,7 +362,7 @@ OUTER:
 		}
 	}
 
-	log.Warningf("%v-runStateListener: Exiting", d.Identifier)
+	log.Debugf("%v-runStateListener: Exiting", d.Identifier)
 }
 
 // This method exists to deal with a case where a director launches for the
@@ -422,7 +418,6 @@ func (d *Director) runCheckConfigWatcher(ctx context.Context) {
 			break
 		} else if err != nil {
 			log.Errorf("%v-checkConfigWatcher: Unexpected error: %v", d.Identifier, err.Error())
-			d.Config.Health.Write(false, fmt.Sprintf("Director engine watcher encountering errors: %v", err.Error()))
 
 			d.OverwatchChan <- &overwatch.Message{
 				Error:     fmt.Errorf("Unexpected watcher error: %v", err),
@@ -445,7 +440,7 @@ func (d *Director) runCheckConfigWatcher(ctx context.Context) {
 		}
 	}
 
-	log.Warningf("%v-checkConfigWatcher: Exiting...", d.Identifier)
+	log.Debugf("%v-checkConfigWatcher: Exiting...", d.Identifier)
 }
 
 func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
@@ -564,8 +559,6 @@ func (d *Director) PickNextMember(checkTag string) (string, error) {
 
 	// figure out feasible members
 	feasibleMembers := d.filterMembersByTag(d.CheckStats, checkTag)
-
-	log.Warningf(">>>>>> FEASIBLE MEMBER CONTENT: %v", feasibleMembers)
 
 	if len(feasibleMembers) == 0 {
 		return "", fmt.Errorf("No feasible members found after filter; required tag: '%v'", checkTag)

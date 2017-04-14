@@ -97,6 +97,8 @@ func (o *Overwatch) runListener() error {
 // Wrapper for: stopping all components, starting dep watch and re-starting all
 // components upon dependency recovery
 func (o *Overwatch) stopTheWorld(msg *Message) error {
+	log.Warningf("%v: Stopping all components", o.Identifier)
+
 	// Stop all components
 	for _, v := range o.Components {
 		log.Debugf("%v: Stopping component '%v'...", o.Identifier, v.Identify())
@@ -110,6 +112,9 @@ func (o *Overwatch) stopTheWorld(msg *Message) error {
 
 	// Start watching dependency
 	go o.handleWatch(msg)
+
+	// And tell the healthcheck we're not doing great
+	o.Config.Health.Write(false, fmt.Sprintf("%v: %v", msg.Source, msg.Error))
 
 	return nil
 }
@@ -214,6 +219,9 @@ func (o *Overwatch) startTheWorld() error {
 	if len(errorList) != 0 {
 		return fmt.Errorf("Ran into one or more errors during component startup: %v", strings.Join(errorList, "; "))
 	}
+
+	// Finally, update the healthcheck to say we've recovered
+	o.Config.Health.Write(true, fmt.Sprintf("Recovered from previous error: '%v'", o.Config.Health.Message))
 
 	return nil
 }

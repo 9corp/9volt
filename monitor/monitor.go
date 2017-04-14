@@ -201,13 +201,13 @@ func (m *Monitor) stop(monitorName string) error {
 }
 
 func (m *Monitor) StopAll() error {
-	log.Warningf("%v: Performing full monitor shutdown", m.Identifier)
+	log.Debugf("%v: Performing full monitor shutdown", m.Identifier)
 
 	m.runningMonitorLock.Lock()
 	defer m.runningMonitorLock.Unlock()
 
 	for _, v := range m.runningMonitors {
-		log.Warningf("%v: Shutting down check '%v'", m.Identifier, v.Identify())
+		log.Debugf("%v: Shutting down check '%v'", m.Identifier, v.Identify())
 		v.Stop()
 	}
 

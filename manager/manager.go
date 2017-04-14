@@ -54,8 +54,6 @@ func (m *Manager) Start() error {
 }
 
 func (m *Manager) Stop() error {
-	log.Warningf("%v: Stopping all subcomponents", m.Identifier)
-
 	if m.Component.Cancel == nil {
 		log.Warningf("%v: Looks like .Cancel is nil; is this expected?", m.Identifier)
 	} else {
@@ -76,14 +74,12 @@ func (m *Manager) run() error {
 		resp, err := watcher.Next(m.Component.Ctx)
 		if err != nil {
 			if err.Error() == "context canceled" {
-				log.Warningf("%v: Received a notice to shutdown", m.Identifier)
+				log.Debugf("%v: Received a notice to shutdown", m.Identifier)
 				break
 			}
 
 			m.Config.EQClient.AddWithErrorLog("error",
 				fmt.Sprintf("%v: Unexpected watcher error: %v", m.Identifier, err.Error()))
-
-			m.Config.Health.Write(false, fmt.Sprintf("Manager engine watcher encountering errors: %v", err.Error()))
 
 			// Tell overwatch that something bad just happened
 			m.OverwatchChan <- &overwatch.Message{
@@ -116,7 +112,7 @@ func (m *Manager) run() error {
 		}
 	}
 
-	log.Warningf("%v: Exiting", m.Identifier)
+	log.Debugf("%v: Exiting", m.Identifier)
 
 	return nil
 }
