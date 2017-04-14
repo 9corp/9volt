@@ -86,6 +86,7 @@ type Cluster struct {
 	DirectorMonitorLooper   looper.Looper
 	DirectorHeartbeatLooper looper.Looper
 	MemberHeartbeatLooper   looper.Looper
+	restarted               bool
 
 	base.Component
 }
@@ -137,7 +138,7 @@ func New(cfg *config.Config, stateChan, distributeChan chan<- bool, overwatchCha
 }
 
 func (c *Cluster) Start() error {
-	log.Debugf("%v: Launching cluster engine components...", c.Identifier)
+	log.Infof("%v: Launching cluster engine components...", c.Identifier)
 
 	c.Component.Ctx, c.Component.Cancel = context.WithCancel(context.Background())
 
@@ -172,6 +173,9 @@ func (c *Cluster) Stop() error {
 
 	// stop memberHeartbeat
 	c.MemberHeartbeatLooper.Quit()
+
+	// Let the subcomponents know that we've been
+	c.restarted = true
 
 	return nil
 }
@@ -418,6 +422,8 @@ func (c *Cluster) runMemberHeartbeat() {
 					ErrorType: overwatch.ETCD_GENERIC_ERROR,
 				}
 			}
+
+			log.Warningf("%v: Performing member %v refresh!!!!!!!", c.Identifier, memberDir)
 		}(memberDir, heartbeatTimeoutInt)
 
 		return nil
@@ -491,6 +497,13 @@ func (c *Cluster) handleState(directorJSON *DirectorJSON) error {
 				c.Identifier)
 			return c.changeState(START, directorJSON, UPDATE) // update so we can compareAndSwap
 		}
+
+		// This case is hit when we got started back up via overwatch (still a
+		// director but need to let director know to take over checks once more)
+		if c.restarted {
+			c.restarted = false
+			return c.changeState(START, nil, NOOP) // update so we can compareAndSwap
+		}
 	}
 
 	// etcd says we are not director, but we think we are
@@ -549,6 +562,7 @@ func (c *Cluster) setDirectorState(newState bool) {
 	c.DirectorState = newState
 
 	// Update state channel to inform director to start watching etcd
+	log.Warningf("%v-setDirectorState: Got triggered!", c.Identifier)
 	c.StateChan <- newState
 }
 

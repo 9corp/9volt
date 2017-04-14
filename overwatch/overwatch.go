@@ -18,12 +18,11 @@ import (
 
 	"github.com/9corp/9volt/base"
 	"github.com/9corp/9volt/config"
-	"github.com/9corp/9volt/util"
 )
 
 const (
 	WATCH_RETRY_INTERVAL  = time.Duration(5) * time.Second
-	HEALTH_WATCH_DURATION = time.Duration(30) * time.Second
+	HEALTH_WATCH_DURATION = time.Duration(10) * time.Second
 
 	ETCD_WATCHER_ERROR int = iota
 	ETCD_GENERIC_ERROR
@@ -143,7 +142,7 @@ func (o *Overwatch) beginEtcdWatch() error {
 			select {
 			case <-tmpWatchChannel:
 				// errors occurred, reset timer
-				log.Warningf("%v: An error occurred in the watcher; continue watching", o.Identifier)
+				log.Debugf("%v: Errors with backend, continue test watch", o.Identifier)
 				startTime = time.Now()
 			default:
 				if time.Now().Sub(startTime) >= HEALTH_WATCH_DURATION {
@@ -166,7 +165,7 @@ func (o *Overwatch) beginEtcdWatch() error {
 			time.Sleep(time.Duration(1) * time.Second)
 		}
 
-		log.Warningf("%v: Primary watcher goroutine exiting", o.Identifier)
+		log.Debugf("%v: Primary watcher goroutine exiting", o.Identifier)
 	}(cancel)
 
 	// Start the actual watcher
@@ -184,10 +183,10 @@ func (o *Overwatch) beginEtcdWatch() error {
 				_, err := watcher.Next(ctx)
 				if err != nil {
 					if err.Error() == "context canceled" {
-						log.Warningf("%v: Etcd watcher has been cancelled", o.Identifier)
+						log.Debugf("%v: Etcd watcher has been cancelled", o.Identifier)
 						break OUTER
 					} else {
-						log.Errorf("%v: Experienced error during watch, recreating watcher: %v", o.Identifier, err)
+						// log.Debugf("%v: Experienced error during watch, recreating watcher: %v", o.Identifier, err)
 						tmpWatchChannel <- true
 						break
 					}
@@ -195,7 +194,7 @@ func (o *Overwatch) beginEtcdWatch() error {
 			}
 		}
 
-		log.Warningf("%v: Etcd watcher goroutine exiting...", o.Identifier)
+		log.Debugf("%v: Etcd watcher goroutine exiting...", o.Identifier)
 	}(ctx)
 
 	return nil
@@ -204,16 +203,8 @@ func (o *Overwatch) beginEtcdWatch() error {
 func (o *Overwatch) startTheWorld() error {
 	errorList := make([]string, 0)
 
-	// temporary
-	allowedList := []string{"director", "alerter", "manager", "state", "event", "cluster"}
-
 	for _, v := range o.Components {
-		if !util.StringSliceContains(allowedList, v.Identify()) {
-			log.Debugf("%v: Skipping start of %v", o.Identifier, v.Identify())
-			continue
-		}
-
-		log.Warningf("%v: Starting up '%v' component", o.Identifier, v.Identify())
+		log.Debugf("%v: Starting up '%v' component", o.Identifier, v.Identify())
 		if err := v.Start(); err != nil {
 			errorList = append(errorList, err.Error())
 			log.Errorf("%v: Unable to start '%v' component: %v", o.Identifier, v.Identify(), err)

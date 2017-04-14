@@ -140,7 +140,7 @@ func runServer() {
 	alerter := alerter.New(cfg, messageChannel)
 	state := state.New(cfg, monitorStateChannel)
 
-	// Start all of the components
+	// Start all of the components (start order matters!)
 	components := []base.IComponent{cluster, director, manager, alerter, state, eventQueue}
 
 	watcher := overwatch.New(cfg, overwatchChannel, components)

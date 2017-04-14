@@ -68,7 +68,7 @@ func New(cfg *config.Config, stateChan <-chan bool, distributeChan <-chan bool, 
 }
 
 func (d *Director) Start() error {
-	log.Debugf("%v: Launching director components...", d.Identifier)
+	log.Infof("%v: Launching director components...", d.Identifier)
 
 	// Generate a new context
 	d.Component.Ctx, d.Component.Cancel = context.WithCancel(context.Background())
@@ -121,6 +121,8 @@ func (d *Director) collectCheckStats() {
 }
 
 func (d *Director) runDistributeListener() {
+	log.Debugf("%v-runDistributeListener: Starting", d.Identifier)
+
 OUTER:
 	for {
 		select {
@@ -136,7 +138,7 @@ OUTER:
 					fmt.Sprintf("%v-distributeListener: Unable to distribute checks: %v", d.Identifier, err.Error()))
 			}
 		case <-d.Component.Ctx.Done():
-			log.Warningf("%v-runDistributeListener: Asked to shutdown", d.Identifier)
+			log.Warningf("%v-runDistributeListener: Received a notice to shutdown", d.Identifier)
 			break OUTER
 		}
 	}
@@ -322,6 +324,8 @@ func (d *Director) convertMembersMap(members map[string][]string) map[string][]s
 }
 
 func (d *Director) runStateListener() {
+	log.Debugf("%v-runStateListener: Starting", d.Identifier)
+
 	var ctx context.Context
 	var cancel context.CancelFunc
 
@@ -329,6 +333,8 @@ OUTER:
 	for {
 		select {
 		case state := <-d.StateChan:
+			log.Warningf("%v-stateListener: Got triggered", d.Identifier)
+
 			d.setState(state)
 
 			if state {
@@ -349,7 +355,7 @@ OUTER:
 				cancel()
 			}
 		case <-d.Component.Ctx.Done():
-			log.Warningf("%v-runStateListener: Asked to shutdown", d.Identifier)
+			log.Warningf("%v-runStateListener: Received a notice to shutdown", d.Identifier)
 
 			// Shutdown potential checkConfigWatcher
 			if cancel != nil {

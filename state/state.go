@@ -69,7 +69,6 @@ func (s *State) Stop() error {
 	if s.Component.Cancel == nil {
 		log.Warningf("%v: Looks like .Cancel is nil; is this expected?", s.Identifier)
 	} else {
-		log.Warningf("YOYO: Called context for state")
 		s.Component.Cancel()
 	}
 
@@ -95,7 +94,7 @@ OUTER:
 
 			return nil
 		case <-s.Component.Ctx.Done():
-			log.Warningf("%v-runReader: Asked to shutdown", s.Identifier)
+			log.Warningf("%v-runReader: Received a notice to shutdown", s.Identifier)
 			break OUTER
 		}
 	}
