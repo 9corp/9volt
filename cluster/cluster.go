@@ -26,6 +26,7 @@ package cluster
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -105,6 +106,10 @@ type MemberJSON struct {
 	Version       string
 	SemVer        string
 }
+
+var (
+	logFatalf = log.Fatalf
+)
 
 func New(cfg *config.Config, stateChan, distributeChan chan<- bool, overwatchChan chan<- *overwatch.Message) (*Cluster, error) {
 	dalClient, err := dal.New(cfg.EtcdPrefix, cfg.EtcdMembers, cfg.EtcdUserPass, false, false, false)
@@ -212,12 +217,13 @@ func (c *Cluster) runDirectorHeartbeat() {
 	c.DirectorHeartbeatLooper.Loop(func() error {
 		if !c.amDirector() {
 			// log.Debugf("%v-directorHeartbeat: Not a director - nothing to do", c.Identifier)
-			return nil
+			return errors.New("Not a director, nothing to do")
 		}
 
 		// update */director with current state data
 		if err := c.sendDirectorHeartbeat(); err != nil {
 			c.Config.EQClient.AddWithErrorLog("error", fmt.Sprintf("%v-directorHeartbeat: %v", c.Identifier, err.Error()))
+			return err
 		} else {
 			log.Debugf("%v-directorHeartbeat: Successfully sent periodic heartbeat (MemberID: %v)",
 				c.Identifier, c.MemberID)
@@ -359,7 +365,7 @@ func (c *Cluster) runMemberHeartbeat() {
 
 	// create initial member dir
 	if err := c.createInitialMemberStructure(memberDir, heartbeatTimeoutInt); err != nil {
-		log.Fatalf("%v-memberHeartbeat: Unable to create initial member dir: %v",
+		logFatalf("%v-memberHeartbeat: Unable to create initial member dir: %v",
 			c.Identifier, err.Error())
 	}
 
@@ -373,7 +379,7 @@ func (c *Cluster) runMemberHeartbeat() {
 			c.Config.EQClient.AddWithErrorLog("error",
 				fmt.Sprintf("%v-runMemberHeartbeat: Unable to generate member JSON (retrying in %v): %v",
 					c.Identifier, c.Config.HeartbeatInterval.String(), err.Error()))
-			return nil
+			return err
 		}
 
 		// set status key (could fail)
@@ -398,8 +404,7 @@ func (c *Cluster) runMemberHeartbeat() {
 				ErrorType: overwatch.ETCD_GENERIC_ERROR,
 			}
 
-			// Let overwatch determine if we should be shutdown or not
-			return nil
+			return err
 		}
 
 		// refresh dir
