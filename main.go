@@ -178,7 +178,7 @@ func runServer() {
 	}
 
 	// start api server
-	apiServer := api.New(cfg, mwHandler, debugUserInterface, *accessTokens)
+	apiServer := api.New(cfg, mwHandler, debugUserInterface, util.SplitTags(*accessTokens))
 	go apiServer.Run()
 
 	log.Infof("9volt has started! API address: %v MemberID: %v Tags: %v", "http://"+
