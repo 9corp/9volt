@@ -20,7 +20,8 @@ import (
 
 // MWHandler struct is used to configure and access rye's basic functionality.
 type MWHandler struct {
-	Config Config
+	Config         Config
+	beforeHandlers []Handler
 }
 
 // Config struct allows you to set a reference to a statsd.Statter and include it's stats rate.
@@ -64,10 +65,17 @@ func NewMWHandler(config Config) *MWHandler {
 	}
 }
 
+// Use adds a handler to every request. All handlers set up with use
+// are fired first and then any route specific handlers are called
+func (m *MWHandler) Use(handler Handler) {
+	m.beforeHandlers = append(m.beforeHandlers, handler)
+}
+
 // The Handle function is the primary way to set up your chain of middlewares to be called by rye.
 // It returns a http.HandlerFunc from net/http that can be set as a route in your http server.
-func (m *MWHandler) Handle(handlers []Handler) http.Handler {
+func (m *MWHandler) Handle(customHandlers []Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlers := append(m.beforeHandlers, customHandlers...)
 		for _, handler := range handlers {
 			var resp *Response
 

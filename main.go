@@ -31,6 +31,7 @@ var (
 	server        = kingpin.Command("server", "9volt server")
 	listenAddress = server.Flag("listen", "Address for 9volt's API to listen on").Short('l').Default("0.0.0.0:8080").Envar("NINEV_LISTEN_ADDRESS").String()
 	tags          = server.Flag("tags", "Specify one or more member tags this instance has; see MONITOR_CONFIGS.md for details").Short('t').Envar("NINEV_MEMBER_TAGS").String()
+	accessTokens  = server.Flag("access-tokens", "Specify required access tokens in the header for API requests").Short('a').PlaceHolder("token1,token2").Envar("NINEV_ACCESS_TOKENS").String()
 
 	cfg         = kingpin.Command("cfg", "9volt configuration utility")
 	dirArg      = cfg.Arg("dir", "Directory to search for 9volt YAML files").Required().String()
@@ -177,7 +178,7 @@ func runServer() {
 	}
 
 	// start api server
-	apiServer := api.New(cfg, mwHandler, debugUserInterface)
+	apiServer := api.New(cfg, mwHandler, debugUserInterface, util.SplitTags(*accessTokens))
 	go apiServer.Run()
 
 	log.Infof("9volt has started! API address: %v MemberID: %v Tags: %v", "http://"+
