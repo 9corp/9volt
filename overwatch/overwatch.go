@@ -9,6 +9,7 @@ package overwatch
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -80,7 +81,7 @@ func (o *Overwatch) runListener() error {
 
 		if o.activeWatch {
 			log.Debugf("%v: Watcher already activated, nothing else left to do", o.Identifier)
-			return nil
+			return errors.New("Watcher already activated, nothing else left to do")
 		}
 
 		o.activeWatch = true
@@ -101,7 +102,7 @@ func (o *Overwatch) stopTheWorld(msg *Message) error {
 
 	// Stop all components
 	for _, v := range o.Components {
-		log.Debugf("%v: Stopping component '%v'...", o.Identifier, v.Identify())
+		log.Warningf("%v: Stopping component '%v'...", o.Identifier, v.Identify())
 
 		if err := v.Stop(); err != nil {
 			// TODO: Do something smarter here

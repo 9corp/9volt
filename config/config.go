@@ -34,7 +34,7 @@ type Config struct {
 type Health struct {
 	Ok      bool
 	Message string
-	lock    *sync.Mutex
+	Lock    *sync.Mutex
 }
 
 type serverConfig struct {
@@ -54,7 +54,7 @@ func New(memberID, listenAddress, etcdPrefix, etcdUserPass string, etcdMembers, 
 	health := &Health{
 		Ok:      true,
 		Message: "OK",
-		lock:    &sync.Mutex{},
+		Lock:    &sync.Mutex{},
 	}
 
 	cfg := &Config{
@@ -171,16 +171,16 @@ func (c *Config) validate(sc *serverConfig) error {
 }
 
 func (h *Health) Write(ok bool, message string) {
-	h.lock.Lock()
-	defer h.lock.Unlock()
+	h.Lock.Lock()
+	defer h.Lock.Unlock()
 
 	h.Ok = ok
 	h.Message = message
 }
 
 func (h *Health) Read() (bool, string) {
-	h.lock.Lock()
-	defer h.lock.Unlock()
+	h.Lock.Lock()
+	defer h.Lock.Unlock()
 
 	return h.Ok, h.Message
 }
