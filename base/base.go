@@ -4,6 +4,8 @@ import (
 	"context"
 )
 
+//go:generate counterfeiter -o ../fakes/basefakes/fake_component.go base.go IComponent
+
 type IComponent interface {
 	Start() error
 	Stop() error
