@@ -69,6 +69,17 @@ var _ = Describe("overwatch", func() {
 
 	Context("Start", func() {
 		It("starts the listener", func() {
+			fakeDAL.NewWatcherForOverwatchReturns(nil, errors.New("foo"))
+
+			o.Start()
+
+			time.Sleep(100 * time.Millisecond)
+
+			// Verify that runListener got executed
+			watchChannel <- &Message{ErrorType: ETCD_GENERIC_ERROR}
+
+			time.Sleep(100 * time.Millisecond)
+			Expect(fakeComponent.StopCallCount()).To(Equal(1))
 		})
 	})
 
@@ -113,16 +124,31 @@ var _ = Describe("overwatch", func() {
 	})
 
 	Context("stopTheWorld", func() {
-		It("attempts to stop all components", func() {
+		BeforeEach(func() {
+			fakeDAL.NewWatcherForOverwatchReturns(nil, errors.New("foo"))
+		})
 
+		It("attempts to stop all components", func() {
+			o.stopTheWorld(&Message{ErrorType: ETCD_GENERIC_ERROR})
+			time.Sleep(100 * time.Millisecond)
+
+			Expect(fakeComponent.StopCallCount()).To(Equal(1))
 		})
 
 		It("launches a goroutine to begin watching deps", func() {
+			o.stopTheWorld(&Message{ErrorType: ETCD_GENERIC_ERROR})
+			time.Sleep(100 * time.Millisecond)
 
+			Expect(fakeDAL.NewWatcherForOverwatchCallCount()).To(Equal(1))
 		})
 
 		It("updates the healthcheck state", func() {
+			o.Config.Health.Ok = true
 
+			o.stopTheWorld(&Message{ErrorType: ETCD_GENERIC_ERROR})
+			time.Sleep(100 * time.Millisecond)
+
+			Expect(o.Config.Health.Ok).To(BeFalse())
 		})
 	})
 
