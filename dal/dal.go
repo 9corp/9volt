@@ -30,6 +30,7 @@ type IDal interface {
 	CreateDirectorState(string) error
 	UpdateDirectorState(string, string, bool) error
 	NewWatcher(string, bool) client.Watcher
+	NewWatcherForOverwatch(string, bool) (client.Watcher, error)
 	GetClusterMembers() ([]string, error)
 	GetCheckKeys() ([]string, error)
 	GetCheckKeysWithMemberTag() (map[string]string, error)
@@ -63,13 +64,14 @@ type GetOptions struct {
 //go:generate perl -pi -e s/github.com\/9corp\/9volt\/vendor\///g ../fakes/etcdclientfakes/fake_keysapi.go
 
 type Dal struct {
-	Client  client.Client
-	KeysAPI client.KeysAPI
-	Members []string
-	Prefix  string
-	Replace bool
-	Dryrun  bool
-	Nosync  bool
+	Client     client.Client
+	ClientConf client.Config
+	KeysAPI    client.KeysAPI
+	Members    []string
+	Prefix     string
+	Replace    bool
+	Dryrun     bool
+	Nosync     bool
 }
 
 // Helper struct for FetchCheckStats()
@@ -110,13 +112,14 @@ func New(prefix string, members []string, userpass string, replace, dryrun, nosy
 	}
 
 	return &Dal{
-		Client:  etcdClient,
-		KeysAPI: client.NewKeysAPI(etcdClient),
-		Members: members,
-		Prefix:  prefix,
-		Replace: replace,
-		Dryrun:  dryrun,
-		Nosync:  nosync,
+		Client:     etcdClient,
+		ClientConf: clientConf,
+		KeysAPI:    client.NewKeysAPI(etcdClient),
+		Members:    members,
+		Prefix:     prefix,
+		Replace:    replace,
+		Dryrun:     dryrun,
+		Nosync:     nosync,
 	}, nil
 }
 
@@ -400,6 +403,18 @@ func (d *Dal) NewWatcher(key string, recursive bool) client.Watcher {
 	return d.KeysAPI.Watcher(d.Prefix+"/"+key, &client.WatcherOptions{
 		Recursive: recursive,
 	})
+}
+
+// Same as NewWatcher, except we generate a fresh etcd client
+func (d *Dal) NewWatcherForOverwatch(key string, recursive bool) (client.Watcher, error) {
+	etcdClient, err := client.New(d.ClientConf)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to generate new etcd client: %v", err)
+	}
+
+	return client.NewKeysAPI(etcdClient).Watcher(d.Prefix+"/"+key, &client.WatcherOptions{
+		Recursive: recursive,
+	}), nil
 }
 
 // Update director state entry (expecting previous director state to match 'prevValue')

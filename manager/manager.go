@@ -13,33 +13,54 @@ import (
 	"github.com/relistan/go-director"
 
 	"github.com/9corp/9volt/alerter"
+	"github.com/9corp/9volt/base"
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/monitor"
+	"github.com/9corp/9volt/overwatch"
 	"github.com/9corp/9volt/state"
 )
 
 type Manager struct {
-	MemberID   string
-	Identifier string
-	Config     *config.Config
-	Looper     director.Looper
-	Monitor    *monitor.Monitor
+	MemberID      string
+	Config        *config.Config
+	Looper        director.Looper
+	Monitor       *monitor.Monitor
+	OverwatchChan chan<- *overwatch.Message
+
+	base.Component
 }
 
-func New(cfg *config.Config, messageChannel chan *alerter.Message, stateChannel chan *state.Message) (*Manager, error) {
+func New(cfg *config.Config, messageChannel chan *alerter.Message, stateChannel chan *state.Message, overwatchChan chan<- *overwatch.Message) (*Manager, error) {
 	return &Manager{
-		Identifier: "manager",
-		MemberID:   cfg.MemberID,
-		Config:     cfg,
-		Looper:     director.NewFreeLooper(director.FOREVER, make(chan error)),
-		Monitor:    monitor.New(cfg, messageChannel, stateChannel),
+		MemberID:      cfg.MemberID,
+		Config:        cfg,
+		Looper:        director.NewFreeLooper(director.FOREVER, make(chan error)),
+		Monitor:       monitor.New(cfg, messageChannel, stateChannel),
+		OverwatchChan: overwatchChan,
+		Component: base.Component{
+			Identifier: "manager",
+		},
 	}, nil
 }
 
 func (m *Manager) Start() error {
 	log.Infof("%v: Starting manager components...", m.Identifier)
 
+	m.Component.Ctx, m.Component.Cancel = context.WithCancel(context.Background())
+
 	go m.run()
+
+	return nil
+}
+
+func (m *Manager) Stop() error {
+	if m.Component.Cancel == nil {
+		log.Warningf("%v: Looks like .Cancel is nil; is this expected?", m.Identifier)
+	} else {
+		m.Component.Cancel()
+	}
+
+	m.Monitor.StopAll()
 
 	return nil
 }
@@ -49,19 +70,32 @@ func (m *Manager) run() error {
 
 	watcher := m.Config.DalClient.NewWatcher(memberConfigDir, true)
 
-	m.Looper.Loop(func() error {
-		resp, err := watcher.Next(context.Background())
+	for {
+		resp, err := watcher.Next(m.Component.Ctx)
 		if err != nil {
+			if err.Error() == "context canceled" {
+				log.Debugf("%v: Received a notice to shutdown", m.Identifier)
+				break
+			}
+
 			m.Config.EQClient.AddWithErrorLog("error",
 				fmt.Sprintf("%v: Unexpected watcher error: %v", m.Identifier, err.Error()))
-			m.Config.Health.Write(false, fmt.Sprintf("Manager engine watcher encountering errors: %v", err.Error()))
-			return err
+
+			// Tell overwatch that something bad just happened
+			m.OverwatchChan <- &overwatch.Message{
+				Error:     fmt.Errorf("Unexpected watcher error: %v", err),
+				Source:    fmt.Sprintf("%v.run", m.Identifier),
+				ErrorType: overwatch.ETCD_WATCHER_ERROR,
+			}
+
+			// Let overwatch determine whether to shut us down
+			continue
 		}
 
 		if m.ignorableWatcherEvent(resp) {
 			log.Debugf("%v: Received an ignorable watcher '%v' event for key '%v'",
 				m.Identifier, resp.Action, resp.Node.Key)
-			return nil
+			continue
 		}
 
 		log.Debugf("%v: Received a '%v' watcher event for '%v' (value: '%v')",
@@ -75,11 +109,10 @@ func (m *Manager) run() error {
 		default:
 			m.Config.EQClient.AddWithErrorLog("error",
 				fmt.Sprintf("%v: Received an unrecognized action '%v' - skipping", m.Identifier, resp.Action))
-			return fmt.Errorf("Unrecognized action '%v' on key %v", resp.Action, resp.Node.Key)
 		}
+	}
 
-		return nil
-	})
+	log.Debugf("%v: Exiting", m.Identifier)
 
 	return nil
 }

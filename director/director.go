@@ -9,9 +9,12 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	etcd "github.com/coreos/etcd/client"
+	looper "github.com/relistan/go-director"
 
+	"github.com/9corp/9volt/base"
 	"github.com/9corp/9volt/config"
 	"github.com/9corp/9volt/dal"
+	"github.com/9corp/9volt/overwatch"
 	"github.com/9corp/9volt/util"
 )
 
@@ -25,40 +28,50 @@ type IDirector interface {
 }
 
 type Director struct {
-	Identifier     string
-	MemberID       string
-	Config         *config.Config
-	State          bool
-	StateChan      <-chan bool
-	DistributeChan <-chan bool
-	StateLock      *sync.Mutex
-	DalClient      dal.IDal
+	MemberID         string
+	Config           *config.Config
+	State            bool
+	StateChan        <-chan bool
+	DistributeChan   <-chan bool
+	OverwatchChan    chan<- *overwatch.Message
+	StateLock        *sync.Mutex
+	DalClient        dal.IDal
+	CheckStatsLooper looper.Looper
 
 	CheckStats      map[string]*dal.MemberStat
 	CheckStatsMutex *sync.Mutex
+
+	base.Component
 }
 
-func New(cfg *config.Config, stateChan <-chan bool, distributeChan <-chan bool) (IDirector, error) {
+func New(cfg *config.Config, stateChan <-chan bool, distributeChan <-chan bool, overwatchChan chan<- *overwatch.Message) (*Director, error) {
 	dalClient, err := dal.New(cfg.EtcdPrefix, cfg.EtcdMembers, cfg.EtcdUserPass, false, false, false)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Director{
-		Identifier:      "director",
-		Config:          cfg,
-		MemberID:        cfg.MemberID,
-		StateChan:       stateChan,
-		DistributeChan:  distributeChan,
-		StateLock:       &sync.Mutex{},
-		DalClient:       dalClient,
-		CheckStats:      make(map[string]*dal.MemberStat, 0),
-		CheckStatsMutex: &sync.Mutex{},
+		Config:           cfg,
+		MemberID:         cfg.MemberID,
+		StateChan:        stateChan,
+		DistributeChan:   distributeChan,
+		OverwatchChan:    overwatchChan,
+		StateLock:        &sync.Mutex{},
+		DalClient:        dalClient,
+		CheckStats:       make(map[string]*dal.MemberStat, 0),
+		CheckStatsMutex:  &sync.Mutex{},
+		CheckStatsLooper: looper.NewTimedLooper(looper.FOREVER, COLLECT_CHECK_STATS_INTERVAL, make(chan error, 1)),
+		Component: base.Component{
+			Identifier: "director",
+		},
 	}, nil
 }
 
 func (d *Director) Start() error {
-	log.Debugf("%v: Launching director components...", d.Identifier)
+	log.Infof("%v: Launching director components...", d.Identifier)
+
+	// Generate a new context
+	d.Component.Ctx, d.Component.Cancel = context.WithCancel(context.Background())
 
 	go d.runDistributeListener()
 	go d.runStateListener()
@@ -67,11 +80,24 @@ func (d *Director) Start() error {
 	return nil
 }
 
+func (d *Director) Stop() error {
+	if d.Component.Cancel == nil {
+		log.Warningf("%v: Looks like .Cancel is nil; is this expected?", d.Identifier)
+	} else {
+		d.Component.Cancel()
+	}
+
+	// Some things may not utilize context and use a looper instead
+	d.CheckStatsLooper.Quit()
+
+	return nil
+}
+
 // This is used for figuring out how many checks are assigned to each member;
 // this information is necessary for determining which member is next in line
 // to be given/assigned a new check.
 func (d *Director) collectCheckStats() {
-	for {
+	d.CheckStatsLooper.Loop(func() error {
 		// To avoid a potential race here; all members have a count of how many
 		// checks each member is assigned.
 		// This will *probably* be switched to utilize `state` later on.
@@ -79,34 +105,43 @@ func (d *Director) collectCheckStats() {
 		if err != nil {
 			d.Config.EQClient.AddWithErrorLog("error",
 				fmt.Sprintf("%v-collectCheckStats: Unable to fetch check stats: %v", d.Identifier, err.Error()))
-			time.Sleep(COLLECT_CHECK_STATS_INTERVAL)
-			continue
+			return nil
 		}
 
 		d.CheckStatsMutex.Lock()
 		d.CheckStats = checkStats
 		d.CheckStatsMutex.Unlock()
 
-		time.Sleep(COLLECT_CHECK_STATS_INTERVAL)
-	}
+		return nil
+	})
+
+	log.Debugf("%v-collectCheckStats: Exiting", d.Identifier)
 }
 
 func (d *Director) runDistributeListener() {
+	log.Debugf("%v-runDistributeListener: Starting", d.Identifier)
+
+OUTER:
 	for {
-		// Notification sent by cluster component
-		<-d.DistributeChan
+		select {
+		case <-d.DistributeChan:
+			// safety valve
+			if !d.amDirector() {
+				log.Warningf("%v-distributeListener: Was asked to distribute checks but am not director!", d.Identifier)
+				continue
+			}
 
-		// safety valve
-		if !d.amDirector() {
-			log.Warningf("%v-distributeListener: Was asked to distribute checks but am not director!", d.Identifier)
-			continue
-		}
-
-		if err := d.distributeChecks(); err != nil {
-			d.Config.EQClient.AddWithErrorLog("error",
-				fmt.Sprintf("%v-distributeListener: Unable to distribute checks: %v", d.Identifier, err.Error()))
+			if err := d.distributeChecks(); err != nil {
+				d.Config.EQClient.AddWithErrorLog("error",
+					fmt.Sprintf("%v-distributeListener: Unable to distribute checks: %v", d.Identifier, err.Error()))
+			}
+		case <-d.Component.Ctx.Done():
+			log.Debugf("%v-runDistributeListener: Received a notice to shutdown", d.Identifier)
+			break OUTER
 		}
 	}
+
+	log.Debugf("%v-runDistributeListener: Exiting", d.Identifier)
 }
 
 func (d *Director) distributeChecks() error {
@@ -287,32 +322,47 @@ func (d *Director) convertMembersMap(members map[string][]string) map[string][]s
 }
 
 func (d *Director) runStateListener() {
+	log.Debugf("%v-runStateListener: Starting", d.Identifier)
+
 	var ctx context.Context
 	var cancel context.CancelFunc
 
+OUTER:
 	for {
-		state := <-d.StateChan
+		select {
+		case state := <-d.StateChan:
+			d.setState(state)
 
-		d.setState(state)
+			if state {
+				log.Infof("%v-stateListener: Starting up etcd watchers", d.Identifier)
 
-		if state {
-			log.Infof("%v-stateListener: Starting up etcd watchers", d.Identifier)
+				// create new context + cancel func
+				ctx, cancel = context.WithCancel(context.Background())
 
-			// create new context + cancel func
-			ctx, cancel = context.WithCancel(context.Background())
+				go d.runCheckConfigWatcher(ctx)
 
-			go d.runCheckConfigWatcher(ctx)
-
-			// distribute checks in case we just took over as director (or first start)
-			if err := d.distributeChecks(); err != nil {
-				d.Config.EQClient.AddWithErrorLog("error",
-					fmt.Sprintf("%v-stateListener: Unable to (re)distribute checks: %v", d.Identifier, err.Error()))
+				// distribute checks in case we just took over as director (or first start)
+				if err := d.distributeChecks(); err != nil {
+					d.Config.EQClient.AddWithErrorLog("error",
+						fmt.Sprintf("%v-stateListener: Unable to (re)distribute checks: %v", d.Identifier, err.Error()))
+				}
+			} else {
+				log.Infof("%v-stateListener: Shutting down etcd watchers", d.Identifier)
+				cancel()
 			}
-		} else {
-			log.Infof("%v-stateListener: Shutting down etcd watchers", d.Identifier)
-			cancel()
+		case <-d.Component.Ctx.Done():
+			log.Debugf("%v-runStateListener: Received a notice to shutdown", d.Identifier)
+
+			// Shutdown potential checkConfigWatcher
+			if cancel != nil {
+				cancel()
+			}
+
+			break OUTER
 		}
 	}
+
+	log.Debugf("%v-runStateListener: Exiting", d.Identifier)
 }
 
 // This method exists to deal with a case where a director launches for the
@@ -353,7 +403,7 @@ func (d *Director) runCheckConfigWatcher(ctx context.Context) {
 
 	watcher := d.DalClient.NewWatcher("monitor/", true)
 
-	// TODO: Needs to be turned into a looper
+	// No need for a looper here since we can control the loop via the context
 	for {
 		// safety valve
 		if !d.amDirector() {
@@ -368,7 +418,14 @@ func (d *Director) runCheckConfigWatcher(ctx context.Context) {
 			break
 		} else if err != nil {
 			log.Errorf("%v-checkConfigWatcher: Unexpected error: %v", d.Identifier, err.Error())
-			d.Config.Health.Write(false, fmt.Sprintf("Director engine watcher encountering errors: %v", err.Error()))
+
+			d.OverwatchChan <- &overwatch.Message{
+				Error:     fmt.Errorf("Unexpected watcher error: %v", err),
+				Source:    fmt.Sprintf("%v.runCheckConfigWatcher", d.Identifier),
+				ErrorType: overwatch.ETCD_WATCHER_ERROR,
+			}
+
+			// Let overwatch determine if it should shut things down or not
 			continue
 		}
 
@@ -383,7 +440,7 @@ func (d *Director) runCheckConfigWatcher(ctx context.Context) {
 		}
 	}
 
-	log.Warningf("%v-checkConfigWatcher: Exiting...", d.Identifier)
+	log.Debugf("%v-checkConfigWatcher: Exiting...", d.Identifier)
 }
 
 func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
@@ -502,8 +559,6 @@ func (d *Director) PickNextMember(checkTag string) (string, error) {
 
 	// figure out feasible members
 	feasibleMembers := d.filterMembersByTag(d.CheckStats, checkTag)
-
-	log.Warningf(">>>>>> FEASIBLE MEMBER CONTENT: %v", feasibleMembers)
 
 	if len(feasibleMembers) == 0 {
 		return "", fmt.Errorf("No feasible members found after filter; required tag: '%v'", checkTag)

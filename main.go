@@ -11,6 +11,7 @@ import (
 
 	"github.com/9corp/9volt/alerter"
 	"github.com/9corp/9volt/api"
+	"github.com/9corp/9volt/base"
 	"github.com/9corp/9volt/cfgutil"
 	"github.com/9corp/9volt/cluster"
 	"github.com/9corp/9volt/config"
@@ -18,6 +19,7 @@ import (
 	"github.com/9corp/9volt/director"
 	"github.com/9corp/9volt/event"
 	"github.com/9corp/9volt/manager"
+	"github.com/9corp/9volt/overwatch"
 	"github.com/9corp/9volt/state"
 	"github.com/9corp/9volt/util"
 )
@@ -118,54 +120,41 @@ func runServer() {
 	distributeChannel := make(chan bool)
 	messageChannel := make(chan *alerter.Message)
 	monitorStateChannel := make(chan *state.Message)
+	overwatchChannel := make(chan *overwatch.Message)
 
-	// Start cluster engine
-	cluster, err := cluster.New(cfg, clusterStateChannel, distributeChannel)
+	// Instantiate all of the components
+	cluster, err := cluster.New(cfg, clusterStateChannel, distributeChannel, overwatchChannel)
 	if err != nil {
 		log.Fatalf("Unable to instantiate cluster engine: %v", err.Error())
 	}
 
-	if err := cluster.Start(); err != nil {
-		log.Fatalf("Unable to complete cluster engine initialization: %v", err.Error())
-	}
-
-	// start director (check distributor)
-	director, err := director.New(cfg, clusterStateChannel, distributeChannel)
+	director, err := director.New(cfg, clusterStateChannel, distributeChannel, overwatchChannel)
 	if err != nil {
 		log.Fatalf("Unable to instantiate director: %v", err.Error())
 	}
 
-	if err := director.Start(); err != nil {
-		log.Fatalf("Unable to complete director initialization: %v", err.Error())
-	}
-
-	// start manager
-	manager, err := manager.New(cfg, messageChannel, monitorStateChannel)
+	manager, err := manager.New(cfg, messageChannel, monitorStateChannel, overwatchChannel)
 	if err != nil {
 		log.Fatalf("Unable to instantiate manager: %v", err.Error())
 	}
 
-	if err := manager.Start(); err != nil {
-		log.Fatalf("Unable to complete manager initialization: %v", err.Error())
-	}
-
-	// start the alerter
 	alerter := alerter.New(cfg, messageChannel)
-
-	if err := alerter.Start(); err != nil {
-		log.Fatalf("Unable to complete alerter initialization: %v", err.Error())
-	}
-
-	// start the state dumper
 	state := state.New(cfg, monitorStateChannel)
 
-	if err := state.Start(); err != nil {
-		log.Fatalf("Unable to complete state initialization: %v", err.Error())
+	// Start all of the components (start order matters!)
+	components := []base.IComponent{cluster, director, manager, alerter, state, eventQueue}
+
+	watcher := overwatch.New(cfg, overwatchChannel, components)
+	if err := watcher.Start(); err != nil {
+		log.Fatalf("Unable to start overwatch component: %v", err)
 	}
 
-	// Start the event queue
-	if err := eventQueue.Start(); err != nil {
-		log.Fatalf("Unable to complete event queue initialization: %v", err.Error())
+	for _, cmp := range components {
+		log.Infof("Starting component '%v'", cmp.Identify())
+
+		if err := cmp.Start(); err != nil {
+			log.Fatalf("Unable to start component '%v': %v", cmp.Identify(), err)
+		}
 	}
 
 	// create a new middleware handler

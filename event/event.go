@@ -1,3 +1,15 @@
+// Event package is responsible for receiving events from 9volt components and
+// dumping them to etcd. The event queue is powered by WORKER_COUNT workers and
+// has a BUFFER_LEN buffer.
+//
+// Unlike other components, the event queue does NOT get shutdown in the event
+// of a backend failure - it gets *paused*. In the *pause* state, the event queue
+// will simply discard any inbound messages and will NOT attempt to save them to
+// the backend.
+//
+// This is done in order to avoid potential race conditions where lagging/slower
+// components continue to write to the event queue even though they've been asked
+// to shutdown.
 package event
 
 import (
@@ -8,6 +20,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 
+	"github.com/9corp/9volt/base"
 	"github.com/9corp/9volt/dal"
 	"github.com/9corp/9volt/util"
 )
@@ -20,10 +33,13 @@ const (
 )
 
 type Queue struct {
-	Identifier string
-	DalClient  dal.IDal
-	MemberID   string
-	channel    chan *Event
+	DalClient dal.IDal
+	MemberID  string
+	channel   chan *Event
+	Running   bool // do not allow more than one Start() to be issued; resets Pause
+	Pause     bool // Pause set via Stop(); causes messages to be discarded
+
+	base.Component
 }
 
 //go:generate counterfeiter -o ../fakes/eventfakes/fake_client.go event.go IClient
@@ -46,14 +62,25 @@ type Event struct {
 
 func NewQueue(memberID string, dalClient dal.IDal) *Queue {
 	return &Queue{
-		Identifier: "event",
-		DalClient:  dalClient,
-		MemberID:   memberID,
-		channel:    make(chan *Event, BUFFER_LEN),
+		DalClient: dalClient,
+		MemberID:  memberID,
+		channel:   make(chan *Event, BUFFER_LEN),
+		Component: base.Component{
+			Identifier: "event",
+		},
 	}
 }
 
 func (q *Queue) Start() error {
+	q.Pause = false
+
+	if q.Running {
+		log.Debugf("%v: Already running - nothing to do", q.Identifier)
+		return nil
+	}
+
+	q.Running = true
+
 	// launch worker pool
 	log.Debugf("%v: Launching %v queue workers", q.Identifier, WORKER_COUNT)
 
@@ -64,11 +91,24 @@ func (q *Queue) Start() error {
 	return nil
 }
 
+func (q *Queue) Stop() error {
+	log.Debugf("%v: Workers are paused", q.Identifier)
+
+	q.Pause = true
+
+	return nil
+}
+
 func (q *Queue) runWorker(id int) {
 	log.Debugf("%v: Event worker #%v started", q.Identifier, id)
 
 	for {
 		e := <-q.channel
+
+		if q.Pause {
+			log.Debugf("%v: In pause state; dropping inbound message(s)", q.Identifier)
+			continue
+		}
 
 		log.Debugf("%v: Worker #%v received new event! Type: %v Message: %v", q.Identifier,
 			id, e.Type, e.Message)

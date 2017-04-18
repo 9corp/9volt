@@ -200,6 +200,20 @@ func (m *Monitor) stop(monitorName string) error {
 	return nil
 }
 
+func (m *Monitor) StopAll() error {
+	log.Debugf("%v: Performing full monitor shutdown", m.Identifier)
+
+	m.runningMonitorLock.Lock()
+	defer m.runningMonitorLock.Unlock()
+
+	for _, v := range m.runningMonitors {
+		log.Debugf("%v: Shutting down check '%v'", m.Identifier, v.Identify())
+		v.Stop()
+	}
+
+	return nil
+}
+
 // Perform the actual start of a monitor; update running monitor slice
 func (m *Monitor) start(monitorName, monitorConfigLocation string, monitorConfig *MonitorConfig) error {
 	// Let's be overly safe and ensure this monitor type exists

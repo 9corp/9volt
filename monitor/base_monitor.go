@@ -70,6 +70,7 @@ Mainloop:
 				log.Errorf("Unable to complete check handler: %v", err.Error())
 			}
 		case <-b.RMC.StopChannel:
+			log.Debugf("%v-%v: Asked to shutdown monitor %v", b.Identify(), b.RMC.GID, b.RMC.Name)
 			break Mainloop
 		}
 	}
