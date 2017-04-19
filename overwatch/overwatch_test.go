@@ -97,9 +97,9 @@ var _ = Describe("overwatch", func() {
 				o.activeWatch = true
 
 				o.runListener()
-				err := o.Looper.Wait()
 
-				Expect(err).To(Equal(errors.New("Watcher already activated, nothing else left to do")))
+				// stopTheWorld() should not have been called
+				Expect(fakeComponent.StopCallCount()).To(Equal(0))
 			})
 
 			It("sets active watch to true and stops the world", func() {
