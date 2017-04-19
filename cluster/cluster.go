@@ -87,6 +87,7 @@ type Cluster struct {
 	DirectorHeartbeatLooper looper.Looper
 	MemberHeartbeatLooper   looper.Looper
 	restarted               bool
+	shutdown                bool // provide a way for basic (non-director) loopers to exit
 
 	base.Component
 }
@@ -145,6 +146,7 @@ func (c *Cluster) Start() error {
 	log.Infof("%v: Launching cluster engine components...", c.Identifier)
 
 	c.Component.Ctx, c.Component.Cancel = context.WithCancel(context.Background())
+	c.shutdown = false
 
 	go c.runDirectorMonitor()
 	go c.runDirectorHeartbeat()
@@ -167,6 +169,9 @@ func (c *Cluster) Stop() error {
 
 	// stop the director heartbeat send
 	c.DirectorHeartbeatLooper.Quit()
+
+	// alert memberMonitor to stop if we're not a director
+	c.shutdown = true
 
 	// stop memberMonitor
 	if c.Component.Cancel == nil {
@@ -270,6 +275,16 @@ func (c *Cluster) runMemberMonitor() {
 	watcher := c.DalClient.NewWatcher(membersDir, true)
 
 	for {
+		// This for loop cannot be a director looper -- happy path is to block
+		// indefinitely on the watch - with a director looper, another execution
+		// would be triggered when the interval is reached.
+		//
+		// This could be a channel, but this seems easy albeit a bit hacky
+		if c.shutdown {
+			log.Debugf("%v-runMemberMonitor: Received a (non-context based) notice to shutdown", c.Identifier)
+			break
+		}
+
 		if !c.amDirector() {
 			time.Sleep(time.Duration(c.Config.HeartbeatInterval))
 			continue
