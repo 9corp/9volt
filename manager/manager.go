@@ -1,6 +1,3 @@
-// TODO: If our 'member dir' disappears, should we stop all monitors?
-// TODO: Does a state change mean we should cease monitoring?
-
 package manager
 
 import (
@@ -10,7 +7,6 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/coreos/etcd/client"
-	"github.com/relistan/go-director"
 
 	"github.com/9corp/9volt/alerter"
 	"github.com/9corp/9volt/base"
@@ -23,7 +19,6 @@ import (
 type Manager struct {
 	MemberID      string
 	Config        *config.Config
-	Looper        director.Looper
 	Monitor       *monitor.Monitor
 	OverwatchChan chan<- *overwatch.Message
 
@@ -34,7 +29,6 @@ func New(cfg *config.Config, messageChannel chan *alerter.Message, stateChannel 
 	return &Manager{
 		MemberID:      cfg.MemberID,
 		Config:        cfg,
-		Looper:        director.NewFreeLooper(director.FOREVER, make(chan error)),
 		Monitor:       monitor.New(cfg, messageChannel, stateChannel),
 		OverwatchChan: overwatchChan,
 		Component: base.Component{

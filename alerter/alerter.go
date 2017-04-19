@@ -16,7 +16,6 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/relistan/go-director"
 	gouuid "github.com/satori/go.uuid"
 
 	"github.com/9corp/9volt/base"
@@ -41,7 +40,6 @@ type Alerter struct {
 	Config         *config.Config
 	Alerters       map[string]IAlerter
 	MessageChannel <-chan *Message
-	Looper         director.Looper
 
 	base.Component
 }
@@ -63,7 +61,6 @@ func New(cfg *config.Config, messageChannel <-chan *Message) *Alerter {
 		MemberID:       cfg.MemberID,
 		Config:         cfg,
 		MessageChannel: messageChannel,
-		Looper:         director.NewFreeLooper(director.FOREVER, make(chan error)),
 		Component: base.Component{
 			Identifier: "alerter",
 		},
@@ -113,8 +110,6 @@ OUTER:
 			log.Debugf("%v-run: Received message (%v) from checker '%v' -> '%v'", msg.uuid, a.Identifier, msg.Source, msg.Key)
 
 			go a.handleMessage(msg)
-
-			return nil
 		case <-a.Component.Ctx.Done():
 			log.Debugf("%v-run: Asked to shutdown", a.Identifier)
 			break OUTER
