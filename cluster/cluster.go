@@ -26,7 +26,6 @@ package cluster
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -217,13 +216,21 @@ func (c *Cluster) runDirectorHeartbeat() {
 	c.DirectorHeartbeatLooper.Loop(func() error {
 		if !c.amDirector() {
 			// log.Debugf("%v-directorHeartbeat: Not a director - nothing to do", c.Identifier)
-			return errors.New("Not a director, nothing to do")
+			return nil
 		}
 
 		// update */director with current state data
 		if err := c.sendDirectorHeartbeat(); err != nil {
 			c.Config.EQClient.AddWithErrorLog("error", fmt.Sprintf("%v-directorHeartbeat: %v", c.Identifier, err.Error()))
-			return err
+
+			// Let overwatch decide what to do in this case
+			c.OverwatchChan <- &overwatch.Message{
+				Error:     fmt.Errorf("Potential etcd write error: %v", err),
+				Source:    fmt.Sprintf("%v.runDirectorHeartbeat", c.Identifier),
+				ErrorType: overwatch.ETCD_GENERIC_ERROR,
+			}
+
+			return nil
 		} else {
 			log.Debugf("%v-directorHeartbeat: Successfully sent periodic heartbeat (MemberID: %v)",
 				c.Identifier, c.MemberID)
@@ -379,7 +386,7 @@ func (c *Cluster) runMemberHeartbeat() {
 			c.Config.EQClient.AddWithErrorLog("error",
 				fmt.Sprintf("%v-runMemberHeartbeat: Unable to generate member JSON (retrying in %v): %v",
 					c.Identifier, c.Config.HeartbeatInterval.String(), err.Error()))
-			return err
+			return nil
 		}
 
 		// set status key (could fail)
@@ -404,7 +411,7 @@ func (c *Cluster) runMemberHeartbeat() {
 				ErrorType: overwatch.ETCD_GENERIC_ERROR,
 			}
 
-			return err
+			return nil
 		}
 
 		// refresh dir
