@@ -181,9 +181,6 @@ var _ = Describe("cluster", func() {
 			})
 
 			It("should not do anything if not director", func() {
-				err := <-looperChan
-
-				Expect(err).To(Equal(errors.New("Not a director, nothing to do")))
 				Expect(fakeDAL.UpdateDirectorStateCallCount()).To(Equal(0))
 			})
 		})
@@ -193,14 +190,17 @@ var _ = Describe("cluster", func() {
 				fakeDAL.UpdateDirectorStateReturns(errors.New("generic error"))
 			})
 
-			It("should return error + add event log", func() {
-				err := <-looperChan
+			It("should add event log and send message to overwatch", func() {
 				k, v := fakeEventClient.AddWithErrorLogArgsForCall(0)
 
-				Expect(err.Error()).To(ContainSubstring("Unable to update director heartbeat"))
 				Expect(fakeDAL.UpdateDirectorStateCallCount()).To(Equal(1))
 				Expect(k).To(Equal("error"))
 				Expect(v).To(ContainSubstring("directorHeartbeat"))
+
+				time.Sleep(100 * time.Millisecond)
+				overwatchMsg := <-overwatchChan
+
+				Expect(overwatchMsg.Error.Error()).To(ContainSubstring("Potential etcd write error"))
 			})
 		})
 	})

@@ -9,7 +9,7 @@ package overwatch
 
 import (
 	"context"
-	"errors"
+	// "errors"
 	"fmt"
 	"strings"
 	"time"
@@ -81,7 +81,7 @@ func (o *Overwatch) runListener() error {
 
 		if o.activeWatch {
 			log.Debugf("%v: Watcher already activated, nothing else left to do", o.Identifier)
-			return errors.New("Watcher already activated, nothing else left to do")
+			return nil
 		}
 
 		o.activeWatch = true

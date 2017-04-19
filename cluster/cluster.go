@@ -26,7 +26,6 @@ package cluster
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -88,6 +87,7 @@ type Cluster struct {
 	DirectorHeartbeatLooper looper.Looper
 	MemberHeartbeatLooper   looper.Looper
 	restarted               bool
+	shutdown                bool // provide a way for basic (non-director) loopers to exit
 
 	base.Component
 }
@@ -146,6 +146,7 @@ func (c *Cluster) Start() error {
 	log.Infof("%v: Launching cluster engine components...", c.Identifier)
 
 	c.Component.Ctx, c.Component.Cancel = context.WithCancel(context.Background())
+	c.shutdown = false
 
 	go c.runDirectorMonitor()
 	go c.runDirectorHeartbeat()
@@ -168,6 +169,9 @@ func (c *Cluster) Stop() error {
 
 	// stop the director heartbeat send
 	c.DirectorHeartbeatLooper.Quit()
+
+	// alert memberMonitor to stop if we're not a director
+	c.shutdown = true
 
 	// stop memberMonitor
 	if c.Component.Cancel == nil {
@@ -217,13 +221,21 @@ func (c *Cluster) runDirectorHeartbeat() {
 	c.DirectorHeartbeatLooper.Loop(func() error {
 		if !c.amDirector() {
 			// log.Debugf("%v-directorHeartbeat: Not a director - nothing to do", c.Identifier)
-			return errors.New("Not a director, nothing to do")
+			return nil
 		}
 
 		// update */director with current state data
 		if err := c.sendDirectorHeartbeat(); err != nil {
 			c.Config.EQClient.AddWithErrorLog("error", fmt.Sprintf("%v-directorHeartbeat: %v", c.Identifier, err.Error()))
-			return err
+
+			// Let overwatch decide what to do in this case
+			c.OverwatchChan <- &overwatch.Message{
+				Error:     fmt.Errorf("Potential etcd write error: %v", err),
+				Source:    fmt.Sprintf("%v.runDirectorHeartbeat", c.Identifier),
+				ErrorType: overwatch.ETCD_GENERIC_ERROR,
+			}
+
+			return nil
 		} else {
 			log.Debugf("%v-directorHeartbeat: Successfully sent periodic heartbeat (MemberID: %v)",
 				c.Identifier, c.MemberID)
@@ -263,6 +275,16 @@ func (c *Cluster) runMemberMonitor() {
 	watcher := c.DalClient.NewWatcher(membersDir, true)
 
 	for {
+		// This for loop cannot be a director looper -- happy path is to block
+		// indefinitely on the watch - with a director looper, another execution
+		// would be triggered when the interval is reached.
+		//
+		// This could be a channel, but this seems easy albeit a bit hacky
+		if c.shutdown {
+			log.Debugf("%v-runMemberMonitor: Received a (non-context based) notice to shutdown", c.Identifier)
+			break
+		}
+
 		if !c.amDirector() {
 			time.Sleep(time.Duration(c.Config.HeartbeatInterval))
 			continue
@@ -379,7 +401,7 @@ func (c *Cluster) runMemberHeartbeat() {
 			c.Config.EQClient.AddWithErrorLog("error",
 				fmt.Sprintf("%v-runMemberHeartbeat: Unable to generate member JSON (retrying in %v): %v",
 					c.Identifier, c.Config.HeartbeatInterval.String(), err.Error()))
-			return err
+			return nil
 		}
 
 		// set status key (could fail)
@@ -404,7 +426,7 @@ func (c *Cluster) runMemberHeartbeat() {
 				ErrorType: overwatch.ETCD_GENERIC_ERROR,
 			}
 
-			return err
+			return nil
 		}
 
 		// refresh dir

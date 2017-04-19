@@ -357,7 +357,25 @@ func (d *Dal) FetchAllMemberRefs() (map[string]string, []string, error) {
 			Recurse: true,
 		})
 		if err != nil {
-			return nil, nil, fmt.Errorf("Problem fetching refs for '%v': %v", memberID, err.Error())
+			// This is a precaution, it _shouldn't_ happen -- this case should've only
+			// been a problem *before* the introduction of overwatch.
+			//
+			// Previously, if etcd went away, members wouldn't be able to refresh
+			// their memberdir eventually causing the memberdir to automatically
+			// disappear (since they have TTL's). When etcd would come back, th
+			// member would resume sending heartbeats but it's config dir would
+			// no longer exist.
+			//
+			// With overwatch, this should no longer be an issue -- when etcd
+			// experiences a problem, all components are properly shutdown; then
+			// when etcd recovers, overwatch will start the components back up
+			// which will recreate the member's directory structure.
+			if client.IsKeyNotFound(err) {
+				log.Debugf("dal: FetchAllMemberRefs() - member '%v' does not have a config dir, is this expected?", memberID)
+				refs = make(map[string]string, 0)
+			} else {
+				return nil, nil, fmt.Errorf("Problem fetching refs for '%v': %v", memberID, err.Error())
+			}
 		}
 
 		if len(refs) == 0 {
