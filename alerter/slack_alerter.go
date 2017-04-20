@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/inconshreveable/log15"
 	"github.com/nlopes/slack"
 
 	"github.com/9corp/9volt/config"
@@ -22,17 +22,19 @@ const (
 type Slack struct {
 	Config     *config.Config
 	Identifier string
+	Log        log15.Logger
 }
 
-func NewSlack(cfg *config.Config) *Slack {
+func NewSlack(cfg *config.Config, logger log15.Logger) *Slack {
 	return &Slack{
 		Config:     cfg,
 		Identifier: "slack",
+		Log:        logger.New("type", "slack"),
 	}
 }
 
 func (s *Slack) Send(msg *Message, alerterConfig *AlerterConfig) error {
-	log.Debugf("%v: Sending message %v...", s.Identifier, msg.uuid)
+	s.Log.Debug("Sending message", "uuid", msg.uuid)
 
 	// generate slack message params
 	params := s.generateParams(msg, alerterConfig)

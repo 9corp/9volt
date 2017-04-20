@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/PagerDuty/go-pagerduty"
-	log "github.com/Sirupsen/logrus"
+	"github.com/inconshreveable/log15"
 
 	"github.com/9corp/9volt/config"
 )
@@ -19,17 +19,19 @@ const (
 type Pagerduty struct {
 	Config     *config.Config
 	Identifier string
+	Log        log15.Logger
 }
 
-func NewPagerduty(cfg *config.Config) *Pagerduty {
+func NewPagerduty(cfg *config.Config, logger log15.Logger) *Pagerduty {
 	return &Pagerduty{
 		Config:     cfg,
 		Identifier: "pagerduty",
+		Log:        logger.New("type", "pagerduty"),
 	}
 }
 
 func (p *Pagerduty) Send(msg *Message, alerterConfig *AlerterConfig) error {
-	log.Debugf("%v: Sending message %v", p.Identifier, msg.uuid)
+	p.Log.Debug("Sending message", "uuid", msg.uuid)
 
 	// generate event
 	event := p.generateEvent(msg, alerterConfig)
@@ -40,7 +42,7 @@ func (p *Pagerduty) Send(msg *Message, alerterConfig *AlerterConfig) error {
 		return fmt.Errorf("Unable to create pagerduty event for %v: %v", msg.Source, err.Error())
 	}
 
-	log.Debugf("Response Status: %v Message: %v IncidentKey: %v", resp.Status, resp.Message, resp.IncidentKey)
+	p.Log.Debug("Pagerduty response", "status", resp.Status, "msg", resp.Message, "incidentKey", resp.IncidentKey)
 
 	return nil
 }
