@@ -15,7 +15,7 @@ import (
 	"fmt"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/inconshreveable/log15"
 	gouuid "github.com/satori/go.uuid"
 
 	"github.com/9corp/9volt/base"
@@ -56,6 +56,10 @@ type Message struct {
 	uuid        string            // For private use within the alerter
 }
 
+var (
+	log = log15.New("pkg", "alerter")
+)
+
 func New(cfg *config.Config, messageChannel <-chan *Message) *Alerter {
 	return &Alerter{
 		MemberID:       cfg.MemberID,
@@ -68,7 +72,7 @@ func New(cfg *config.Config, messageChannel <-chan *Message) *Alerter {
 }
 
 func (a *Alerter) Start() error {
-	log.Infof("%v: Starting alerter components...", a.Identifier)
+	log.Info("Starting alerter components")
 
 	a.Component.Ctx, a.Component.Cancel = context.WithCancel(context.Background())
 
@@ -91,7 +95,7 @@ func (a *Alerter) Start() error {
 
 func (a *Alerter) Stop() error {
 	if a.Component.Cancel == nil {
-		log.Warningf("%v: Looks like .Cancel is nil; is this expected?", a.Identifier)
+		log.Warn("Looks like .Cancel is nil; is this expected?")
 	} else {
 		a.Component.Cancel()
 	}
@@ -100,6 +104,8 @@ func (a *Alerter) Stop() error {
 }
 
 func (a *Alerter) run() error {
+	llog := log.New("method", "run")
+
 OUTER:
 	for {
 		select {
@@ -107,16 +113,16 @@ OUTER:
 			// tag message
 			msg.uuid = gouuid.NewV4().String()
 
-			log.Debugf("%v-run: Received message (%v) from checker '%v' -> '%v'", msg.uuid, a.Identifier, msg.Source, msg.Key)
+			llog.Debug("Received message from checker", "uuid", msg.uuid, "source", msg.Source, "key", msg.Key)
 
 			go a.handleMessage(msg)
 		case <-a.Component.Ctx.Done():
-			log.Debugf("%v-run: Asked to shutdown", a.Identifier)
+			llog.Debug("Asked to shutdown")
 			break OUTER
 		}
 	}
 
-	log.Debugf("%v-run: Exiting", a.Identifier)
+	llog.Debug("Exiting")
 	return nil
 }
 
@@ -137,7 +143,7 @@ func (a *Alerter) handleMessage(msg *Message) error {
 		if err != nil {
 			errorMessage := fmt.Sprintf("Unable to load alerter key for %v: %v", msg.uuid, err.Error())
 			errorList = append(errorList, errorMessage)
-			log.Errorf("%v: %v", a.Identifier, errorMessage)
+			log.Error(errorMessage)
 			continue
 		}
 
@@ -145,7 +151,7 @@ func (a *Alerter) handleMessage(msg *Message) error {
 		if err := a.Alerters[alerterConfig.Type].ValidateConfig(alerterConfig); err != nil {
 			errorMessage := fmt.Sprintf("Unable to validate alerter config for %v: %v", msg.uuid, err.Error())
 			errorList = append(errorList, errorMessage)
-			log.Errorf("%v: %v", a.Identifier, errorMessage)
+			log.Error(errorMessage)
 			continue
 		}
 
@@ -154,7 +160,7 @@ func (a *Alerter) handleMessage(msg *Message) error {
 		if err := a.Alerters[alerterConfig.Type].Send(msg, alerterConfig); err != nil {
 			errorMessage := fmt.Sprintf("Unable to complete message send for %v: %v", msg.uuid, err.Error())
 			errorList = append(errorList, errorMessage)
-			log.Errorf("%v: %v", a.Identifier, errorMessage)
+			log.Error(errorMessage)
 			continue
 		}
 	}
@@ -164,8 +170,7 @@ func (a *Alerter) handleMessage(msg *Message) error {
 			fmt.Sprintf("%v: Ran into %v errors during alert send for %v (alerters: %v); error list: %v",
 				a.Identifier, len(errorList), msg.Source, msg.Key, strings.Join(errorList, "; ")))
 	} else {
-		log.Debugf("%v: Successfully sent %v alert messages for %v (alerters: %v)",
-			a.Identifier, len(msg.Key), msg.uuid, msg.Key)
+		log.Debug("Successfully sent alert messages", "num", len(msg.Key), "uuid", msg.uuid, "key", msg.Key)
 	}
 
 	return nil
@@ -175,7 +180,7 @@ func (a *Alerter) handleMessage(msg *Message) error {
 func (a *Alerter) loadAlerterConfig(alerterKey string, msg *Message) (*AlerterConfig, error) {
 	jsonAlerterConfig, err := a.Config.DalClient.FetchAlerterConfig(alerterKey)
 	if err != nil {
-		log.Errorf("Unable to fetch alerter config for message %v: %v", msg.uuid, err.Error())
+		log.Error("Unable to fetch alerter config for message", "uuid", msg.uuid, "err", err.Error())
 		return nil, err
 	}
 
@@ -183,7 +188,7 @@ func (a *Alerter) loadAlerterConfig(alerterKey string, msg *Message) (*AlerterCo
 	var alerterConfig *AlerterConfig
 
 	if err := json.Unmarshal([]byte(jsonAlerterConfig), &alerterConfig); err != nil {
-		log.Errorf("Unable to unmarshal alerter config for message %v: %v", msg.uuid, err.Error())
+		log.Error("Unable to unmarshal alerter config for message", "uuid", msg.uuid, "err", err.Error())
 		return nil, err
 	}
 
