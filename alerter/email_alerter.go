@@ -6,7 +6,7 @@ import (
 	"net/smtp"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/inconshreveable/log15"
 
 	"github.com/9corp/9volt/config"
 )
@@ -19,17 +19,19 @@ const (
 type Email struct {
 	Config     *config.Config
 	Identifier string
+	Log        log15.Logger
 }
 
-func NewEmail(cfg *config.Config) *Email {
+func NewEmail(cfg *config.Config, logger log15.Logger) *Email {
 	return &Email{
 		Config:     cfg,
 		Identifier: "email",
+		Log:        logger.New("type", "email"),
 	}
 }
 
 func (e *Email) Send(msg *Message, alerterConfig *AlerterConfig) error {
-	log.Debugf("%v: Sending message %v...", e.Identifier, msg.uuid)
+	e.Log.Debug("Sending message", "uuid", msg.uuid)
 
 	from := DEFAULT_EMAIL_FROM
 

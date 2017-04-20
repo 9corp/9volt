@@ -15,7 +15,7 @@ import (
 	"fmt"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/inconshreveable/log15"
 	gouuid "github.com/satori/go.uuid"
 
 	"github.com/9corp/9volt/base"
@@ -40,6 +40,7 @@ type Alerter struct {
 	Config         *config.Config
 	Alerters       map[string]IAlerter
 	MessageChannel <-chan *Message
+	Log            log15.Logger
 
 	base.Component
 }
@@ -56,6 +57,10 @@ type Message struct {
 	uuid        string            // For private use within the alerter
 }
 
+var (
+	log = log15.New("pkg", "alerter")
+)
+
 func New(cfg *config.Config, messageChannel <-chan *Message) *Alerter {
 	return &Alerter{
 		MemberID:       cfg.MemberID,
@@ -64,18 +69,19 @@ func New(cfg *config.Config, messageChannel <-chan *Message) *Alerter {
 		Component: base.Component{
 			Identifier: "alerter",
 		},
+		Log: log15.New("pkg", "alerter"),
 	}
 }
 
 func (a *Alerter) Start() error {
-	log.Infof("%v: Starting alerter components...", a.Identifier)
+	a.Log.Info("Starting alerter components")
 
 	a.Component.Ctx, a.Component.Cancel = context.WithCancel(context.Background())
 
 	// Instantiate our alerters
-	pagerduty := NewPagerduty(a.Config)
-	slack := NewSlack(a.Config)
-	email := NewEmail(a.Config)
+	pagerduty := NewPagerduty(a.Config, a.Log)
+	slack := NewSlack(a.Config, a.Log)
+	email := NewEmail(a.Config, a.Log)
 
 	a.Alerters = map[string]IAlerter{
 		pagerduty.Identify(): pagerduty,
@@ -91,7 +97,7 @@ func (a *Alerter) Start() error {
 
 func (a *Alerter) Stop() error {
 	if a.Component.Cancel == nil {
-		log.Warningf("%v: Looks like .Cancel is nil; is this expected?", a.Identifier)
+		a.Log.Warn("Looks like .Cancel is nil; is this expected?")
 	} else {
 		a.Component.Cancel()
 	}
@@ -100,6 +106,8 @@ func (a *Alerter) Stop() error {
 }
 
 func (a *Alerter) run() error {
+	llog := a.Log.New("method", "run")
+
 OUTER:
 	for {
 		select {
@@ -107,16 +115,16 @@ OUTER:
 			// tag message
 			msg.uuid = gouuid.NewV4().String()
 
-			log.Debugf("%v-run: Received message (%v) from checker '%v' -> '%v'", msg.uuid, a.Identifier, msg.Source, msg.Key)
+			llog.Debug("Received message from checker", "uuid", msg.uuid, "source", msg.Source, "key", msg.Key)
 
 			go a.handleMessage(msg)
 		case <-a.Component.Ctx.Done():
-			log.Debugf("%v-run: Asked to shutdown", a.Identifier)
+			llog.Debug("Asked to shutdown")
 			break OUTER
 		}
 	}
 
-	log.Debugf("%v-run: Exiting", a.Identifier)
+	llog.Debug("Exiting")
 	return nil
 }
 
@@ -137,7 +145,7 @@ func (a *Alerter) handleMessage(msg *Message) error {
 		if err != nil {
 			errorMessage := fmt.Sprintf("Unable to load alerter key for %v: %v", msg.uuid, err.Error())
 			errorList = append(errorList, errorMessage)
-			log.Errorf("%v: %v", a.Identifier, errorMessage)
+			a.Log.Error(errorMessage)
 			continue
 		}
 
@@ -145,16 +153,17 @@ func (a *Alerter) handleMessage(msg *Message) error {
 		if err := a.Alerters[alerterConfig.Type].ValidateConfig(alerterConfig); err != nil {
 			errorMessage := fmt.Sprintf("Unable to validate alerter config for %v: %v", msg.uuid, err.Error())
 			errorList = append(errorList, errorMessage)
-			log.Errorf("%v: %v", a.Identifier, errorMessage)
+			a.Log.Error(errorMessage)
 			continue
 		}
 
 		// send the actual alert
-		log.Debugf("%v: Sending %v to alerter %v!", a.Identifier, msg.uuid, alerterConfig.Type)
+		a.Log.Debug("Sending message to alerter", "uuid", msg.uuid, "alerter", alerterConfig.Type)
+
 		if err := a.Alerters[alerterConfig.Type].Send(msg, alerterConfig); err != nil {
 			errorMessage := fmt.Sprintf("Unable to complete message send for %v: %v", msg.uuid, err.Error())
 			errorList = append(errorList, errorMessage)
-			log.Errorf("%v: %v", a.Identifier, errorMessage)
+			a.Log.Error(errorMessage)
 			continue
 		}
 	}
@@ -164,8 +173,7 @@ func (a *Alerter) handleMessage(msg *Message) error {
 			fmt.Sprintf("%v: Ran into %v errors during alert send for %v (alerters: %v); error list: %v",
 				a.Identifier, len(errorList), msg.Source, msg.Key, strings.Join(errorList, "; ")))
 	} else {
-		log.Debugf("%v: Successfully sent %v alert messages for %v (alerters: %v)",
-			a.Identifier, len(msg.Key), msg.uuid, msg.Key)
+		a.Log.Debug("Successfully sent alert messages", "num", len(msg.Key), "uuid", msg.uuid, "key", msg.Key)
 	}
 
 	return nil
@@ -175,7 +183,7 @@ func (a *Alerter) handleMessage(msg *Message) error {
 func (a *Alerter) loadAlerterConfig(alerterKey string, msg *Message) (*AlerterConfig, error) {
 	jsonAlerterConfig, err := a.Config.DalClient.FetchAlerterConfig(alerterKey)
 	if err != nil {
-		log.Errorf("Unable to fetch alerter config for message %v: %v", msg.uuid, err.Error())
+		a.Log.Error("Unable to fetch alerter config for message", "uuid", msg.uuid, "err", err.Error())
 		return nil, err
 	}
 
@@ -183,14 +191,14 @@ func (a *Alerter) loadAlerterConfig(alerterKey string, msg *Message) (*AlerterCo
 	var alerterConfig *AlerterConfig
 
 	if err := json.Unmarshal([]byte(jsonAlerterConfig), &alerterConfig); err != nil {
-		log.Errorf("Unable to unmarshal alerter config for message %v: %v", msg.uuid, err.Error())
+		a.Log.Error("Unable to unmarshal alerter config for message", "uuid", msg.uuid, "err", err.Error())
 		return nil, err
 	}
 
 	// check if we have given alerter
 	if _, ok := a.Alerters[alerterConfig.Type]; !ok {
 		err := fmt.Errorf("Unable to find any alerter named %v", alerterConfig.Type)
-		log.Error(err.Error())
+		a.Log.Error(err.Error())
 		return nil, err
 	}
 
