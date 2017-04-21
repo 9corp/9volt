@@ -4,7 +4,6 @@ package state
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"sync"
 	"time"
 
@@ -31,6 +30,7 @@ type Message struct {
 
 type State struct {
 	Config       *config.Config
+	Log          log.FieldLogger
 	StateChannel chan *Message
 	Mutex        *sync.Mutex
 	Data         map[string]*Message
@@ -42,6 +42,7 @@ type State struct {
 func New(cfg *config.Config, stateChannel chan *Message) *State {
 	return &State{
 		Config:       cfg,
+		Log:          log.WithField("pkg", "state"),
 		StateChannel: stateChannel,
 		Mutex:        &sync.Mutex{},
 		Data:         make(map[string]*Message, 0),
@@ -53,7 +54,7 @@ func New(cfg *config.Config, stateChannel chan *Message) *State {
 }
 
 func (s *State) Start() error {
-	log.Infof("%v: Starting state components...", s.Identifier)
+	s.Log.Info("Starting state components...")
 
 	s.Component.Ctx, s.Component.Cancel = context.WithCancel(context.Background())
 
@@ -65,7 +66,7 @@ func (s *State) Start() error {
 
 func (s *State) Stop() error {
 	if s.Component.Cancel == nil {
-		log.Warningf("%v: Looks like .Cancel is nil; is this expected?", s.Identifier)
+		s.Log.Warning("Looks like .Cancel is nil; is this expected?")
 	} else {
 		s.Component.Cancel()
 	}
@@ -78,6 +79,8 @@ func (s *State) Stop() error {
 
 // Read from state channel, update local state map; gets shutdown via context
 func (s *State) runReader() error {
+	llog := s.Log.WithField("method", "runReader")
+
 OUTER:
 	for {
 		select {
@@ -88,20 +91,22 @@ OUTER:
 			s.Data[msg.Check] = msg
 			s.Mutex.Unlock()
 
-			log.Debugf("%v-runReader: Received state message for '%v'", s.Identifier, msg.Check)
+			llog.WithField("msg", msg.Check).Debug("Received state message")
 		case <-s.Component.Ctx.Done():
-			log.Debugf("%v-runReader: Received a notice to shutdown", s.Identifier)
+			llog.Debug("Received a notice to shutdown")
 			break OUTER
 		}
 	}
 
-	log.Debugf("%v-runReader: Exiting", s.Identifier)
+	llog.Debug("Exiting...")
 
 	return nil
 }
 
 // Periodically dump state to etcd; gets shutdown via looper
 func (s *State) runDumper() error {
+	llog := s.Log.WithField("method", "runDumper")
+
 	s.DumperLooper.Loop(func() error {
 		// log.Debugf("%v: Dumping state to etcd every %v", s.Identifier, s.Config.StateDumpInterval.String())
 
@@ -118,14 +123,12 @@ func (s *State) runDumper() error {
 
 			messageBlob, err := json.Marshal(v)
 			if err != nil {
-				s.Config.EQClient.AddWithErrorLog("error",
-					fmt.Sprintf("%v: Unable to marshal state message for key %v: %v", s.Identifier, k, err))
+				s.Config.EQClient.AddWithErrorLog("error", "Unable to marshal state message", llog, log.Fields{"key": k, "err": err})
 				continue
 			}
 
 			if err := s.Config.DalClient.Set(fullKey, string(messageBlob), nil); err != nil {
-				s.Config.EQClient.AddWithErrorLog("error",
-					fmt.Sprintf("%v: Unable to dump state for key %v: %v", s.Identifier, k, err))
+				s.Config.EQClient.AddWithErrorLog("error", "Unable to dump state", llog, log.Fields{"key": k, "err": err})
 				continue
 			}
 
@@ -135,7 +138,7 @@ func (s *State) runDumper() error {
 		return nil
 	})
 
-	log.Debugf("%v-runDumper: Exiting", s.Identifier)
+	llog.Debug("Exiting...")
 
 	return nil
 }
