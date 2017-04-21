@@ -47,7 +47,7 @@ type Queue struct {
 
 type IClient interface {
 	Add(string, string) error
-	AddWithErrorLog(string, string, log.FieldLogger) error
+	AddWithErrorLog(string, string, log.FieldLogger, log.Fields) error
 }
 
 type Client struct {
@@ -159,7 +159,7 @@ func (c *Client) Add(key, value string) error {
 	}
 }
 
-func (c *Client) AddWithErrorLog(key, value, logger log.FieldLogger, fields log.Fields) error {
+func (c *Client) AddWithErrorLog(key, value string, logger log.FieldLogger, fields log.Fields) error {
 	logger.WithFields(fields).Error(value)
 
 	eventMessage := value + " ["
