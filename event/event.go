@@ -33,6 +33,7 @@ const (
 )
 
 type Queue struct {
+	Log       log.FieldLogger
 	DalClient dal.IDal
 	MemberID  string
 	channel   chan *Event
@@ -46,7 +47,7 @@ type Queue struct {
 
 type IClient interface {
 	Add(string, string) error
-	AddWithErrorLog(string, string) error
+	AddWithErrorLog(string, string, log.FieldLogger) error
 }
 
 type Client struct {
@@ -62,6 +63,7 @@ type Event struct {
 
 func NewQueue(memberID string, dalClient dal.IDal) *Queue {
 	return &Queue{
+		Log:       log.WithFields(log.Fields{"pkg": "event"}),
 		DalClient: dalClient,
 		MemberID:  memberID,
 		channel:   make(chan *Event, BUFFER_LEN),
@@ -75,14 +77,14 @@ func (q *Queue) Start() error {
 	q.Pause = false
 
 	if q.Running {
-		log.Debugf("%v: Already running - nothing to do", q.Identifier)
+		q.Log.Debug("Already running - nothing to do")
 		return nil
 	}
 
 	q.Running = true
 
 	// launch worker pool
-	log.Debugf("%v: Launching %v queue workers", q.Identifier, WORKER_COUNT)
+	q.Log.Debugf("Launching %v queue workers", WORKER_COUNT)
 
 	for i := 1; i <= WORKER_COUNT; i++ {
 		go q.runWorker(i)
@@ -92,7 +94,7 @@ func (q *Queue) Start() error {
 }
 
 func (q *Queue) Stop() error {
-	log.Debugf("%v: Workers are paused", q.Identifier)
+	q.Log.Debug("Workers are paused")
 
 	q.Pause = true
 
@@ -100,24 +102,24 @@ func (q *Queue) Stop() error {
 }
 
 func (q *Queue) runWorker(id int) {
-	log.Debugf("%v: Event worker #%v started", q.Identifier, id)
+	llog := q.Log.WithFields(log.Fields{"id": id})
+
+	llog.Debug("Event worker started")
 
 	for {
 		e := <-q.channel
 
 		if q.Pause {
-			log.Debugf("%v: In pause state; dropping inbound message(s)", q.Identifier)
+			llog.Debug("In pause state; dropping inbound message(s)")
 			continue
 		}
 
-		log.Debugf("%v: Worker #%v received new event! Type: %v Message: %v", q.Identifier,
-			id, e.Type, e.Message)
+		llog.WithFields(log.Fields{"type": e.Type, "msg": e.Message}).Debug("Worker received new event")
 
 		// marshal the event
 		eventBlob, err := json.Marshal(e)
 		if err != nil {
-			log.Errorf("%v: Unable to marshal event '%v' to JSON (worker #%v): %v",
-				q.Identifier, e, id, err)
+			llog.WithFields(log.Fields{"event": e, "err": err}).Errorf("Unable to marshal event")
 			continue
 		}
 
@@ -125,8 +127,7 @@ func (q *Queue) runWorker(id int) {
 		fullKey := fmt.Sprintf("event/%v-%v", e.Type, util.RandomString(6, true))
 
 		if err := q.DalClient.Set(fullKey, string(eventBlob), &dal.SetOptions{Dir: false, TTLSec: MAX_EVENT_AGE, PrevExist: ""}); err != nil {
-			log.Errorf("%v: Unable to save event blob '%v' to path '%v' to etcd (worker: #%v): %v",
-				q.Identifier, e, fullKey, id, err)
+			llog.WithFields(log.Fields{"event": e, "path": fullKey, "err": err}).Error("Unable to save event blob")
 		}
 
 		// Artificially slow down queue workers (and prevent an etcd write flood)
@@ -158,10 +159,16 @@ func (c *Client) Add(key, value string) error {
 	}
 }
 
-func (c *Client) AddWithErrorLog(key, value string) error {
-	log.Error(value)
+func (c *Client) AddWithErrorLog(key, value, logger log.FieldLogger, fields log.Fields) error {
+	logger.WithFields(fields).Error(value)
 
-	if err := c.Add(key, value); err != nil {
+	eventMessage := value + " ["
+	for k, v := range fields {
+		eventMessage = fmt.Sprintf("%v %v=%v", eventMessage, k, v)
+	}
+	eventMessage = eventMessage + "]"
+
+	if err := c.Add(key, eventMessage); err != nil {
 		return err
 	}
 
