@@ -586,7 +586,7 @@ func (d *Director) PickNextMember(checkTag string) (string, error) {
 
 	for _, memberID := range feasibleMembers {
 		if _, ok := d.CheckStats[memberID]; !ok {
-			log.Warningf("CheckStats do not (yet) contain cluster member '%v'; new check distribution suboptimal", memberID)
+			d.Log.Warningf("CheckStats do not (yet) contain cluster member '%v'; new check distribution suboptimal", memberID)
 			continue
 		}
 
@@ -639,7 +639,7 @@ func (d *Director) filterMembersByTag(checkStats map[string]*dal.MemberStat, che
 // Determine if a specific event can be ignored
 func (d *Director) ignorableWatcherEvent(resp *etcd.Response) bool {
 	if resp == nil {
-		log.Debug("Received a nil etcd response - bug?")
+		d.Log.Debug("Received a nil etcd response - bug?")
 		return true
 	}
 
