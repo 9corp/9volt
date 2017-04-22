@@ -34,6 +34,7 @@ type IMonitor interface {
 
 type Monitor struct {
 	Config             *config.Config
+	Log                log.FieldLogger
 	Identifier         string
 	runningMonitorLock *sync.Mutex
 	runningMonitors    map[string]IMonitor
@@ -106,6 +107,7 @@ func New(cfg *config.Config, messageChannel chan *alerter.Message, stateChannel 
 	return &Monitor{
 		Identifier:     "monitor",
 		Config:         cfg,
+		Log:            log.WithField("pkg", "monitor"),
 		MessageChannel: messageChannel,
 		StateChannel:   stateChannel,
 		MemberID:       cfg.MemberID,
@@ -125,57 +127,59 @@ func (m *Monitor) Handle(action int, monitorName, monitorConfigLocation string) 
 	// if stop action, check if we have a running instance of the check, if not, return an error
 	if action == STOP {
 		if m.monitorRunning(monitorName) {
-			log.Debugf("%v: Stopping running monitor '%v'...", m.Identifier, monitorName)
+			m.Log.Debugf("Stopping running monitor '%v'...", monitorName)
 			return m.stop(monitorName)
 		}
 
-		log.Errorf("%v: Asked to stop monitor '%v' but monitor is not running!", m.Identifier, monitorName)
+		m.Log.Errorf("Asked to stop monitor '%v' but monitor is not running!", monitorName)
 		return fmt.Errorf("Asked to stop monitor %v but monitor is not running", monitorName)
 	}
 
 	// fetch fresh configuration from etcd
 	monitorConfig, err := m.fetchMonitorConfig(monitorConfigLocation)
 	if err != nil {
-		m.Config.EQClient.AddWithErrorLog("error",
-			fmt.Sprintf("%v: Unable to fetch monitor configuration for '%v' (%v): %v",
-				m.Identifier, monitorName, monitorConfigLocation, err.Error()))
+		m.Config.EQClient.AddWithErrorLog("error", "Unable to fetch monitor configuration for monitorName",
+			m.Log, log.Fields{"monitorName": monitorName, "cfgLocation": monitorConfigLocation, "err": err})
 		return err
 	}
 
 	// validate monitor configuration
 	if err := m.validateMonitorConfig(monitorConfig); err != nil {
-		m.Config.EQClient.AddWithErrorLog("error",
-			fmt.Sprintf("%v: Unable to validate monitor config for '%v' (%v): %v",
-				m.Identifier, monitorName, monitorConfigLocation, err.Error()))
+		m.Config.EQClient.AddWithErrorLog("error", "Unable to validate monitor config for monitorName",
+			m.Log, log.Fields{"monitorName": monitorName, "cfgLocation": monitorConfigLocation, "err": err})
+
 		return fmt.Errorf("Unable to validate monitor configuration for %v: %v", monitorName, err.Error())
 	}
 
 	// if check already running, stop it
 	if m.monitorRunning(monitorName) {
-		log.Debugf("%v: Monitor '%v' already running. Stopping it first...", m.Identifier, monitorName)
+		m.Log.Debugf("Monitor '%v' already running. Stopping it first...", monitorName)
 
 		if err := m.stop(monitorName); err != nil {
-			m.Config.EQClient.AddWithErrorLog("error",
-				fmt.Sprintf("%v: Unable to stop running monitor '%v': %v", m.Identifier, monitorName, err.Error()))
+			m.Config.EQClient.AddWithErrorLog("error", "Unable to stop running monitor",
+				m.Log, log.Fields{"monitorName": monitorName, "err": err})
+
 			return fmt.Errorf("Unable to stop running monitor %v: %v", monitorName, err.Error())
 		}
 	}
 
 	// If check is disabled, do not start it back up
 	if monitorConfig.Disable {
-		log.Debugf("%v: '%v' is disabled. No further action will be taken.", m.Identifier, monitorName)
+		m.Log.Debugf("'%v' monitor is disabled. No further action will be taken.", monitorName)
 		return nil
 	}
 
 	// start check with new monitor configuration
-	log.Debugf("%v: Starting new monitor for %v...", m.Identifier, monitorName)
+	m.Log.Debugf("Starting new monitor for %v...", monitorName)
+
 	if err := m.start(monitorName, monitorConfigLocation, monitorConfig); err != nil {
-		m.Config.EQClient.AddWithErrorLog("error",
-			fmt.Sprintf("%v: Unable to start new monitor '%v': %v", m.Identifier, monitorName, err.Error()))
+		m.Config.EQClient.AddWithErrorLog("error", "Unable to start new monitor",
+			m.Log, log.Fields{"monitorName": monitorName, "err": err})
+
 		return fmt.Errorf("Unable to start new monitor %v: %v", monitorName, err.Error())
 	}
 
-	log.Debugf("%v: Successfully started new monitor %v!", m.Identifier, monitorName)
+	m.Log.Debugf("Successfully started new monitor '%v'", monitorName)
 
 	return nil
 }
@@ -201,13 +205,13 @@ func (m *Monitor) stop(monitorName string) error {
 }
 
 func (m *Monitor) StopAll() error {
-	log.Debugf("%v: Performing full monitor shutdown", m.Identifier)
+	m.Log.Debug("Performing full monitor shutdown")
 
 	m.runningMonitorLock.Lock()
 	defer m.runningMonitorLock.Unlock()
 
 	for _, v := range m.runningMonitors {
-		log.Debugf("%v: Shutting down check '%v'", m.Identifier, v.Identify())
+		m.Log.Debugf("Shutting down check '%v'", v.Identify())
 		v.Stop()
 	}
 

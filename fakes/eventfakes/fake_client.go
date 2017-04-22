@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/9corp/9volt/event"
+	log "github.com/Sirupsen/logrus"
 )
 
 type FakeIClient struct {
@@ -20,11 +21,13 @@ type FakeIClient struct {
 	addReturnsOnCall map[int]struct {
 		result1 error
 	}
-	AddWithErrorLogStub        func(string, string) error
+	AddWithErrorLogStub        func(string, string, log.FieldLogger, log.Fields) error
 	addWithErrorLogMutex       sync.RWMutex
 	addWithErrorLogArgsForCall []struct {
 		arg1 string
 		arg2 string
+		arg3 log.FieldLogger
+		arg4 log.Fields
 	}
 	addWithErrorLogReturns struct {
 		result1 error
@@ -85,17 +88,19 @@ func (fake *FakeIClient) AddReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
-func (fake *FakeIClient) AddWithErrorLog(arg1 string, arg2 string) error {
+func (fake *FakeIClient) AddWithErrorLog(arg1 string, arg2 string, arg3 log.FieldLogger, arg4 log.Fields) error {
 	fake.addWithErrorLogMutex.Lock()
 	ret, specificReturn := fake.addWithErrorLogReturnsOnCall[len(fake.addWithErrorLogArgsForCall)]
 	fake.addWithErrorLogArgsForCall = append(fake.addWithErrorLogArgsForCall, struct {
 		arg1 string
 		arg2 string
-	}{arg1, arg2})
-	fake.recordInvocation("AddWithErrorLog", []interface{}{arg1, arg2})
+		arg3 log.FieldLogger
+		arg4 log.Fields
+	}{arg1, arg2, arg3, arg4})
+	fake.recordInvocation("AddWithErrorLog", []interface{}{arg1, arg2, arg3, arg4})
 	fake.addWithErrorLogMutex.Unlock()
 	if fake.AddWithErrorLogStub != nil {
-		return fake.AddWithErrorLogStub(arg1, arg2)
+		return fake.AddWithErrorLogStub(arg1, arg2, arg3, arg4)
 	}
 	if specificReturn {
 		return ret.result1
@@ -109,10 +114,10 @@ func (fake *FakeIClient) AddWithErrorLogCallCount() int {
 	return len(fake.addWithErrorLogArgsForCall)
 }
 
-func (fake *FakeIClient) AddWithErrorLogArgsForCall(i int) (string, string) {
+func (fake *FakeIClient) AddWithErrorLogArgsForCall(i int) (string, string, log.FieldLogger, log.Fields) {
 	fake.addWithErrorLogMutex.RLock()
 	defer fake.addWithErrorLogMutex.RUnlock()
-	return fake.addWithErrorLogArgsForCall[i].arg1, fake.addWithErrorLogArgsForCall[i].arg2
+	return fake.addWithErrorLogArgsForCall[i].arg1, fake.addWithErrorLogArgsForCall[i].arg2, fake.addWithErrorLogArgsForCall[i].arg3, fake.addWithErrorLogArgsForCall[i].arg4
 }
 
 func (fake *FakeIClient) AddWithErrorLogReturns(result1 error) {
