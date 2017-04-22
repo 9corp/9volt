@@ -58,6 +58,8 @@ installnode: ## Used by TravisCI
 
 generate: ## Run generate for non-vendor packages only
 	go list ./... | grep -v vendor | xargs go generate
+	echo "WARNING: Fakes generated for vendored libs will (probably) have a bad import line -- update it manually for now"
+	counterfeiter -o fakes/logfakes/fake_fieldlogger.go vendor/github.com/Sirupsen/logrus/logrus.go FieldLogger
 	go fmt ./fakes/...
 
 build: semvercheck clean build/linux build/darwin ## Build for linux and darwin (save to OUTPUT_DIR/BIN)

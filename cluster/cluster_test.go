@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	d "github.com/relistan/go-director"
@@ -15,6 +16,7 @@ import (
 	"github.com/9corp/9volt/dal"
 	"github.com/9corp/9volt/fakes/dalfakes"
 	"github.com/9corp/9volt/fakes/eventfakes"
+	"github.com/9corp/9volt/fakes/logfakes"
 	"github.com/9corp/9volt/overwatch"
 	"github.com/9corp/9volt/util"
 )
@@ -24,6 +26,7 @@ var _ = Describe("cluster", func() {
 		c                   *Cluster
 		fakeDAL             *dalfakes.FakeIDal
 		fakeEventClient     *eventfakes.FakeIClient
+		fakeLog             *logfakes.FakeFieldLogger
 		looperChan          chan error
 		stateChan           chan bool
 		distributeChan      chan bool
@@ -36,6 +39,9 @@ var _ = Describe("cluster", func() {
 	BeforeEach(func() {
 		fakeDAL = &dalfakes.FakeIDal{}
 		fakeEventClient = &eventfakes.FakeIClient{}
+		fakeLog = &logfakes.FakeFieldLogger{}
+		fakeLog.WithFieldReturns(&log.Entry{})
+		fakeLog.WithFieldsReturns(&log.Entry{}) // sucks, no way to test the "sublogger"
 		looperChan = make(chan error, 1)
 		stateChan = make(chan bool, 1)
 		distributeChan = make(chan bool, 1)
@@ -47,6 +53,7 @@ var _ = Describe("cluster", func() {
 		c = &Cluster{
 			DalClient:     fakeDAL,
 			DirectorLock:  &sync.Mutex{},
+			Log:           fakeLog,
 			MemberID:      directorID,
 			Hostname:      "hostname",
 			DirectorState: true,
@@ -121,10 +128,10 @@ var _ = Describe("cluster", func() {
 				err := c.DirectorMonitorLooper.Wait()
 				Expect(err).ToNot(HaveOccurred())
 
-				k, v := fakeEventClient.AddWithErrorLogArgsForCall(0)
-				Expect(k).To(Equal("error"))
-				Expect(v).To(ContainSubstring("directorMonitor: Unable to fetch director state"))
-				Expect(v).To(ContainSubstring("some error"))
+				key, msg, _, _ := fakeEventClient.AddWithErrorLogArgsForCall(0)
+				Expect(key).To(Equal("error"))
+				Expect(msg).To(ContainSubstring("directorMonitor: Unable to fetch director state"))
+				Expect(msg).To(ContainSubstring("some error"))
 			})
 		})
 
@@ -145,10 +152,10 @@ var _ = Describe("cluster", func() {
 				err := c.DirectorMonitorLooper.Wait()
 				Expect(err).ToNot(HaveOccurred())
 
-				k, v := fakeEventClient.AddWithErrorLogArgsForCall(0)
-				Expect(k).To(Equal("error"))
-				Expect(v).To(ContainSubstring("directorMonitor: Unable to handle state"))
-				Expect(v).To(ContainSubstring("failed that"))
+				key, msg, _, _ := fakeEventClient.AddWithErrorLogArgsForCall(0)
+				Expect(key).To(Equal("error"))
+				Expect(msg).To(ContainSubstring("directorMonitor: Unable to handle state"))
+				Expect(msg).To(ContainSubstring("failed that"))
 			})
 		})
 	})
@@ -191,11 +198,11 @@ var _ = Describe("cluster", func() {
 			})
 
 			It("should add event log and send message to overwatch", func() {
-				k, v := fakeEventClient.AddWithErrorLogArgsForCall(0)
+				key, msg, _, _ := fakeEventClient.AddWithErrorLogArgsForCall(0)
 
 				Expect(fakeDAL.UpdateDirectorStateCallCount()).To(Equal(1))
-				Expect(k).To(Equal("error"))
-				Expect(v).To(ContainSubstring("directorHeartbeat"))
+				Expect(key).To(Equal("error"))
+				Expect(msg).To(ContainSubstring("directorHeartbeat"))
 
 				time.Sleep(100 * time.Millisecond)
 				overwatchMsg := <-overwatchChan
