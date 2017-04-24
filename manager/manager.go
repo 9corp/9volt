@@ -18,6 +18,7 @@ import (
 
 type Manager struct {
 	MemberID      string
+	Log           log.FieldLogger
 	Config        *config.Config
 	Monitor       *monitor.Monitor
 	OverwatchChan chan<- *overwatch.Message
@@ -29,6 +30,7 @@ func New(cfg *config.Config, messageChannel chan *alerter.Message, stateChannel 
 	return &Manager{
 		MemberID:      cfg.MemberID,
 		Config:        cfg,
+		Log:           log.WithField("pkg", "manager"),
 		Monitor:       monitor.New(cfg, messageChannel, stateChannel),
 		OverwatchChan: overwatchChan,
 		Component: base.Component{
@@ -38,7 +40,7 @@ func New(cfg *config.Config, messageChannel chan *alerter.Message, stateChannel 
 }
 
 func (m *Manager) Start() error {
-	log.Infof("%v: Starting manager components...", m.Identifier)
+	m.Log.Info("Starting manager components...")
 
 	m.Component.Ctx, m.Component.Cancel = context.WithCancel(context.Background())
 
@@ -49,7 +51,7 @@ func (m *Manager) Start() error {
 
 func (m *Manager) Stop() error {
 	if m.Component.Cancel == nil {
-		log.Warningf("%v: Looks like .Cancel is nil; is this expected?", m.Identifier)
+		m.Log.Warning("Looks like .Cancel is nil; is this expected?")
 	} else {
 		m.Component.Cancel()
 	}
@@ -68,12 +70,12 @@ func (m *Manager) run() error {
 		resp, err := watcher.Next(m.Component.Ctx)
 		if err != nil {
 			if err.Error() == "context canceled" {
-				log.Debugf("%v: Received a notice to shutdown", m.Identifier)
+				m.Log.Debug("Received a notice to shutdown")
 				break
 			}
 
-			m.Config.EQClient.AddWithErrorLog("error",
-				fmt.Sprintf("%v: Unexpected watcher error: %v", m.Identifier, err.Error()))
+			m.Config.EQClient.AddWithErrorLog("error", "Unexpected watcher error",
+				m.Log, log.Fields{"err": err})
 
 			// Tell overwatch that something bad just happened
 			m.OverwatchChan <- &overwatch.Message{
@@ -87,13 +89,12 @@ func (m *Manager) run() error {
 		}
 
 		if m.ignorableWatcherEvent(resp) {
-			log.Debugf("%v: Received an ignorable watcher '%v' event for key '%v'",
-				m.Identifier, resp.Action, resp.Node.Key)
+			m.Log.Debugf("Received an ignorable watcher '%v' event for key '%v'", resp.Action, resp.Node.Key)
 			continue
 		}
 
-		log.Debugf("%v: Received a '%v' watcher event for '%v' (value: '%v')",
-			m.Identifier, resp.Action, resp.Node.Key, resp.Node.Value)
+		m.Log.Debugf("Received a '%v' watcher event for '%v' (value: '%v')",
+			resp.Action, resp.Node.Key, resp.Node.Value)
 
 		switch resp.Action {
 		case "set":
@@ -101,12 +102,12 @@ func (m *Manager) run() error {
 		case "delete":
 			go m.Monitor.Handle(monitor.STOP, path.Base(resp.Node.Key), resp.Node.Value)
 		default:
-			m.Config.EQClient.AddWithErrorLog("error",
-				fmt.Sprintf("%v: Received an unrecognized action '%v' - skipping", m.Identifier, resp.Action))
+			m.Config.EQClient.AddWithErrorLog("error", "Received an unrecognized action -> skipping",
+				m.Log, log.Fields{"action": resp.Action})
 		}
 	}
 
-	log.Debugf("%v: Exiting", m.Identifier)
+	m.Log.Debug("Exiting...")
 
 	return nil
 }
@@ -114,7 +115,7 @@ func (m *Manager) run() error {
 // Determine if a specific event can be ignored
 func (m *Manager) ignorableWatcherEvent(resp *client.Response) bool {
 	if resp == nil {
-		log.Debugf("%v: Received a nil etcd response - bug?", m.Identifier)
+		m.Log.Debug("Received a nil etcd response - bug?")
 		return true
 	}
 

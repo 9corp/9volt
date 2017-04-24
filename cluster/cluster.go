@@ -74,6 +74,7 @@ type ICluster interface {
 
 type Cluster struct {
 	Config                  *config.Config
+	Log                     log.FieldLogger
 	DirectorState           bool
 	DirectorLock            *sync.Mutex
 	MemberID                string
@@ -108,7 +109,10 @@ type MemberJSON struct {
 }
 
 var (
-	logFatalf = log.Fatalf
+	// overwrite for tests
+	logFatal = func(logger log.FieldLogger, fields log.Fields, msg string) {
+		logger.WithFields(fields).Fatal(msg)
+	}
 )
 
 func New(cfg *config.Config, stateChan, distributeChan chan<- bool, overwatchChan chan<- *overwatch.Message) (*Cluster, error) {
@@ -124,6 +128,7 @@ func New(cfg *config.Config, stateChan, distributeChan chan<- bool, overwatchCha
 
 	return &Cluster{
 		Config:                  cfg,
+		Log:                     log.WithField("pkg", "cluster"),
 		DirectorState:           false,
 		DirectorLock:            new(sync.Mutex),
 		MemberID:                cfg.MemberID,
@@ -143,7 +148,7 @@ func New(cfg *config.Config, stateChan, distributeChan chan<- bool, overwatchCha
 }
 
 func (c *Cluster) Start() error {
-	log.Infof("%v: Launching cluster engine components...", c.Identifier)
+	c.Log.Info("Launching cluster engine components...")
 
 	c.Component.Ctx, c.Component.Cancel = context.WithCancel(context.Background())
 	c.shutdown = false
@@ -175,7 +180,7 @@ func (c *Cluster) Stop() error {
 
 	// stop memberMonitor
 	if c.Component.Cancel == nil {
-		log.Warningf("%v: Looks like .Cancel is nil; is this expected?", c.Identifier)
+		c.Log.Warning("Looks like .Cancel is nil; is this expected?")
 	} else {
 		c.Component.Cancel()
 	}
@@ -191,32 +196,32 @@ func (c *Cluster) Stop() error {
 
 // ALWAYS: monitor /9volt/cluster/director to expire; become director
 func (c *Cluster) runDirectorMonitor() {
-	log.Debugf("%v: Launching director monitor...", c.Identifier)
+	llog := c.Log.WithField("method", "runDirectorMonitor")
+
+	llog.Debug("Launching director monitor...")
 
 	c.DirectorMonitorLooper.Loop(func() error {
 		directorJSON, err := c.getState()
 		if err != nil {
-			c.Config.EQClient.AddWithErrorLog("error",
-				fmt.Sprintf("%v-directorMonitor: Unable to fetch director state: %v",
-					c.Identifier, err.Error()))
-
+			c.Config.EQClient.AddWithErrorLog("error", "Unable to fetch director state", llog, log.Fields{"err": err})
 			return nil
 		}
 
 		if err := c.handleState(directorJSON); err != nil {
-			c.Config.EQClient.AddWithErrorLog("error",
-				fmt.Sprintf("%v-directorMonitor: Unable to handle state: %v", c.Identifier, err.Error()))
+			c.Config.EQClient.AddWithErrorLog("error", "Unable to handle state", llog, log.Fields{"err": err})
 		}
 
 		return nil
 	})
 
-	log.Debugf("%v-directorMonitor: Exiting", c.Identifier)
+	llog.Debug("Exiting...")
 }
 
 // IF DIRECTOR: send periodic heartbeats to /9volt/cluster/director
 func (c *Cluster) runDirectorHeartbeat() {
-	log.Debugf("%v: Launching director heartbeat...", c.Identifier)
+	llog := c.Log.WithField("method", "runDirectorHeartbeat")
+
+	llog.Debug("Launching director heartbeat...")
 
 	c.DirectorHeartbeatLooper.Loop(func() error {
 		if !c.amDirector() {
@@ -226,7 +231,7 @@ func (c *Cluster) runDirectorHeartbeat() {
 
 		// update */director with current state data
 		if err := c.sendDirectorHeartbeat(); err != nil {
-			c.Config.EQClient.AddWithErrorLog("error", fmt.Sprintf("%v-directorHeartbeat: %v", c.Identifier, err.Error()))
+			c.Config.EQClient.AddWithErrorLog("error", "Unable to send director heartbeat", llog, log.Fields{"err": err})
 
 			// Let overwatch decide what to do in this case
 			c.OverwatchChan <- &overwatch.Message{
@@ -237,14 +242,13 @@ func (c *Cluster) runDirectorHeartbeat() {
 
 			return nil
 		} else {
-			log.Debugf("%v-directorHeartbeat: Successfully sent periodic heartbeat (MemberID: %v)",
-				c.Identifier, c.MemberID)
+			llog.WithField("id", c.MemberID).Debug("Successfully sent periodic heartbeat")
 		}
 
 		return nil
 	})
 
-	log.Debugf("%v-directorHeartbeat: Exiting", c.Identifier)
+	llog.Debug("Exiting...")
 }
 
 func (c *Cluster) sendDirectorHeartbeat() error {
@@ -267,7 +271,9 @@ func (c *Cluster) sendDirectorHeartbeat() error {
 
 // IF DIRECTOR: monitor /9volt/cluster/members/*
 func (c *Cluster) runMemberMonitor() {
-	log.Debugf("%v: Launching member monitor...", c.Identifier)
+	llog := c.Log.WithField("method", "runMemberMonitor")
+
+	llog.Debug("Launching member monitor...")
 
 	membersDir := "cluster/members/"
 
@@ -281,7 +287,7 @@ func (c *Cluster) runMemberMonitor() {
 		//
 		// This could be a channel, but this seems easy albeit a bit hacky
 		if c.shutdown {
-			log.Debugf("%v-runMemberMonitor: Received a (non-context based) notice to shutdown", c.Identifier)
+			llog.Debug("Received a (non-context based) notice to shutdown")
 			break
 		}
 
@@ -295,12 +301,11 @@ func (c *Cluster) runMemberMonitor() {
 		resp, err := watcher.Next(c.Component.Ctx)
 		if err != nil {
 			if err.Error() == "context canceled" {
-				log.Debugf("%v-runMemberMonitor: Received a notice to shutdown", c.Identifier)
+				llog.Debug("Received a notice to shutdown")
 				break
 			}
 
-			c.Config.EQClient.AddWithErrorLog("error",
-				fmt.Sprintf("%v-runMemberMonitor: Unexpected watcher error: %v", c.Identifier, err.Error()))
+			c.Config.EQClient.AddWithErrorLog("error", "Unexpected watcher error", llog, log.Fields{"err": err})
 
 			c.OverwatchChan <- &overwatch.Message{
 				Error:     fmt.Errorf("Watcher error: %v", err),
@@ -316,27 +321,24 @@ func (c *Cluster) runMemberMonitor() {
 		case "set":
 			// Only care about set's on base dir and 'config'
 			if !resp.Node.Dir || path.Base(resp.Node.Key) == "config" {
-				log.Debugf("%v-runMemberMonitor: Ignoring watcher action on key %v",
-					c.Identifier, resp.Node.Key)
+				llog.WithField("key", resp.Node.Key).Debug("Ignoring watcher action")
 				continue
 			}
 
 			newMemberID := path.Base(resp.Node.Key)
-			log.Infof("%v-runMemberMonitor: New member '%v' has joined the cluster",
-				c.Identifier, newMemberID)
+			llog.WithField("member", newMemberID).Info("New member has joined the cluster")
 			c.DistributeChan <- true
 		case "expire":
 			// only dirs expire under /cluster/members/; don't need to do anything fancy
 			oldMemberID := path.Base(resp.Node.Key)
-			log.Infof("%v-runMemberMonitor: Detected an expire for old member '%v'",
-				c.Identifier, oldMemberID)
+			llog.WithField("member", oldMemberID).Info("Detected an expire for old member")
 			c.DistributeChan <- true
 		default:
 			continue
 		}
 	}
 
-	log.Debugf("%v-runMemberMonitor: Exiting", c.Identifier)
+	llog.Debug("Exiting...")
 }
 
 // Re-create member dir structure, set initial state
@@ -348,7 +350,7 @@ func (c *Cluster) createInitialMemberStructure(memberDir string, heartbeatTimeou
 	}
 
 	if exists {
-		log.Debugf("%v: MemberDir %v already exists. Trying to delete...", c.Identifier, memberDir)
+		c.Log.Infof("MemberDir %v already exists. Trying to delete...", memberDir)
 
 		if err := c.DalClient.Delete(memberDir, true); err != nil {
 			return fmt.Errorf("Unable to delete pre-existing member dir '%v': %v", memberDir, err.Error())
@@ -380,15 +382,16 @@ func (c *Cluster) createInitialMemberStructure(memberDir string, heartbeatTimeou
 
 // ALWAYS: send member heartbeat updates
 func (c *Cluster) runMemberHeartbeat() {
-	log.Debugf("%v: Launching member heartbeat...", c.Identifier)
+	llog := c.Log.WithField("method", "runMemberHeartbeat")
+
+	llog.Debug("Launching member heartbeat...")
 
 	memberDir := fmt.Sprintf("cluster/members/%v", c.MemberID)
 	heartbeatTimeoutInt := int(time.Duration(c.Config.HeartbeatTimeout).Seconds())
 
 	// create initial member dir
 	if err := c.createInitialMemberStructure(memberDir, heartbeatTimeoutInt); err != nil {
-		logFatalf("%v-memberHeartbeat: Unable to create initial member dir: %v",
-			c.Identifier, err.Error())
+		logFatal(llog, log.Fields{"err": err}, "Unable to create initial member dir")
 	}
 
 	// Avoid data structure creation/existence race
@@ -399,8 +402,9 @@ func (c *Cluster) runMemberHeartbeat() {
 		memberJSON, err := c.generateMemberJSON()
 		if err != nil {
 			c.Config.EQClient.AddWithErrorLog("error",
-				fmt.Sprintf("%v-runMemberHeartbeat: Unable to generate member JSON (retrying in %v): %v",
-					c.Identifier, c.Config.HeartbeatInterval.String(), err.Error()))
+				fmt.Sprintf("Unable to generate member JSON (retrying in %v)", c.Config.HeartbeatInterval.String()),
+				llog, log.Fields{"err": err})
+
 			return nil
 		}
 
@@ -416,8 +420,8 @@ func (c *Cluster) runMemberHeartbeat() {
 			},
 		); err != nil {
 			c.Config.EQClient.AddWithErrorLog("error",
-				fmt.Sprintf("%v-runMemberHeartbeat: Unable to save member JSON status (retrying in %v): %v",
-					c.Identifier, c.Config.HeartbeatInterval.String(), err.Error()))
+				fmt.Sprintf("Unable to save member JSON status (retrying in %v)", c.Config.HeartbeatInterval.String()),
+				llog, log.Fields{"err": err})
 
 			// Let's tell overwatch that something bad happened with backend
 			c.OverwatchChan <- &overwatch.Message{
@@ -434,8 +438,8 @@ func (c *Cluster) runMemberHeartbeat() {
 			if err := c.DalClient.Refresh(memberDir, heartbeatTimeoutInt); err != nil {
 				// Not sure if this should cause a member dropout
 				c.Config.EQClient.AddWithErrorLog("error",
-					fmt.Sprintf("%v-runMemberHeartbeat: Unable to refresh member dir '%v' (retrying in %v): %v",
-						c.Identifier, memberDir, c.Config.HeartbeatInterval.String(), err.Error()))
+					fmt.Sprintf("Unable to refresh member dir (retrying in %v)", c.Config.HeartbeatInterval.String()),
+					llog, log.Fields{"dir": memberDir, "err": err})
 
 				c.OverwatchChan <- &overwatch.Message{
 					Error:     fmt.Errorf("Unable to refresh key in etcd: %v", err),
@@ -448,7 +452,7 @@ func (c *Cluster) runMemberHeartbeat() {
 		return nil
 	})
 
-	log.Debugf("%v-runMemberHeartbeat: Exiting", c.Identifier)
+	llog.Debug("Exiting...")
 }
 
 func (c *Cluster) generateMemberJSON() (string, error) {
@@ -475,13 +479,12 @@ func (c *Cluster) getState() (*DirectorJSON, error) {
 	data, err := c.DalClient.Get(DIRECTOR_KEY, nil)
 
 	if c.DalClient.IsKeyNotFound(err) {
-		log.Debugf("%v-directorMonitor: No active director found", c.Identifier)
+		c.Log.Debug("No active director found")
 		return nil, nil
 	}
 
 	if err != nil {
-		log.Warningf("%v-directorMonitor: Unexpected dal get error: %v",
-			c.Identifier, err.Error())
+		c.Log.WithField("err", err).Warning("Unexpected dal get error")
 		return nil, err
 	}
 
@@ -503,8 +506,7 @@ func (c *Cluster) getState() (*DirectorJSON, error) {
 func (c *Cluster) handleState(directorJSON *DirectorJSON) error {
 	// nil directorJSON == no existing director entry
 	if directorJSON == nil {
-		log.Infof("%v-directorMonitor: No existing director entry found - changing state!",
-			c.Identifier)
+		c.Log.Info("No existing director entry found - changing state!")
 		return c.changeState(START, nil, CREATE)
 	}
 
@@ -512,8 +514,7 @@ func (c *Cluster) handleState(directorJSON *DirectorJSON) error {
 	// (ie. someone updated etcd manually and set us as director)
 	if directorJSON.MemberID == c.MemberID {
 		if !c.amDirector() {
-			log.Infof("%v-directorMonitor: Not a director, but etcd says we are (updating state)!",
-				c.Identifier)
+			c.Log.Info("Not a director, but etcd says we are (updating state)!")
 			return c.changeState(START, directorJSON, UPDATE) // update so we can compareAndSwap
 		}
 
@@ -529,8 +530,7 @@ func (c *Cluster) handleState(directorJSON *DirectorJSON) error {
 	// (dealing with a potential race?)
 	if directorJSON.MemberID != c.MemberID {
 		if c.amDirector() {
-			log.Warningf("%v-directorMonitor: Running in director mode, but etcd says we are not!",
-				c.Identifier)
+			c.Log.Info("Running in director mode, but etcd says we are not!")
 			return c.changeState(STOP, nil, NOOP)
 		}
 	}
@@ -538,12 +538,10 @@ func (c *Cluster) handleState(directorJSON *DirectorJSON) error {
 	// happy path
 	if directorJSON.MemberID != c.MemberID {
 		if c.isExpired(directorJSON.LastUpdate) {
-			log.Infof("%v-directorMonitor: Current director '%v' expired; time to upscale!",
-				c.Identifier, directorJSON.MemberID)
+			c.Log.Infof("Current director '%v' expired; time to upscale!", directorJSON.MemberID)
 			return c.changeState(START, directorJSON, UPDATE)
 		} else {
-			log.Infof("%v-directorMonitor: Current director '%v' not expired yet; waiting patiently",
-				c.Identifier, directorJSON.MemberID)
+			c.Log.Infof("Current director '%v' not expired yet; waiting patiently", directorJSON.MemberID)
 		}
 	}
 
@@ -553,7 +551,7 @@ func (c *Cluster) handleState(directorJSON *DirectorJSON) error {
 
 func (c *Cluster) changeState(action int, prevDirectorJSON *DirectorJSON, etcdAction int) error {
 	if action == START {
-		log.Infof("%v-directorMonitor: Taking over director role", c.Identifier)
+		c.Log.Info("Taking over director role")
 
 		// Only attempt to update state if we have to write to etcd (for UPDATE/CREATE)
 		if etcdAction != NOOP {
@@ -565,7 +563,7 @@ func (c *Cluster) changeState(action int, prevDirectorJSON *DirectorJSON, etcdAc
 		// Notify things to start? (ie. DirectorHeartbeat)
 		c.setDirectorState(true)
 	} else {
-		log.Infof("%v-directorMonitor: Shutting down director role", c.Identifier)
+		c.Log.Info("Shutting down director role")
 
 		// Notify things to shutdown?
 		c.setDirectorState(false)
@@ -620,8 +618,7 @@ func (c *Cluster) updateState(prevDirectorJSON *DirectorJSON, etcdAction int) er
 		return fmt.Errorf("Unable to %v director state in dal: %v", actionVerb, stateErr.Error())
 	}
 
-	log.Debugf("%v-directorMonitor: Successfully %vd director state in dal",
-		c.Identifier, actionVerb)
+	c.Log.Debugf("Successfully %vd director state in dal", actionVerb)
 
 	return nil
 }

@@ -30,6 +30,7 @@ type IDirector interface {
 type Director struct {
 	MemberID         string
 	Config           *config.Config
+	Log              log.FieldLogger
 	State            bool
 	StateChan        <-chan bool
 	DistributeChan   <-chan bool
@@ -52,6 +53,7 @@ func New(cfg *config.Config, stateChan <-chan bool, distributeChan <-chan bool, 
 
 	return &Director{
 		Config:           cfg,
+		Log:              log.WithField("pkg", "director"),
 		MemberID:         cfg.MemberID,
 		StateChan:        stateChan,
 		DistributeChan:   distributeChan,
@@ -68,7 +70,7 @@ func New(cfg *config.Config, stateChan <-chan bool, distributeChan <-chan bool, 
 }
 
 func (d *Director) Start() error {
-	log.Infof("%v: Launching director components...", d.Identifier)
+	d.Log.Debug("Launching director components...")
 
 	// Generate a new context
 	d.Component.Ctx, d.Component.Cancel = context.WithCancel(context.Background())
@@ -82,7 +84,7 @@ func (d *Director) Start() error {
 
 func (d *Director) Stop() error {
 	if d.Component.Cancel == nil {
-		log.Warningf("%v: Looks like .Cancel is nil; is this expected?", d.Identifier)
+		d.Log.Warning("Looks like .Cancel is nil; is this expected?")
 	} else {
 		d.Component.Cancel()
 	}
@@ -97,14 +99,15 @@ func (d *Director) Stop() error {
 // this information is necessary for determining which member is next in line
 // to be given/assigned a new check.
 func (d *Director) collectCheckStats() {
+	llog := d.Log.WithField("method", "collectCheckStats")
+
 	d.CheckStatsLooper.Loop(func() error {
 		// To avoid a potential race here; all members have a count of how many
 		// checks each member is assigned.
 		// This will *probably* be switched to utilize `state` later on.
 		checkStats, err := d.DalClient.FetchCheckStats()
 		if err != nil {
-			d.Config.EQClient.AddWithErrorLog("error",
-				fmt.Sprintf("%v-collectCheckStats: Unable to fetch check stats: %v", d.Identifier, err.Error()))
+			d.Config.EQClient.AddWithErrorLog("error", "Unable to fetch check stats", llog, log.Fields{"err": err})
 			return nil
 		}
 
@@ -115,11 +118,13 @@ func (d *Director) collectCheckStats() {
 		return nil
 	})
 
-	log.Debugf("%v-collectCheckStats: Exiting", d.Identifier)
+	llog.Debug("Exiting...")
 }
 
 func (d *Director) runDistributeListener() {
-	log.Debugf("%v-runDistributeListener: Starting", d.Identifier)
+	llog := d.Log.WithField("method", "runDistributeListener")
+
+	llog.Debug("Starting...")
 
 OUTER:
 	for {
@@ -127,32 +132,32 @@ OUTER:
 		case <-d.DistributeChan:
 			// safety valve
 			if !d.amDirector() {
-				log.Warningf("%v-distributeListener: Was asked to distribute checks but am not director!", d.Identifier)
+				llog.Warning("Was asked to distribute checks but am not director!")
 				continue
 			}
 
 			if err := d.distributeChecks(); err != nil {
-				d.Config.EQClient.AddWithErrorLog("error",
-					fmt.Sprintf("%v-distributeListener: Unable to distribute checks: %v", d.Identifier, err.Error()))
+				d.Config.EQClient.AddWithErrorLog("error", "Unable to distribute checks", llog, log.Fields{"err": err})
 			}
 		case <-d.Component.Ctx.Done():
-			log.Debugf("%v-runDistributeListener: Received a notice to shutdown", d.Identifier)
+			llog.Debug("Received a notice to shutdown")
 			break OUTER
 		}
 	}
 
-	log.Debugf("%v-runDistributeListener: Exiting", d.Identifier)
+	llog.Debug("Exiting...")
 }
 
 func (d *Director) distributeChecks() error {
-	log.Debugf("%v-distributeChecks: Performing member existence verification", d.Identifier)
+	llog := d.Log.WithField("method", "distributeChecks")
+	llog.Debug("Performing member existence verification")
 
 	if err := d.verifyMemberExistence(); err != nil {
 		return fmt.Errorf("%v-distributeChecks: Unable to verify member existence in cluster: %v",
 			d.Identifier, err.Error())
 	}
 
-	log.Infof("%v-distributeChecks: Performing check distribution across members in cluster", d.Identifier)
+	llog.Info("Performing check distribution across members in cluster")
 
 	// fetch all members in cluster
 	members, err := d.DalClient.GetClusterMembersWithTags()
@@ -164,7 +169,7 @@ func (d *Director) distributeChecks() error {
 		return fmt.Errorf("No active cluster members found - bug?")
 	}
 
-	log.Debugf("%v-distributeChecks: Distributing checks between %v cluster members", d.Identifier, len(members))
+	llog.Debugf("Distributing checks between %v cluster members", len(members))
 
 	// fetch all check keys
 	checkKeys, err := d.DalClient.GetCheckKeysWithMemberTag()
@@ -211,6 +216,7 @@ func (d *Director) distributeChecks() error {
 //
 // Note: The words 'node' and 'member' are used interchangibly here.
 func (d *Director) performCheckDistribution(members map[string][]string, checkKeys map[string]string) error {
+	llog := d.Log.WithField("method", "distributeChecks")
 	memberList := d.convertMembersMap(members)
 
 	for tag, memList := range memberList {
@@ -227,8 +233,11 @@ func (d *Director) performCheckDistribution(members map[string][]string, checkKe
 
 			// Blow away any pre-existing config references
 			if err := d.DalClient.ClearCheckReferences(memList[memberNum]); err != nil {
-				log.Errorf("%v: Unable to clear existing check references for member %v: %v",
-					d.Identifier, memList[memberNum], err.Error())
+				llog.WithFields(log.Fields{
+					"id":  memList[memberNum],
+					"err": err,
+				}).Error("Unable to clear existing check references for member")
+
 				return err
 			}
 
@@ -242,11 +251,14 @@ func (d *Director) performCheckDistribution(members map[string][]string, checkKe
 			totalAssigned := 0
 
 			for i := start; i != maxChecks; i++ {
-				log.Debugf("%v: Assigning check '%v' to member '%v'", d.Identifier, checks[i], memList[memberNum])
+				llog.Debugf("Assigning check '%v' to member '%v'", checks[i], memList[memberNum])
 
 				if err := d.DalClient.CreateCheckReference(memList[memberNum], checks[i]); err != nil {
-					log.Errorf("%v: Unable to create check reference for member %v: %v",
-						d.Identifier, memList[memberNum], err.Error())
+					llog.WithFields(log.Fields{
+						"id":  memList[memberNum],
+						"err": err,
+					}).Error("Unable to create check reference for member")
+
 					return err
 				}
 
@@ -256,17 +268,16 @@ func (d *Director) performCheckDistribution(members map[string][]string, checkKe
 			// Update our start num
 			start = maxChecks
 
-			log.Debugf("%v-performCheckDistribution: Assigned %v checks to %v (tag: '%v')", d.Identifier,
-				totalAssigned, memList[memberNum], tag)
+			llog.Debugf("Assigned %v checks to %v (tag: '%v')", totalAssigned, memList[memberNum], tag)
 		}
 	}
 
 	// entries in checkKeys are deleted during filterCheckKeysByTag()
 	if len(checkKeys) != 0 {
-		log.Warningf("%v-performCheckDistribution: Found %v orphaned checks (unable to find any fitting nodes)", d.Identifier, len(checkKeys))
+		llog.Warningf("Found %v orphaned checks (unable to find any fitting nodes)", len(checkKeys))
 
 		for checkName, checkTag := range checkKeys {
-			log.Debugf("%v-performCheckDistribution: Unable to find fitting member for check '%v' (w/ tag '%v')", d.Identifier, checkName, checkTag)
+			llog.Debugf("Unable to find fitting member for check '%v' (w/ tag '%v')", checkName, checkTag)
 		}
 	}
 
@@ -322,7 +333,9 @@ func (d *Director) convertMembersMap(members map[string][]string) map[string][]s
 }
 
 func (d *Director) runStateListener() {
-	log.Debugf("%v-runStateListener: Starting", d.Identifier)
+	llog := d.Log.WithField("method", "runStateListener")
+
+	llog.Debug("Starting...")
 
 	var ctx context.Context
 	var cancel context.CancelFunc
@@ -334,7 +347,7 @@ OUTER:
 			d.setState(state)
 
 			if state {
-				log.Infof("%v-stateListener: Starting up etcd watchers", d.Identifier)
+				llog.WithField("change", "up").Info("Starting up etcd watchers")
 
 				// create new context + cancel func
 				ctx, cancel = context.WithCancel(context.Background())
@@ -343,15 +356,14 @@ OUTER:
 
 				// distribute checks in case we just took over as director (or first start)
 				if err := d.distributeChecks(); err != nil {
-					d.Config.EQClient.AddWithErrorLog("error",
-						fmt.Sprintf("%v-stateListener: Unable to (re)distribute checks: %v", d.Identifier, err.Error()))
+					d.Config.EQClient.AddWithErrorLog("error", "Unable to (re)distribute checks", llog, log.Fields{"err": err})
 				}
 			} else {
-				log.Infof("%v-stateListener: Shutting down etcd watchers", d.Identifier)
+				llog.WithField("change", "down").Info("Shutting down etcd watchers")
 				cancel()
 			}
 		case <-d.Component.Ctx.Done():
-			log.Debugf("%v-runStateListener: Received a notice to shutdown", d.Identifier)
+			llog.Debug("Received a notice to shutdown")
 
 			// Shutdown potential checkConfigWatcher
 			if cancel != nil {
@@ -362,7 +374,7 @@ OUTER:
 		}
 	}
 
-	log.Debugf("%v-runStateListener: Exiting", d.Identifier)
+	llog.Debug("Exiting...")
 }
 
 // This method exists to deal with a case where a director launches for the
@@ -370,6 +382,7 @@ OUTER:
 // yet had a chance to populate itself under /cluster/members/*
 func (d *Director) verifyMemberExistence() error {
 	// TODO: This can probably go into dal.GetClusterMembers()
+	llog := d.Log.WithField("method", "verifyMemberExistence")
 
 	// Let's wait a `heartbeatInterval`*2 to ensure that at least 1 active member
 	// is in the cluster (if not - there's either a bug or the system is *massively* overloaded)
@@ -383,13 +396,11 @@ func (d *Director) verifyMemberExistence() error {
 		}
 
 		if resp.Action != "set" && resp.Action != "update" {
-			log.Debugf("%v-verifyMemberExistence: Ignoring '%v' action on key %v",
-				d.Identifier, resp.Action, resp.Node.Key)
+			llog.Debugf("Ignoring '%v' action on key %v", resp.Action, resp.Node.Key)
 			continue
 		}
 
-		log.Debugf("%v-verifyMemberExistence: Detected '%v' action for key %v",
-			d.Identifier, resp.Action, resp.Node.Key)
+		llog.Debugf("Detected '%v' action for key %v", resp.Action, resp.Node.Key)
 
 		return nil
 	}
@@ -399,7 +410,9 @@ func (d *Director) verifyMemberExistence() error {
 // ie. Something under /monitor changes -> figure out which member is responsible
 //     for that particular check -> NOOP update OR DELETE corresponding member key
 func (d *Director) runCheckConfigWatcher(ctx context.Context) {
-	log.Debugf("%v-checkConfigWatcher: Launching...", d.Identifier)
+	llog := d.Log.WithField("method", "runCheckConfigWatcher")
+
+	llog.Debug("Starting...")
 
 	watcher := d.DalClient.NewWatcher("monitor/", true)
 
@@ -407,17 +420,17 @@ func (d *Director) runCheckConfigWatcher(ctx context.Context) {
 	for {
 		// safety valve
 		if !d.amDirector() {
-			log.Warningf("%v-checkConfigWatcher: Not active director - stopping", d.Identifier)
+			llog.Warning("Not active director - stopping")
 			break
 		}
 
 		// watch check config entries
 		resp, err := watcher.Next(ctx)
 		if err != nil && err.Error() == "context canceled" {
-			log.Warningf("%v-checkConfigWatcher: Received a notice to shutdown", d.Identifier)
+			llog.Warning("Received a notice to shutdown")
 			break
 		} else if err != nil {
-			log.Errorf("%v-checkConfigWatcher: Unexpected error: %v", d.Identifier, err.Error())
+			llog.WithField("err", err).Error("Unexpected error")
 
 			d.OverwatchChan <- &overwatch.Message{
 				Error:     fmt.Errorf("Unexpected watcher error: %v", err),
@@ -430,22 +443,25 @@ func (d *Director) runCheckConfigWatcher(ctx context.Context) {
 		}
 
 		if d.ignorableWatcherEvent(resp) {
-			log.Debugf("%v-checkConfigWatcher: Received ignorable watcher event for %v", d.Identifier, resp.Node.Key)
+			llog.WithField("key", resp.Node.Key).Debug("Received ignorable watcher event")
 			continue
 		}
 
 		if err := d.handleCheckConfigChange(resp); err != nil {
-			log.Errorf("%v-checkConfigWatcher: Unable to process config change for %v: %v",
-				d.Identifier, resp.Node.Key, err.Error())
+			llog.WithFields(log.Fields{
+				"key": resp.Node.Key,
+				"err": err,
+			}).Error("Unable to process config change for given key")
 		}
 	}
 
-	log.Debugf("%v-checkConfigWatcher: Exiting...", d.Identifier)
+	llog.Debug("Exiting...")
 }
 
 func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
-	log.Debugf("%v-handleCheckConfigChange: Received new response for key %v",
-		d.Identifier, resp.Node.Key)
+	llog := d.Log.WithField("method", "handleCheckConfigChange")
+
+	llog.WithField("key", resp.Node.Key).Debug("Received new response for key")
 
 	// Let's not bother going any further if we got an unsupported action
 	knownActions := []string{"set", "update", "create", "delete"}
@@ -466,7 +482,7 @@ func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
 					memberID, resp.Node.Key, err)
 			}
 		} else {
-			log.Warningf("'delete' action for an orphaned check '%v' -- nothing to do", resp.Node.Key)
+			llog.Warningf("'delete' action for an orphaned check '%v' -- nothing to do", resp.Node.Key)
 		}
 
 		return nil
@@ -475,7 +491,7 @@ func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
 	// Not a delete, so let's get this check's tag
 	checkTag, err := d.DalClient.GetCheckMemberTag(resp.Node.Key)
 	if err != nil {
-		return fmt.Errorf("handleCheckConfigChange: Unable to figure out tag for '%v': %v", resp.Node.Key, err)
+		return fmt.Errorf("Unable to figure out tag for '%v': %v", resp.Node.Key, err)
 	}
 
 	var (
@@ -520,7 +536,7 @@ func (d *Director) handleCheckConfigChange(resp *etcd.Response) error {
 
 	// Finally, let's create the actual check reference (and cause manager to start the check)
 	if err := d.DalClient.CreateCheckReference(newMemberID, resp.Node.Key); err != nil {
-		return fmt.Errorf("%v-handleCheckConfigChange: Unable to complete check config update: %v", d.Identifier, err)
+		return fmt.Errorf("Unable to complete check config update: %v", err)
 	}
 
 	return nil
@@ -570,7 +586,7 @@ func (d *Director) PickNextMember(checkTag string) (string, error) {
 
 	for _, memberID := range feasibleMembers {
 		if _, ok := d.CheckStats[memberID]; !ok {
-			log.Warningf("CheckStats do not (yet) contain cluster member '%v'; new check distribution suboptimal", memberID)
+			d.Log.Warningf("CheckStats do not (yet) contain cluster member '%v'; new check distribution suboptimal", memberID)
 			continue
 		}
 
@@ -623,7 +639,7 @@ func (d *Director) filterMembersByTag(checkStats map[string]*dal.MemberStat, che
 // Determine if a specific event can be ignored
 func (d *Director) ignorableWatcherEvent(resp *etcd.Response) bool {
 	if resp == nil {
-		log.Debugf("%v: Received a nil etcd response - bug?", d.Identifier)
+		d.Log.Debug("Received a nil etcd response - bug?")
 		return true
 	}
 
