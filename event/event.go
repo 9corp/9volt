@@ -162,11 +162,13 @@ func (c *Client) Add(key, value string) error {
 func (c *Client) AddWithErrorLog(key, value string, logger log.FieldLogger, fields log.Fields) error {
 	logger.WithFields(fields).Error(value)
 
-	eventMessage := value + " ["
+	fieldEntries := make([]string, 0)
+
 	for k, v := range fields {
-		eventMessage = fmt.Sprintf("%v %v=%v", eventMessage, k, v)
+		fieldEntries = append(fieldEntries, fmt.Sprintf("%v=%v", k, v))
 	}
-	eventMessage = eventMessage + "]"
+
+	eventMessage := value + " [" + strings.Join(fieldEntries, " ") + "]"
 
 	if err := c.Add(key, eventMessage); err != nil {
 		return err
