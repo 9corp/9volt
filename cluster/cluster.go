@@ -392,7 +392,6 @@ func (c *Cluster) runMemberHeartbeat() {
 	// create initial member dir
 	if err := c.createInitialMemberStructure(memberDir, heartbeatTimeoutInt); err != nil {
 		logFatal(llog, log.Fields{"err": err}, "Unable to create initial member dir")
-		// llog.WithField("err", err).Fatal("Unable to create initial member dir")
 	}
 
 	// Avoid data structure creation/existence race
