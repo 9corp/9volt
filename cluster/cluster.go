@@ -109,7 +109,10 @@ type MemberJSON struct {
 }
 
 var (
-	logFatalf = log.Fatalf
+	// overwrite for tests
+	logFatal = func(logger log.FieldLogger, fields log.Fields, msg string) {
+		logger.WithFields(fields).Fatal(msg)
+	}
 )
 
 func New(cfg *config.Config, stateChan, distributeChan chan<- bool, overwatchChan chan<- *overwatch.Message) (*Cluster, error) {
@@ -388,7 +391,8 @@ func (c *Cluster) runMemberHeartbeat() {
 
 	// create initial member dir
 	if err := c.createInitialMemberStructure(memberDir, heartbeatTimeoutInt); err != nil {
-		llog.WithField("err", err).Fatal("Unable to create initial member dir")
+		logFatal(llog, log.Fields{"err": err}, "Unable to create initial member dir")
+		// llog.WithField("err", err).Fatal("Unable to create initial member dir")
 	}
 
 	// Avoid data structure creation/existence race

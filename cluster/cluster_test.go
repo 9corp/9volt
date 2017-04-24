@@ -1,6 +1,8 @@
 package cluster
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,7 +18,6 @@ import (
 	"github.com/9corp/9volt/dal"
 	"github.com/9corp/9volt/fakes/dalfakes"
 	"github.com/9corp/9volt/fakes/eventfakes"
-	"github.com/9corp/9volt/fakes/logfakes"
 	"github.com/9corp/9volt/overwatch"
 	"github.com/9corp/9volt/util"
 )
@@ -26,12 +27,13 @@ var _ = Describe("cluster", func() {
 		c                   *Cluster
 		fakeDAL             *dalfakes.FakeIDal
 		fakeEventClient     *eventfakes.FakeIClient
-		fakeLog             *logfakes.FakeFieldLogger
 		looperChan          chan error
 		stateChan           chan bool
 		distributeChan      chan bool
 		overwatchChan       chan *overwatch.Message
 		memberHeartbeatChan chan error
+		testBuffer          *bytes.Buffer
+		logger              *log.Logger
 
 		directorID string
 	)
@@ -39,25 +41,20 @@ var _ = Describe("cluster", func() {
 	BeforeEach(func() {
 		fakeDAL = &dalfakes.FakeIDal{}
 		fakeEventClient = &eventfakes.FakeIClient{}
-		fakeLog = &logfakes.FakeFieldLogger{}
-
-		// I'd like to do something like this?
-		// fakeLog.WithFieldReturns(log.NewEntry((*log.Logger)(fakeLog)))
-
-		fakeLog.WithFieldReturns(log.NewEntry(log.New())) // <--- :(
-
 		looperChan = make(chan error, 1)
 		stateChan = make(chan bool, 1)
 		distributeChan = make(chan bool, 1)
 		memberHeartbeatChan = make(chan error, 1)
 		overwatchChan = make(chan *overwatch.Message, 1)
+		logger = log.New()
+		logger.Out = bufio.NewWriter(testBuffer)
 
 		directorID = "myid123"
 
 		c = &Cluster{
 			DalClient:     fakeDAL,
 			DirectorLock:  &sync.Mutex{},
-			Log:           fakeLog,
+			Log:           logger,
 			MemberID:      directorID,
 			Hostname:      "hostname",
 			DirectorState: true,
@@ -459,13 +456,13 @@ var _ = Describe("cluster", func() {
 
 		Context("when unable to create initial member structure", func() {
 			var (
-				called             int
-				logFatalfArgFormat string
+				logFatalNumCalled int
+				logFatalMsg       string
 			)
 			It("should exit", func() {
-				logFatalf = func(format string, vars ...interface{}) {
-					called++
-					logFatalfArgFormat = format
+				logFatal = func(logger log.FieldLogger, fields log.Fields, msg string) {
+					logFatalNumCalled++
+					logFatalMsg = msg
 				}
 
 				// cause createInitialMemberStructure to fail
@@ -473,8 +470,8 @@ var _ = Describe("cluster", func() {
 
 				c.runMemberHeartbeat()
 
-				Expect(called).To(Equal(1))
-				Expect(logFatalfArgFormat).To(ContainSubstring("Unable to create initial member dir"))
+				Expect(logFatalNumCalled).To(Equal(1))
+				Expect(logFatalMsg).To(ContainSubstring("Unable to create initial member dir"))
 			})
 		})
 
