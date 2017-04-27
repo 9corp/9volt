@@ -4,6 +4,7 @@ package state
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -12,10 +13,14 @@ import (
 
 	"github.com/9corp/9volt/base"
 	"github.com/9corp/9volt/config"
+	"github.com/9corp/9volt/dal"
+	"github.com/9corp/9volt/util"
 )
 
 const (
-	STATE_PREFIX = "state"
+	STATE_PREFIX         = "state"
+	DEFAULT_STATE_TTL    = time.Hour * 24
+	STATE_TTL_MULTIPLIER = 2
 )
 
 type Message struct {
@@ -37,6 +42,11 @@ type State struct {
 	DumperLooper director.Looper
 
 	base.Component
+}
+
+// Used for parsing/fetching the interval from a config in a state message
+type TmpMonitorConfig struct {
+	Interval util.CustomDuration `json:"interval"`
 }
 
 func New(cfg *config.Config, stateChannel chan *Message) *State {
@@ -119,6 +129,15 @@ func (s *State) runDumper() error {
 		}
 
 		for k, v := range s.Data {
+			ttl, err := s.getInterval([]byte(v.Config))
+			if err != nil {
+				s.Config.EQClient.AddWithErrorLog("error", "Unable to fetch interval", llog, log.Fields{"err": err})
+				ttl = DEFAULT_STATE_TTL
+			} else {
+				// got a legitimate interval, let's increase it a bit
+				ttl = ttl * STATE_TTL_MULTIPLIER
+			}
+
 			fullKey := STATE_PREFIX + "/" + k
 
 			messageBlob, err := json.Marshal(v)
@@ -127,7 +146,9 @@ func (s *State) runDumper() error {
 				continue
 			}
 
-			if err := s.Config.DalClient.Set(fullKey, string(messageBlob), nil); err != nil {
+			if err := s.Config.DalClient.Set(fullKey, string(messageBlob), &dal.SetOptions{
+				TTLSec: int(ttl.Seconds()),
+			}); err != nil {
 				s.Config.EQClient.AddWithErrorLog("error", "Unable to dump state", llog, log.Fields{"key": k, "err": err})
 				continue
 			}
@@ -141,4 +162,15 @@ func (s *State) runDumper() error {
 	llog.Debug("Exiting...")
 
 	return nil
+}
+
+// Fetch the run interval from a given json blob
+func (s *State) getInterval(config []byte) (time.Duration, error) {
+	var cfg TmpMonitorConfig
+
+	if err := json.Unmarshal(config, &cfg); err != nil {
+		return 0, fmt.Errorf("Unable to unmarshal config struct: %v", err)
+	}
+
+	return time.Duration(cfg.Interval), nil
 }
