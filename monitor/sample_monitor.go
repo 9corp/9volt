@@ -12,10 +12,6 @@
 
 package monitor
 
-import (
-	log "github.com/Sirupsen/logrus"
-)
-
 type SampleMonitor struct {
 	Base
 }
@@ -38,7 +34,7 @@ func (s *SampleMonitor) Validate() error {
 }
 
 func (s *SampleMonitor) sampleCheck() error {
-	log.Debugf("%v-%v: Performing check for '%v'", s.Identifier, s.RMC.GID, s.RMC.ConfigName)
+	s.RMC.Log.WithField("configName", s.RMC.ConfigName).Debug("Performing sample check")
 
 	return nil
 }

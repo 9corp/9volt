@@ -4,10 +4,12 @@ import (
 	"errors"
 	"time"
 
-	"github.com/9corp/9volt/alerter"
-	"github.com/9corp/9volt/state"
+	log "github.com/Sirupsen/logrus"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"github.com/9corp/9volt/alerter"
+	"github.com/9corp/9volt/state"
 )
 
 const (
@@ -40,6 +42,7 @@ var _ = Describe("base_monitor", func() {
 			StopChannel:    stopChan,
 			StateChannel:   stateChan,
 			ConfigName:     "mock_config",
+			Log:            log.New(),
 			MessageChannel: messageChan,
 			Config: &MonitorConfig{
 				CriticalThreshold: CriticalMessages,

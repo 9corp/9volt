@@ -8,8 +8,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-
-	log "github.com/Sirupsen/logrus"
 )
 
 const (
@@ -45,7 +43,7 @@ func NewExecMonitor(rmc *RootMonitorConfig) *ExecMonitor {
 }
 
 func (e *ExecMonitor) Validate() error {
-	log.Debugf("%v: Performing monitor config validation for %v", e.Identifier, e.RMC.ConfigName)
+	e.RMC.Log.WithField("configName", e.RMC.ConfigName).Debug("Performing monitor config validation")
 
 	if e.RMC.Config.ExecCommand == "" {
 		return errors.New("'command' cannot be blank")
@@ -59,7 +57,7 @@ func (e *ExecMonitor) Validate() error {
 }
 
 func (e *ExecMonitor) execCheck() error {
-	log.Debugf("%v-%v: Performing check for '%v'", e.Identifier, e.RMC.GID, e.RMC.ConfigName)
+	e.RMC.Log.WithField("configName", e.RMC.ConfigName).Debug("Performing check")
 
 	ctx, cancel := context.WithTimeout(context.Background(), e.Timeout)
 	defer cancel()

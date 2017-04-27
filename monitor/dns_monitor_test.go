@@ -3,9 +3,11 @@ package monitor
 import (
 	"time"
 
-	"github.com/9corp/9volt/util"
+	log "github.com/Sirupsen/logrus"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"github.com/9corp/9volt/util"
 )
 
 var _ = Describe("dns_monitor", func() {
@@ -23,6 +25,7 @@ var _ = Describe("dns_monitor", func() {
 				DnsRecordType: "A",
 				Interval:      util.CustomDuration(3 * time.Second),
 			},
+			Log: log.New(),
 		}
 
 		monitor = NewDnsMonitor(config)

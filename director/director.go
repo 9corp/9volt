@@ -157,7 +157,7 @@ func (d *Director) distributeChecks() error {
 			d.Identifier, err.Error())
 	}
 
-	llog.Info("Performing check distribution across members in cluster")
+	llog.Info("Performing check distribution across cluster")
 
 	// fetch all members in cluster
 	members, err := d.DalClient.GetClusterMembersWithTags()
@@ -251,7 +251,10 @@ func (d *Director) performCheckDistribution(members map[string][]string, checkKe
 			totalAssigned := 0
 
 			for i := start; i != maxChecks; i++ {
-				llog.Debugf("Assigning check '%v' to member '%v'", checks[i], memList[memberNum])
+				llog.WithFields(log.Fields{
+					"check":  checks[i],
+					"member": memList[memberNum],
+				}).Debug("Assigning check to member")
 
 				if err := d.DalClient.CreateCheckReference(memList[memberNum], checks[i]); err != nil {
 					llog.WithFields(log.Fields{
@@ -268,7 +271,11 @@ func (d *Director) performCheckDistribution(members map[string][]string, checkKe
 			// Update our start num
 			start = maxChecks
 
-			llog.Debugf("Assigned %v checks to %v (tag: '%v')", totalAssigned, memList[memberNum], tag)
+			llog.WithFields(log.Fields{
+				"totalAssigned": totalAssigned,
+				"memberID":      memList[memberNum],
+				"tag":           tag,
+			}).Debug("Assigned check(s) to member")
 		}
 	}
 
@@ -277,7 +284,10 @@ func (d *Director) performCheckDistribution(members map[string][]string, checkKe
 		llog.Warningf("Found %v orphaned checks (unable to find any fitting nodes)", len(checkKeys))
 
 		for checkName, checkTag := range checkKeys {
-			llog.Debugf("Unable to find fitting member for check '%v' (w/ tag '%v')", checkName, checkTag)
+			llog.WithFields(log.Fields{
+				"check": checkName,
+				"tag":   checkTag,
+			}).Debug("Unable to find fitting member for check")
 		}
 	}
 
@@ -396,11 +406,16 @@ func (d *Director) verifyMemberExistence() error {
 		}
 
 		if resp.Action != "set" && resp.Action != "update" {
-			llog.Debugf("Ignoring '%v' action on key %v", resp.Action, resp.Node.Key)
-			continue
+			llog.WithFields(log.Fields{
+				"action": resp.Action,
+				"key":    resp.Node.Key,
+			}).Debug("Ignoring etcd action on key")
 		}
 
-		llog.Debugf("Detected '%v' action for key %v", resp.Action, resp.Node.Key)
+		llog.WithFields(log.Fields{
+			"action": resp.Action,
+			"key":    resp.Node.Key,
+		}).Debug("Detected etcd action on key")
 
 		return nil
 	}

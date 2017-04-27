@@ -55,7 +55,9 @@ func (b *Base) Identify() string {
 
 // Run the check on a given interval -> evaluate response via b.handle()
 func (b *Base) Run() error {
-	log.Debugf("%v-%v: Starting work for monitor %v...", b.Identify(), b.RMC.GID, b.RMC.Name)
+	llog := b.RMC.Log.WithFields(log.Fields{"monitorName": b.RMC.Name, "method": b.RMC.Name})
+
+	llog.Debug("Starting work")
 
 	defer b.RMC.Ticker.Stop()
 
@@ -65,17 +67,17 @@ Mainloop:
 	for {
 		select {
 		case <-b.RMC.Ticker.C:
-			log.Debugf("%v-%v: Tick for monitor %v", b.Identify(), b.RMC.GID, b.RMC.Name)
+			llog.Debug("Monitor tick")
 			if err := b.handle(b.MonitorFunc()); err != nil {
 				log.Errorf("Unable to complete check handler: %v", err.Error())
 			}
 		case <-b.RMC.StopChannel:
-			log.Debugf("%v-%v: Asked to shutdown monitor %v", b.Identify(), b.RMC.GID, b.RMC.Name)
+			llog.Debug("Asked to shutdown")
 			break Mainloop
 		}
 	}
 
-	log.Debugf("%v-%v: Goroutine has been stopped for monitor %v; exiting...", b.Identify(), b.RMC.GID, b.RMC.Name)
+	llog.Debug("Goroutine exiting...")
 	return nil
 }
 
@@ -111,7 +113,7 @@ func (b *Base) sendMessage(curState int, titleMessage, alertMessage, errorDetail
 	var alertType = [3]string{"resolve", "warning", "critical"}
 	var alertKey = [3][]string{[]string{}, b.RMC.Config.WarningAlerter, b.RMC.Config.CriticalAlerter}
 
-	log.Warningf("%v-%v: (%v) %v", b.Identifier, b.RMC.GID, b.RMC.Name, alertMessage)
+	log.Debugf("%v-%v: (%v) %v", b.Identifier, b.RMC.GID, b.RMC.Name, alertMessage)
 
 	msg := &alerter.Message{
 		Type:        alertType[curState],
@@ -133,8 +135,11 @@ func (b *Base) sendMessage(curState int, titleMessage, alertMessage, errorDetail
 	// Send the message
 	b.RMC.MessageChannel <- msg
 
-	log.Debugf("%v-%v: Successfully sent '%v' message for %v (%v)",
-		b.Identifier, b.RMC.GID, msg.Type, b.RMC.ConfigName, b.RMC.Name)
+	b.RMC.Log.WithFields(log.Fields{
+		"configName": b.RMC.ConfigName,
+		"msgType":    msg.Type,
+		"name":       b.RMC.Name,
+	}).Debug("Successfully sent message")
 
 	// Get resolve functions ready
 	for _, alert := range alertKey[curState] {
@@ -182,7 +187,7 @@ func (b *Base) updateState(monitorErr error) error {
 		Config:  jsonConfig,
 	}
 
-	log.Debugf("%v: Successfully sent state message for '%v' to state reader", b.Identifier, b.RMC.ConfigName)
+	b.RMC.Log.WithField("configName", b.RMC.ConfigName).Debug("Successfully sent state message")
 
 	return nil
 }

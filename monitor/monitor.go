@@ -54,6 +54,7 @@ type RootMonitorConfig struct {
 	StateChannel   chan *state.Message
 	StopChannel    chan bool
 	Ticker         *time.Ticker
+	Log            log.FieldLogger
 }
 
 // TODO: This should probably be split up between each individual check type
@@ -170,7 +171,7 @@ func (m *Monitor) Handle(action int, monitorName, monitorConfigLocation string) 
 	}
 
 	// start check with new monitor configuration
-	m.Log.Debugf("Starting new monitor for %v...", monitorName)
+	m.Log.WithField("monitorName", monitorName).Debug("Starting new monitor")
 
 	if err := m.start(monitorName, monitorConfigLocation, monitorConfig); err != nil {
 		m.Config.EQClient.AddWithErrorLog("error", "Unable to start new monitor",
@@ -179,7 +180,7 @@ func (m *Monitor) Handle(action int, monitorName, monitorConfigLocation string) 
 		return fmt.Errorf("Unable to start new monitor %v: %v", monitorName, err.Error())
 	}
 
-	m.Log.Debugf("Successfully started new monitor '%v'", monitorName)
+	m.Log.WithField("monitorName", monitorName).Debug("Successfully started new monitor")
 
 	return nil
 }
@@ -225,18 +226,21 @@ func (m *Monitor) start(monitorName, monitorConfigLocation string, monitorConfig
 		return fmt.Errorf("%v: No such monitor type found '%v'", m.Identifier, monitorConfig.Type)
 	}
 
+	gid := util.RandomString(GOROUTINE_ID_LENGTH, false)
+
 	// Create a new monitor instance
 	newMonitor := m.SupportedMonitors[monitorConfig.Type](
 		&RootMonitorConfig{
 			Name:           monitorName,
 			ConfigName:     path.Base(monitorConfigLocation),
-			GID:            util.RandomString(GOROUTINE_ID_LENGTH, false),
+			GID:            gid,
 			Config:         monitorConfig,
 			MemberID:       m.MemberID,
 			MessageChannel: m.MessageChannel,
 			StateChannel:   m.StateChannel,
 			StopChannel:    make(chan bool, 1),
 			Ticker:         time.NewTicker(time.Duration(monitorConfig.Interval)),
+			Log:            m.Log.WithFields(log.Fields{"type": monitorConfig.Type, "gid": gid}),
 		},
 	)
 
@@ -278,23 +282,18 @@ func (m *Monitor) validateMonitorConfig(monitorConfig *MonitorConfig) error {
 		return errors.New("'interval' must be > 0s")
 	}
 
-	if monitorConfig.CriticalThreshold == 0 {
-		return errors.New("'critical-threshold' must be non-zero")
+	if monitorConfig.WarningThreshold < 0 {
+		return errors.New("'critical-threshold' must be larger or equal to 0")
+	}
+
+	if monitorConfig.CriticalThreshold < 0 {
+		return errors.New("'critical-threshold' must be larger or equal to 0")
 	}
 
 	// TODO: Logic for this should be changed/fixed at some point
+	// edit1: Should it? seems to make sense right now ~dselans 04.27.2017
 	if monitorConfig.WarningThreshold > monitorConfig.CriticalThreshold {
 		return errors.New("'warning-threshold' cannot be larger than 'CriticalThreshold'")
-	}
-
-	// TODO: It should be possible to NOT have a WarningAlerter setting (and just
-	// have a `CriticalAlerter` setting)
-	if len(monitorConfig.WarningAlerter) == 0 {
-		return errors.New("'warning-alerter' list must contain at least one entry")
-	}
-
-	if len(monitorConfig.CriticalAlerter) == 0 {
-		return errors.New("'critical-alerter' list must contain at least one entry")
 	}
 
 	if monitorConfig.Port > MAX_PORT {

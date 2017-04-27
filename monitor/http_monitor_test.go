@@ -4,10 +4,12 @@ import (
 	"io/ioutil"
 	"time"
 
-	"github.com/9corp/9volt/util"
+	log "github.com/Sirupsen/logrus"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"gopkg.in/jarcoal/httpmock.v1"
+
+	"github.com/9corp/9volt/util"
 )
 
 var _ = BeforeSuite(func() {
@@ -42,6 +44,7 @@ var _ = Describe("http_monitor", func() {
 					Host:           "beowulf",
 					HTTPStatusCode: 200,
 				},
+				Log: log.New(),
 			}
 			monitor = NewHTTPMonitor(config)
 
@@ -60,6 +63,7 @@ var _ = Describe("http_monitor", func() {
 					Host:           "beowulf",
 					HTTPStatusCode: 200,
 				},
+				Log: log.New(),
 			}
 			monitor = NewHTTPMonitor(config)
 		})
@@ -86,6 +90,7 @@ var _ = Describe("http_monitor", func() {
 					Host:           "beowulf",
 					HTTPStatusCode: 200,
 				},
+				Log: log.New(),
 			}
 			monitor = NewHTTPMonitor(config)
 			url = monitor.constructURL()
@@ -131,6 +136,7 @@ var _ = Describe("http_monitor", func() {
 		BeforeEach(func() {
 			config = &RootMonitorConfig{
 				Config: &MonitorConfig{},
+				Log:    log.New(),
 			}
 
 			monitor = NewHTTPMonitor(config)
@@ -179,6 +185,7 @@ var _ = Describe("http_monitor", func() {
 					HTTPSSL: true,
 					Host:    "beowulf",
 				},
+				Log: log.New(),
 			}
 			monitor = NewHTTPMonitor(config)
 			url = monitor.constructURL()
