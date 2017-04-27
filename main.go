@@ -90,12 +90,15 @@ func runServer() {
 
 	etcdMemberList := util.SplitTags(*etcdMembers)
 
-	log.Infof("Starting 9volt server ID:%s Tags:%v", memberID, memberTags)
+	log.WithFields(log.Fields{
+		"memberID": memberID,
+		"tags":     memberTags,
+	}).Info("Starting 9volt server")
 
 	// Create an initial dal client
 	dalClient, err := dal.New(*etcdPrefix, etcdMemberList, *etcdUserPass, false, false, false)
 	if err != nil {
-		log.Fatalf("Unable to start initial etcd client: %v", err.Error())
+		log.WithField("err", err).Fatal("Unable to start initial etcd client")
 	}
 
 	// Create and start event queue
@@ -107,12 +110,13 @@ func runServer() {
 		memberTags, dalClient, eqClient, version, semver)
 
 	if err := cfg.Load(); err != nil {
-		log.Fatalf("Unable to load configuration from etcd: %v", err.Error())
+
+		log.WithField("err", err).Fatal("Unable to load configuration from etcd")
 	}
 
 	// Perform etcd layout validation
 	if errorList := cfg.ValidateDirs(); len(errorList) != 0 {
-		log.Fatalf("Unable to complete etcd layout validation: %v", strings.Join(errorList, "; "))
+		log.WithField("errorList", strings.Join(errorList, "; ")).Fatal("Unable to complete etcd layout validation")
 	}
 
 	// Create necessary channels
@@ -125,17 +129,17 @@ func runServer() {
 	// Instantiate all of the components
 	cluster, err := cluster.New(cfg, clusterStateChannel, distributeChannel, overwatchChannel)
 	if err != nil {
-		log.Fatalf("Unable to instantiate cluster engine: %v", err.Error())
+		log.WithField("err", err).Fatal("Unable to instantiate cluster engine")
 	}
 
 	director, err := director.New(cfg, clusterStateChannel, distributeChannel, overwatchChannel)
 	if err != nil {
-		log.Fatalf("Unable to instantiate director: %v", err.Error())
+		log.WithField("err", err).Fatal("Unable to instantiate director")
 	}
 
 	manager, err := manager.New(cfg, messageChannel, monitorStateChannel, overwatchChannel)
 	if err != nil {
-		log.Fatalf("Unable to instantiate manager: %v", err.Error())
+		log.WithField("err", err).Fatal("Unable to instantiate manager")
 	}
 
 	alerter := alerter.New(cfg, messageChannel)
@@ -146,14 +150,17 @@ func runServer() {
 
 	watcher := overwatch.New(cfg, overwatchChannel, components)
 	if err := watcher.Start(); err != nil {
-		log.Fatalf("Unable to start overwatch component: %v", err)
+		log.WithField("err", err).Fatal("Unable to start overwatch component")
 	}
 
 	for _, cmp := range components {
-		log.Infof("Starting component '%v'", cmp.Identify())
+		log.WithField("component", cmp.Identify()).Info("Starting component")
 
 		if err := cmp.Start(); err != nil {
-			log.Fatalf("Unable to start component '%v': %v", cmp.Identify(), err)
+			log.WithFields(log.Fields{
+				"component": cmp.Identify(),
+				"err":       err,
+			}).Fatal("Unable to start component")
 		}
 	}
 
@@ -170,8 +177,11 @@ func runServer() {
 	apiServer := api.New(cfg, mwHandler, debugUserInterface, util.SplitTags(*accessTokens))
 	go apiServer.Run()
 
-	log.Infof("9volt has started! API address: %v MemberID: %v Tags: %v", "http://"+
-		*listenAddress, memberID, strings.Join(memberTags, ", "))
+	log.WithFields(log.Fields{
+		"listenAddress": *listenAddress,
+		"memberID":      memberID,
+		"tags":          strings.Join(memberTags, ", "),
+	}).Info("9volt has started!")
 
 	wg.Wait()
 }

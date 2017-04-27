@@ -41,7 +41,7 @@ func NewTCPMonitor(rmc *RootMonitorConfig) *TCPMonitor {
 }
 
 func (t *TCPMonitor) Validate() error {
-	log.Debugf("%v: Performing monitor config validation for %v", t.Identifier, t.RMC.ConfigName)
+	t.RMC.Log.WithField("configName", t.RMC.ConfigName).Debug("Performing monitor config validation")
 
 	if t.ConnTimeout >= time.Duration(t.RMC.Config.Interval) {
 		return fmt.Errorf("'timeout' (%v) cannot equal or exceed 'interval' (%v)", t.ConnTimeout.String(), t.RMC.Config.Interval.String())
@@ -99,7 +99,7 @@ func (t *TCPMonitor) updateSettings() {
 func (t *TCPMonitor) tcpCheck() error {
 	fullAddress := fmt.Sprintf("%v:%v", t.RMC.Config.Host, t.RMC.Config.Port)
 
-	log.Debugf("%v-%v: Performing tcp check against '%v'", t.Identify(), t.RMC.GID, fullAddress)
+	t.RMC.Log.WithField("address", fullAddress).Debug("Performing tcp check")
 
 	// Open the connection
 	conn, err := net.DialTimeout("tcp", fullAddress, t.ConnTimeout)

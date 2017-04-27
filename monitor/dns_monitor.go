@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/9corp/9volt/util"
-	log "github.com/Sirupsen/logrus"
 	resolver "github.com/miekg/dns"
+
+	"github.com/9corp/9volt/util"
 )
 
 const (
@@ -60,10 +60,7 @@ func NewDnsMonitor(rmc *RootMonitorConfig) *DnsMonitor {
 }
 
 func (dns *DnsMonitor) Validate() error {
-	log.Debugf(
-		"%v: Performing monitor config validation for %v",
-		dns.Identifier, dns.RMC.ConfigName,
-	)
+	dns.RMC.Log.WithField("configName", dns.RMC.ConfigName).Debug("Performing monitor config validation")
 
 	if _, ok := resolver.StringToType[strings.ToUpper(dns.RMC.Config.DnsRecordType)]; !ok {
 		return fmt.Errorf("Unknown record type: %s", dns.RMC.Config.DnsRecordType)
@@ -104,7 +101,7 @@ func (dns *DnsMonitor) dnsCheck() error {
 	target := resolver.Fqdn(dns.RMC.Config.DnsTarget)
 	server := dns.RMC.Config.Host + ":53" // Only support port 53 at least for now
 
-	log.Debugf("%s: Resolving %s against %s", dns.Identifier, target, server)
+	dns.RMC.Log.Debugf("Resolving %s against %s", target, server)
 
 	msg.SetQuestion(target, qType)
 
@@ -156,9 +153,7 @@ func (dns *DnsMonitor) dnsCheck() error {
 			continue
 		}
 
-		log.Warnf("%s: Found non-matching records in DNS result: '%s'",
-			dns.Identifier, ans.Header().String(),
-		)
+		dns.RMC.Log.Warningf("Found non-matching records in DNS result: '%s'", ans.Header().String())
 	}
 
 	if foundCount == expectedCount {

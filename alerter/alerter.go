@@ -125,15 +125,17 @@ OUTER:
 }
 
 func (a *Alerter) handleMessage(msg *Message) error {
+	llog := a.Log.WithField("method", "handleMessage")
+
 	// validate message contents
 	if err := a.validateMessage(msg); err != nil {
-		a.Config.EQClient.AddWithErrorLog("error", "Unable to validate message", a.Log, log.Fields{"uuid": msg.uuid, "err": err})
+		a.Config.EQClient.AddWithErrorLog("error", "Unable to validate message", llog, log.Fields{"uuid": msg.uuid, "err": err})
 		return err
 	}
 
 	// Nothing to do if the alerter config is empty
 	if len(msg.Key) == 0 {
-		a.Log.WithField("uuid", msg.uuid).Debug("Not sending any message - alerter not set in config")
+		llog.WithField("uuid", msg.uuid).Debug("Not sending any message - alerter not set in config")
 		return nil
 	}
 
@@ -144,36 +146,33 @@ func (a *Alerter) handleMessage(msg *Message) error {
 	for _, alerterKey := range msg.Key {
 		alerterConfig, err := a.loadAlerterConfig(alerterKey, msg)
 		if err != nil {
-			errorMessage := fmt.Sprintf("Unable to load alerter key for %v: %v", msg.uuid, err.Error())
-			errorList = append(errorList, errorMessage)
-			log.Errorf("%v: %v", a.Identifier, errorMessage)
+			errorList = append(errorList, fmt.Sprintf("Unable to load alerter key for %v: %v", msg.uuid, err.Error()))
+			llog.WithFields(log.Fields{"uuid": msg.uuid, "err": err}).Error("Unable to load alerter key")
 			continue
 		}
 
 		// validate the alerter config
 		if err := a.Alerters[alerterConfig.Type].ValidateConfig(alerterConfig); err != nil {
-			errorMessage := fmt.Sprintf("Unable to validate alerter config for %v: %v", msg.uuid, err.Error())
-			errorList = append(errorList, errorMessage)
-			log.Errorf("%v: %v", a.Identifier, errorMessage)
+			errorList = append(errorList, fmt.Sprintf("Unable to validate alerter config for %v: %v", msg.uuid, err.Error()))
+			llog.WithFields(log.Fields{"uuid": msg.uuid, "err": err}).Error("Unable to validate alerter config")
 			continue
 		}
 
 		// send the actual alert
-		a.Log.Debug("Sending '%v' to alerter '%v'", msg.uuid, alerterConfig.Type)
+		llog.WithFields(log.Fields{"uuid": msg.uuid, "alerter": alerterConfig.Type}).Debug("Sending message to alerter")
 
 		if err := a.Alerters[alerterConfig.Type].Send(msg, alerterConfig); err != nil {
-			errorMessage := fmt.Sprintf("Unable to complete message send for %v: %v", msg.uuid, err.Error())
-			errorList = append(errorList, errorMessage)
-			log.Errorf("%v: %v", a.Identifier, errorMessage)
+			errorList = append(errorList, fmt.Sprintf("Unable to complete message send for %v: %v", msg.uuid, err.Error()))
+			llog.WithFields(log.Fields{"uuid": msg.uuid, "err": err}).Error("Unable to complete message send")
 			continue
 		}
 	}
 
 	if len(errorList) != 0 {
-		a.Config.EQClient.AddWithErrorLog("error", "Ran into errors during alert send", a.Log,
+		a.Config.EQClient.AddWithErrorLog("error", "Ran into errors during alert send", llog,
 			log.Fields{"numErrors": len(errorList), "source": msg.Source, "key": msg.Key, "errors": strings.Join(errorList, "; ")})
 	} else {
-		a.Log.WithFields(log.Fields{"uuid": msg.uuid, "key": msg.Key}).Debugf("Successfully sent %v alert messages", len(msg.Key))
+		llog.WithFields(log.Fields{"uuid": msg.uuid, "key": msg.Key}).Debugf("Successfully sent %v alert messages", len(msg.Key))
 	}
 
 	return nil

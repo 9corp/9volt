@@ -5,10 +5,9 @@ import (
 	"sync"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	. "github.com/onsi/ginkgo"
-	// . "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
-
 	d "github.com/relistan/go-director"
 
 	"github.com/9corp/9volt/base"
@@ -51,6 +50,7 @@ var _ = Describe("overwatch", func() {
 			Components:   components,
 			WatchLooper:  watchLooper,
 			Looper:       listenerLooper,
+			Log:          log.New(),
 			Component: base.Component{
 				Identifier: "overwatch",
 			},

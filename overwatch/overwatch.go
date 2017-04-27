@@ -36,6 +36,7 @@ type Overwatch struct {
 	WatchLooper  director.Looper
 	Components   []base.IComponent
 	activeWatch  bool
+	Log          log.FieldLogger
 
 	base.Component
 }
@@ -50,6 +51,7 @@ func New(cfg *config.Config, watchChannel <-chan *Message, components []base.ICo
 	return &Overwatch{
 		Config:       cfg,
 		WatchChannel: watchChannel,
+		Log:          log.WithField("pkg", "overwatch"),
 		Components:   components,
 		Looper:       director.NewFreeLooper(director.FOREVER, make(chan error)),
 		WatchLooper:  director.NewTimedLooper(director.FOREVER, WATCH_RETRY_INTERVAL, make(chan error)),
@@ -60,7 +62,8 @@ func New(cfg *config.Config, watchChannel <-chan *Message, components []base.ICo
 }
 
 func (o *Overwatch) Start() error {
-	log.Debugf("%v: Launching watcher component...", o.Identifier)
+
+	o.Log.Debug("Launching watcher component...")
 
 	go o.runListener()
 
@@ -73,14 +76,19 @@ func (o *Overwatch) Stop() error {
 }
 
 func (o *Overwatch) runListener() error {
+	llog := o.Log.WithField("method", "runListener")
+
 	// Listen for bad events from components
 	o.Looper.Loop(func() error {
 		msg := <-o.WatchChannel
 
-		log.Warningf("%v: Received overwatch event from %v (error: %v)", o.Identifier, msg.Source, msg.Error)
+		llog.WithFields(log.Fields{
+			"source": msg.Source,
+			"err":    msg.Error,
+		}).Warning("Received overwatch event")
 
 		if o.activeWatch {
-			log.Debugf("%v: Watcher already activated, nothing else left to do", o.Identifier)
+			llog.Debug("Watcher already activated, nothing else left to do")
 			return nil
 		}
 
@@ -98,15 +106,18 @@ func (o *Overwatch) runListener() error {
 // Wrapper for: stopping all components, starting dep watch and re-starting all
 // components upon dependency recovery
 func (o *Overwatch) stopTheWorld(msg *Message) error {
-	log.Warningf("%v: Stopping all components", o.Identifier)
+	o.Log.Warning("Stopping all components", o.Identifier)
 
 	// Stop all components
 	for _, v := range o.Components {
-		log.Warningf("%v: Stopping component '%v'...", o.Identifier, v.Identify())
+		o.Log.WithField("component", v.Identify()).Warning("Stopping component...")
 
 		if err := v.Stop(); err != nil {
 			// TODO: Do something smarter here
-			log.Errorf("%v: Unable to stop component '%v': %v", o.Identifier, v.Identify(), err)
+			o.Log.WithFields(log.Fields{
+				"component": v.Identify(),
+				"err":       err,
+			}).Error("Unable to stop component")
 			continue
 		}
 	}
@@ -128,7 +139,11 @@ func (o *Overwatch) handleWatch(msg *Message) error {
 	case ETCD_GENERIC_ERROR:
 		go o.beginEtcdWatch()
 	default:
-		log.Errorf("%v: Unknown error type '%v' - unable to complete handleWatch(); (error: %v)", o.Identifier, msg.ErrorType, msg.Error)
+		o.Log.WithFields(log.Fields{
+			"errorType": msg.ErrorType,
+			"err":       msg.Error,
+		}).Error("Unknown error type; unable to complete handleWatch()")
+
 		return fmt.Errorf("%v: Unknown error type '%v' - unable to complete handleWatch(); (error: %v)", o.Identifier, msg.ErrorType, msg.Error)
 	}
 
@@ -148,18 +163,19 @@ func (o *Overwatch) beginEtcdWatch() error {
 			select {
 			case <-tmpWatchChannel:
 				// errors occurred, reset timer
-				log.Debugf("%v: Errors with backend, continue test watch", o.Identifier)
+				o.Log.Debug("Errors with backend, continuing test watch")
 				startTime = time.Now()
 			default:
 				if time.Now().Sub(startTime) >= HEALTH_WATCH_DURATION {
-					log.Warningf("%v: Watcher has not reported errors for %v; starting everything back up", o.Identifier, HEALTH_WATCH_DURATION)
+					o.Log.WithField("watchPeriod", HEALTH_WATCH_DURATION).Warning(
+						"Watcher has not reported errors during watchPeriod; starting everything back up")
 
 					o.activeWatch = false
 					cancel()
 
 					if err := o.startTheWorld(); err != nil {
 						// TODO: Starting the components failed, what now?
-						log.Errorf("%v: Unable to start the world after recovery: %v", o.Identifier, err)
+						o.Log.WithField("err", err).Error("Unable to start the world after recovery")
 					}
 
 					break OUTER
@@ -171,7 +187,7 @@ func (o *Overwatch) beginEtcdWatch() error {
 			time.Sleep(time.Duration(1) * time.Second)
 		}
 
-		log.Debugf("%v: Primary watcher goroutine exiting", o.Identifier)
+		o.Log.Debug("Primary watcher goroutine exiting")
 	}(cancel)
 
 	// Start the actual watcher
@@ -180,7 +196,10 @@ func (o *Overwatch) beginEtcdWatch() error {
 		for {
 			watcher, err := o.Config.DalClient.NewWatcherForOverwatch("/", true)
 			if err != nil {
-				log.Errorf("%v: Unable to begin watching '/'; retrying in %v: %v", o.Identifier, WATCH_RETRY_INTERVAL, err)
+				o.Log.WithFields(log.Fields{
+					"retryInterval": WATCH_RETRY_INTERVAL,
+					"err":           err,
+				}).Error("Unable to begin watching '/'; retrying...")
 				time.Sleep(WATCH_RETRY_INTERVAL)
 				continue
 			}
@@ -189,7 +208,7 @@ func (o *Overwatch) beginEtcdWatch() error {
 				_, err := watcher.Next(ctx)
 				if err != nil {
 					if err.Error() == "context canceled" {
-						log.Debugf("%v: Etcd watcher has been cancelled", o.Identifier)
+						o.Log.Debug("Etcd watcher has been cancelled")
 						break OUTER
 					} else {
 						// log.Debugf("%v: Experienced error during watch, recreating watcher: %v", o.Identifier, err)
@@ -200,7 +219,7 @@ func (o *Overwatch) beginEtcdWatch() error {
 			}
 		}
 
-		log.Debugf("%v: Etcd watcher goroutine exiting...", o.Identifier)
+		o.Log.Debug("Etcd watcher goroutine exiting...")
 	}(ctx)
 
 	return nil
@@ -213,7 +232,11 @@ func (o *Overwatch) startTheWorld() error {
 		log.Debugf("%v: Starting up '%v' component", o.Identifier, v.Identify())
 		if err := v.Start(); err != nil {
 			errorList = append(errorList, err.Error())
-			log.Errorf("%v: Unable to start '%v' component: %v", o.Identifier, v.Identify(), err)
+
+			o.Log.WithFields(log.Fields{
+				"component": v.Identify(),
+				"err":       err,
+			}).Error("Unable to start component")
 		}
 	}
 

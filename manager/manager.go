@@ -89,12 +89,18 @@ func (m *Manager) run() error {
 		}
 
 		if m.ignorableWatcherEvent(resp) {
-			m.Log.Debugf("Received an ignorable watcher '%v' event for key '%v'", resp.Action, resp.Node.Key)
+			m.Log.WithFields(log.Fields{
+				"action": resp.Action,
+				"key":    resp.Node.Key,
+			}).Debug("Received an ignorable watcher event")
 			continue
 		}
 
-		m.Log.Debugf("Received a '%v' watcher event for '%v' (value: '%v')",
-			resp.Action, resp.Node.Key, resp.Node.Value)
+		m.Log.WithFields(log.Fields{
+			"action": resp.Action,
+			"key":    resp.Node.Key,
+			"value":  resp.Node.Value,
+		}).Debug("Received watcher event")
 
 		switch resp.Action {
 		case "set":

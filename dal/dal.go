@@ -72,6 +72,7 @@ type Dal struct {
 	Replace    bool
 	Dryrun     bool
 	Nosync     bool
+	Log        log.FieldLogger
 }
 
 // Helper struct for FetchCheckStats()
@@ -86,7 +87,8 @@ type FullConfigs struct {
 }
 
 func New(prefix string, members []string, userpass string, replace, dryrun, nosync bool) (*Dal, error) {
-	log.Debugf("Connecting to etcd cluster with members: %v", members) //needs to be before any errs
+	llog := log.WithField("pkg", "dal")
+	llog.WithField("members", members).Debug("Connecting to etcd members") //needs to be before any errs
 
 	clientConf := client.Config{
 		Endpoints: members,
@@ -100,7 +102,7 @@ func New(prefix string, members []string, userpass string, replace, dryrun, nosy
 			return nil, fmt.Errorf("Bad username/password passed, must be of format 'username:password'")
 		}
 
-		log.Debugf("Using authentication with etcd. Username is '%v'", creds[0])
+		llog.WithField("username", creds[0]).Debug("Using authentication with etcd")
 
 		clientConf.Username = creds[0]
 		clientConf.Password = creds[1]
@@ -120,6 +122,7 @@ func New(prefix string, members []string, userpass string, replace, dryrun, nosy
 		Replace:    replace,
 		Dryrun:     dryrun,
 		Nosync:     nosync,
+		Log:        llog,
 	}, nil
 }
 
@@ -371,7 +374,7 @@ func (d *Dal) FetchAllMemberRefs() (map[string]string, []string, error) {
 			// when etcd recovers, overwatch will start the components back up
 			// which will recreate the member's directory structure.
 			if client.IsKeyNotFound(err) {
-				log.Debugf("dal: FetchAllMemberRefs() - member '%v' does not have a config dir, is this expected?", memberID)
+				d.Log.WithField("member", memberID).Debug("Could not find member config dir; is this expected?", memberID)
 				refs = make(map[string]string, 0)
 			} else {
 				return nil, nil, fmt.Errorf("Problem fetching refs for '%v': %v", memberID, err.Error())

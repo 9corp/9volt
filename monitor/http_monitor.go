@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/9corp/9volt/util"
-	log "github.com/Sirupsen/logrus"
 )
 
 const (
@@ -42,7 +41,7 @@ func NewHTTPMonitor(rmc *RootMonitorConfig) *HTTPMonitor {
 }
 
 func (h *HTTPMonitor) Validate() error {
-	log.Debugf("%v: Performing monitor config validation for %v", h.Identifier, h.RMC.ConfigName)
+	h.RMC.Log.WithField("configName", h.RMC.ConfigName).Debug("Performing monitor config validation")
 
 	if h.Timeout >= time.Duration(h.RMC.Config.Interval) {
 		return fmt.Errorf("'timeout' (%v) cannot equal or exceed 'interval' (%v)", h.Timeout.String(), h.RMC.Config.Interval.String())
@@ -56,7 +55,7 @@ func (h *HTTPMonitor) Validate() error {
 func (h *HTTPMonitor) httpCheck() error {
 	fullURL := h.constructURL()
 
-	log.Debugf("%v-%v: Performing http check for '%v'", h.Identify(), h.RMC.GID, fullURL)
+	h.RMC.Log.WithField("fullURL", fullURL).Debug("Performing http check")
 
 	resp, err := h.performRequest(h.RMC.Config.HTTPMethod, fullURL, h.RMC.Config.HTTPRequestBody)
 	if err != nil {
