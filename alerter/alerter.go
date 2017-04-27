@@ -131,6 +131,12 @@ func (a *Alerter) handleMessage(msg *Message) error {
 		return err
 	}
 
+	// Nothing to do if the alerter config is empty
+	if len(msg.Key) == 0 {
+		a.Log.WithField("uuid", msg.uuid).Debug("Not sending any message - alerter not set in config")
+		return nil
+	}
+
 	errorList := make([]string, 0)
 
 	// fetch alert configuration for each individual key, send alert for each.
@@ -201,10 +207,6 @@ func (a *Alerter) loadAlerterConfig(alerterKey string, msg *Message) (*AlerterCo
 
 // Perform message validation; return err if one of required fields is not filled out
 func (a *Alerter) validateMessage(msg *Message) error {
-	if len(msg.Key) == 0 {
-		return errors.New("Message must have at least one element in the 'Key' slice")
-	}
-
 	if msg.Source == "" {
 		return errors.New("Message must have the 'Source' value filled out")
 	}

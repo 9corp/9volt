@@ -278,23 +278,18 @@ func (m *Monitor) validateMonitorConfig(monitorConfig *MonitorConfig) error {
 		return errors.New("'interval' must be > 0s")
 	}
 
-	if monitorConfig.CriticalThreshold == 0 {
-		return errors.New("'critical-threshold' must be non-zero")
+	if monitorConfig.WarningThreshold < 0 {
+		return errors.New("'critical-threshold' must be larger or equal to 0")
+	}
+
+	if monitorConfig.CriticalThreshold < 0 {
+		return errors.New("'critical-threshold' must be larger or equal to 0")
 	}
 
 	// TODO: Logic for this should be changed/fixed at some point
+	// edit1: Should it? seems to make sense right now ~dselans 04.27.2017
 	if monitorConfig.WarningThreshold > monitorConfig.CriticalThreshold {
 		return errors.New("'warning-threshold' cannot be larger than 'CriticalThreshold'")
-	}
-
-	// TODO: It should be possible to NOT have a WarningAlerter setting (and just
-	// have a `CriticalAlerter` setting)
-	if len(monitorConfig.WarningAlerter) == 0 {
-		return errors.New("'warning-alerter' list must contain at least one entry")
-	}
-
-	if len(monitorConfig.CriticalAlerter) == 0 {
-		return errors.New("'critical-alerter' list must contain at least one entry")
 	}
 
 	if monitorConfig.Port > MAX_PORT {

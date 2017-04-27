@@ -111,7 +111,7 @@ func (b *Base) sendMessage(curState int, titleMessage, alertMessage, errorDetail
 	var alertType = [3]string{"resolve", "warning", "critical"}
 	var alertKey = [3][]string{[]string{}, b.RMC.Config.WarningAlerter, b.RMC.Config.CriticalAlerter}
 
-	log.Warningf("%v-%v: (%v) %v", b.Identifier, b.RMC.GID, b.RMC.Name, alertMessage)
+	log.Debugf("%v-%v: (%v) %v", b.Identifier, b.RMC.GID, b.RMC.Name, alertMessage)
 
 	msg := &alerter.Message{
 		Type:        alertType[curState],
