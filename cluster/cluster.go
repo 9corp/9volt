@@ -203,12 +203,12 @@ func (c *Cluster) runDirectorMonitor() {
 	c.DirectorMonitorLooper.Loop(func() error {
 		directorJSON, err := c.getState()
 		if err != nil {
-			c.Config.EQClient.AddWithErrorLog("error", "Unable to fetch director state", llog, log.Fields{"err": err})
+			c.Config.EQClient.AddWithErrorLog("Unable to fetch director state", llog, log.Fields{"err": err})
 			return nil
 		}
 
 		if err := c.handleState(directorJSON); err != nil {
-			c.Config.EQClient.AddWithErrorLog("error", "Unable to handle state", llog, log.Fields{"err": err})
+			c.Config.EQClient.AddWithErrorLog("Unable to handle state", llog, log.Fields{"err": err})
 		}
 
 		return nil
@@ -231,7 +231,7 @@ func (c *Cluster) runDirectorHeartbeat() {
 
 		// update */director with current state data
 		if err := c.sendDirectorHeartbeat(); err != nil {
-			c.Config.EQClient.AddWithErrorLog("error", "Unable to send director heartbeat", llog, log.Fields{"err": err})
+			c.Config.EQClient.AddWithErrorLog("Unable to send director heartbeat", llog, log.Fields{"err": err})
 
 			// Let overwatch decide what to do in this case
 			c.OverwatchChan <- &overwatch.Message{
@@ -305,7 +305,7 @@ func (c *Cluster) runMemberMonitor() {
 				break
 			}
 
-			c.Config.EQClient.AddWithErrorLog("error", "Unexpected watcher error", llog, log.Fields{"err": err})
+			c.Config.EQClient.AddWithErrorLog("Unexpected watcher error", llog, log.Fields{"err": err})
 
 			c.OverwatchChan <- &overwatch.Message{
 				Error:     fmt.Errorf("Watcher error: %v", err),
@@ -401,7 +401,7 @@ func (c *Cluster) runMemberHeartbeat() {
 		// Unlikely error, but let's check jic
 		memberJSON, err := c.generateMemberJSON()
 		if err != nil {
-			c.Config.EQClient.AddWithErrorLog("error",
+			c.Config.EQClient.AddWithErrorLog(
 				fmt.Sprintf("Unable to generate member JSON (retrying in %v)", c.Config.HeartbeatInterval.String()),
 				llog, log.Fields{"err": err})
 
@@ -419,7 +419,7 @@ func (c *Cluster) runMemberHeartbeat() {
 				Depth:         1,
 			},
 		); err != nil {
-			c.Config.EQClient.AddWithErrorLog("error",
+			c.Config.EQClient.AddWithErrorLog(
 				fmt.Sprintf("Unable to save member JSON status (retrying in %v)", c.Config.HeartbeatInterval.String()),
 				llog, log.Fields{"err": err})
 
@@ -437,7 +437,7 @@ func (c *Cluster) runMemberHeartbeat() {
 		go func(memberDir string, ttl int) {
 			if err := c.DalClient.Refresh(memberDir, heartbeatTimeoutInt); err != nil {
 				// Not sure if this should cause a member dropout
-				c.Config.EQClient.AddWithErrorLog("error",
+				c.Config.EQClient.AddWithErrorLog(
 					fmt.Sprintf("Unable to refresh member dir (retrying in %v)", c.Config.HeartbeatInterval.String()),
 					llog, log.Fields{"dir": memberDir, "err": err})
 

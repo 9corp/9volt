@@ -129,7 +129,7 @@ func (a *Alerter) handleMessage(msg *Message) error {
 
 	// validate message contents
 	if err := a.validateMessage(msg); err != nil {
-		a.Config.EQClient.AddWithErrorLog("error", "Unable to validate message", llog, log.Fields{"uuid": msg.uuid, "err": err})
+		a.Config.EQClient.AddWithErrorLog("Unable to validate message", llog, log.Fields{"uuid": msg.uuid, "err": err})
 		return err
 	}
 
@@ -169,7 +169,7 @@ func (a *Alerter) handleMessage(msg *Message) error {
 	}
 
 	if len(errorList) != 0 {
-		a.Config.EQClient.AddWithErrorLog("error", "Ran into errors during alert send", llog,
+		a.Config.EQClient.AddWithErrorLog("Ran into errors during alert send", llog,
 			log.Fields{"numErrors": len(errorList), "source": msg.Source, "key": msg.Key, "errors": strings.Join(errorList, "; ")})
 	} else {
 		llog.WithFields(log.Fields{"uuid": msg.uuid, "key": msg.Key}).Debugf("Successfully sent %v alert messages", len(msg.Key))

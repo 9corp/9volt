@@ -139,14 +139,14 @@ func (m *Monitor) Handle(action int, monitorName, monitorConfigLocation string) 
 	// fetch fresh configuration from etcd
 	monitorConfig, err := m.fetchMonitorConfig(monitorConfigLocation)
 	if err != nil {
-		m.Config.EQClient.AddWithErrorLog("error", "Unable to fetch monitor configuration for monitorName",
+		m.Config.EQClient.AddWithErrorLog("Unable to fetch monitor configuration for monitorName",
 			m.Log, log.Fields{"monitorName": monitorName, "cfgLocation": monitorConfigLocation, "err": err})
 		return err
 	}
 
 	// validate monitor configuration
 	if err := m.validateMonitorConfig(monitorConfig); err != nil {
-		m.Config.EQClient.AddWithErrorLog("error", "Unable to validate monitor config for monitorName",
+		m.Config.EQClient.AddWithErrorLog("Unable to validate monitor config for monitorName",
 			m.Log, log.Fields{"monitorName": monitorName, "cfgLocation": monitorConfigLocation, "err": err})
 
 		return fmt.Errorf("Unable to validate monitor configuration for %v: %v", monitorName, err.Error())
@@ -157,7 +157,7 @@ func (m *Monitor) Handle(action int, monitorName, monitorConfigLocation string) 
 		m.Log.Debugf("Monitor '%v' already running. Stopping it first...", monitorName)
 
 		if err := m.stop(monitorName); err != nil {
-			m.Config.EQClient.AddWithErrorLog("error", "Unable to stop running monitor",
+			m.Config.EQClient.AddWithErrorLog("Unable to stop running monitor",
 				m.Log, log.Fields{"monitorName": monitorName, "err": err})
 
 			return fmt.Errorf("Unable to stop running monitor %v: %v", monitorName, err.Error())
@@ -174,7 +174,7 @@ func (m *Monitor) Handle(action int, monitorName, monitorConfigLocation string) 
 	m.Log.WithField("monitorName", monitorName).Debug("Starting new monitor")
 
 	if err := m.start(monitorName, monitorConfigLocation, monitorConfig); err != nil {
-		m.Config.EQClient.AddWithErrorLog("error", "Unable to start new monitor",
+		m.Config.EQClient.AddWithErrorLog("Unable to start new monitor",
 			m.Log, log.Fields{"monitorName": monitorName, "err": err})
 
 		return fmt.Errorf("Unable to start new monitor %v: %v", monitorName, err.Error())
