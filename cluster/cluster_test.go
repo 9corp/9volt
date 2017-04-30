@@ -129,8 +129,7 @@ var _ = Describe("cluster", func() {
 				err := c.DirectorMonitorLooper.Wait()
 				Expect(err).ToNot(HaveOccurred())
 
-				key, msg, _, _ := fakeEventClient.AddWithErrorLogArgsForCall(0)
-				Expect(key).To(Equal("error"))
+				msg, _, _ := fakeEventClient.AddWithErrorLogArgsForCall(0)
 				Expect(msg).To(ContainSubstring("Unable to fetch director state"))
 				// Expect(msg).To(ContainSubstring("some error"))
 			})
@@ -153,8 +152,7 @@ var _ = Describe("cluster", func() {
 				err := c.DirectorMonitorLooper.Wait()
 				Expect(err).ToNot(HaveOccurred())
 
-				key, msg, _, _ := fakeEventClient.AddWithErrorLogArgsForCall(0)
-				Expect(key).To(Equal("error"))
+				msg, _, _ := fakeEventClient.AddWithErrorLogArgsForCall(0)
 				Expect(msg).To(ContainSubstring("Unable to handle state"))
 				// Expect(msg).To(ContainSubstring("failed that"))
 			})
@@ -199,10 +197,9 @@ var _ = Describe("cluster", func() {
 			})
 
 			It("should add event log and send message to overwatch", func() {
-				key, msg, _, _ := fakeEventClient.AddWithErrorLogArgsForCall(0)
+				msg, _, _ := fakeEventClient.AddWithErrorLogArgsForCall(0)
 
 				Expect(fakeDAL.UpdateDirectorStateCallCount()).To(Equal(1))
-				Expect(key).To(Equal("error"))
 				Expect(msg).To(ContainSubstring("Unable to send director heartbeat"))
 
 				time.Sleep(100 * time.Millisecond)
