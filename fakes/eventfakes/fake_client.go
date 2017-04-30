@@ -21,18 +21,31 @@ type FakeIClient struct {
 	addReturnsOnCall map[int]struct {
 		result1 error
 	}
-	AddWithErrorLogStub        func(string, string, log.FieldLogger, log.Fields) error
+	AddWithErrorLogStub        func(string, log.FieldLogger, log.Fields) error
 	addWithErrorLogMutex       sync.RWMutex
 	addWithErrorLogArgsForCall []struct {
 		arg1 string
-		arg2 string
-		arg3 log.FieldLogger
-		arg4 log.Fields
+		arg2 log.FieldLogger
+		arg3 log.Fields
 	}
 	addWithErrorLogReturns struct {
 		result1 error
 	}
 	addWithErrorLogReturnsOnCall map[int]struct {
+		result1 error
+	}
+	AddWithLogStub        func(string, string, log.FieldLogger, log.Fields) error
+	addWithLogMutex       sync.RWMutex
+	addWithLogArgsForCall []struct {
+		arg1 string
+		arg2 string
+		arg3 log.FieldLogger
+		arg4 log.Fields
+	}
+	addWithLogReturns struct {
+		result1 error
+	}
+	addWithLogReturnsOnCall map[int]struct {
 		result1 error
 	}
 	invocations      map[string][][]interface{}
@@ -88,19 +101,18 @@ func (fake *FakeIClient) AddReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
-func (fake *FakeIClient) AddWithErrorLog(arg1 string, arg2 string, arg3 log.FieldLogger, arg4 log.Fields) error {
+func (fake *FakeIClient) AddWithErrorLog(arg1 string, arg2 log.FieldLogger, arg3 log.Fields) error {
 	fake.addWithErrorLogMutex.Lock()
 	ret, specificReturn := fake.addWithErrorLogReturnsOnCall[len(fake.addWithErrorLogArgsForCall)]
 	fake.addWithErrorLogArgsForCall = append(fake.addWithErrorLogArgsForCall, struct {
 		arg1 string
-		arg2 string
-		arg3 log.FieldLogger
-		arg4 log.Fields
-	}{arg1, arg2, arg3, arg4})
-	fake.recordInvocation("AddWithErrorLog", []interface{}{arg1, arg2, arg3, arg4})
+		arg2 log.FieldLogger
+		arg3 log.Fields
+	}{arg1, arg2, arg3})
+	fake.recordInvocation("AddWithErrorLog", []interface{}{arg1, arg2, arg3})
 	fake.addWithErrorLogMutex.Unlock()
 	if fake.AddWithErrorLogStub != nil {
-		return fake.AddWithErrorLogStub(arg1, arg2, arg3, arg4)
+		return fake.AddWithErrorLogStub(arg1, arg2, arg3)
 	}
 	if specificReturn {
 		return ret.result1
@@ -114,10 +126,10 @@ func (fake *FakeIClient) AddWithErrorLogCallCount() int {
 	return len(fake.addWithErrorLogArgsForCall)
 }
 
-func (fake *FakeIClient) AddWithErrorLogArgsForCall(i int) (string, string, log.FieldLogger, log.Fields) {
+func (fake *FakeIClient) AddWithErrorLogArgsForCall(i int) (string, log.FieldLogger, log.Fields) {
 	fake.addWithErrorLogMutex.RLock()
 	defer fake.addWithErrorLogMutex.RUnlock()
-	return fake.addWithErrorLogArgsForCall[i].arg1, fake.addWithErrorLogArgsForCall[i].arg2, fake.addWithErrorLogArgsForCall[i].arg3, fake.addWithErrorLogArgsForCall[i].arg4
+	return fake.addWithErrorLogArgsForCall[i].arg1, fake.addWithErrorLogArgsForCall[i].arg2, fake.addWithErrorLogArgsForCall[i].arg3
 }
 
 func (fake *FakeIClient) AddWithErrorLogReturns(result1 error) {
@@ -139,6 +151,57 @@ func (fake *FakeIClient) AddWithErrorLogReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
+func (fake *FakeIClient) AddWithLog(arg1 string, arg2 string, arg3 log.FieldLogger, arg4 log.Fields) error {
+	fake.addWithLogMutex.Lock()
+	ret, specificReturn := fake.addWithLogReturnsOnCall[len(fake.addWithLogArgsForCall)]
+	fake.addWithLogArgsForCall = append(fake.addWithLogArgsForCall, struct {
+		arg1 string
+		arg2 string
+		arg3 log.FieldLogger
+		arg4 log.Fields
+	}{arg1, arg2, arg3, arg4})
+	fake.recordInvocation("AddWithLog", []interface{}{arg1, arg2, arg3, arg4})
+	fake.addWithLogMutex.Unlock()
+	if fake.AddWithLogStub != nil {
+		return fake.AddWithLogStub(arg1, arg2, arg3, arg4)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fake.addWithLogReturns.result1
+}
+
+func (fake *FakeIClient) AddWithLogCallCount() int {
+	fake.addWithLogMutex.RLock()
+	defer fake.addWithLogMutex.RUnlock()
+	return len(fake.addWithLogArgsForCall)
+}
+
+func (fake *FakeIClient) AddWithLogArgsForCall(i int) (string, string, log.FieldLogger, log.Fields) {
+	fake.addWithLogMutex.RLock()
+	defer fake.addWithLogMutex.RUnlock()
+	return fake.addWithLogArgsForCall[i].arg1, fake.addWithLogArgsForCall[i].arg2, fake.addWithLogArgsForCall[i].arg3, fake.addWithLogArgsForCall[i].arg4
+}
+
+func (fake *FakeIClient) AddWithLogReturns(result1 error) {
+	fake.AddWithLogStub = nil
+	fake.addWithLogReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeIClient) AddWithLogReturnsOnCall(i int, result1 error) {
+	fake.AddWithLogStub = nil
+	if fake.addWithLogReturnsOnCall == nil {
+		fake.addWithLogReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.addWithLogReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakeIClient) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
@@ -146,6 +209,8 @@ func (fake *FakeIClient) Invocations() map[string][][]interface{} {
 	defer fake.addMutex.RUnlock()
 	fake.addWithErrorLogMutex.RLock()
 	defer fake.addWithErrorLogMutex.RUnlock()
+	fake.addWithLogMutex.RLock()
+	defer fake.addWithLogMutex.RUnlock()
 	return fake.invocations
 }
 
