@@ -131,7 +131,7 @@ func (s *State) runDumper() error {
 		for k, v := range s.Data {
 			ttl, err := s.getInterval([]byte(v.Config))
 			if err != nil {
-				s.Config.EQClient.AddWithErrorLog("error", "Unable to fetch interval", llog, log.Fields{"err": err})
+				s.Config.EQClient.AddWithErrorLog("Unable to fetch interval", llog, log.Fields{"err": err})
 				ttl = DEFAULT_STATE_TTL
 			} else {
 				// got a legitimate interval, let's increase it a bit
@@ -142,14 +142,14 @@ func (s *State) runDumper() error {
 
 			messageBlob, err := json.Marshal(v)
 			if err != nil {
-				s.Config.EQClient.AddWithErrorLog("error", "Unable to marshal state message", llog, log.Fields{"key": k, "err": err})
+				s.Config.EQClient.AddWithErrorLog("Unable to marshal state message", llog, log.Fields{"key": k, "err": err})
 				continue
 			}
 
 			if err := s.Config.DalClient.Set(fullKey, string(messageBlob), &dal.SetOptions{
 				TTLSec: int(ttl.Seconds()),
 			}); err != nil {
-				s.Config.EQClient.AddWithErrorLog("error", "Unable to dump state", llog, log.Fields{"key": k, "err": err})
+				s.Config.EQClient.AddWithErrorLog("Unable to dump state", llog, log.Fields{"key": k, "err": err})
 				continue
 			}
 

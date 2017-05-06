@@ -74,7 +74,7 @@ func (m *Manager) run() error {
 				break
 			}
 
-			m.Config.EQClient.AddWithErrorLog("error", "Unexpected watcher error",
+			m.Config.EQClient.AddWithErrorLog("Unexpected watcher error",
 				m.Log, log.Fields{"err": err})
 
 			// Tell overwatch that something bad just happened
@@ -108,7 +108,7 @@ func (m *Manager) run() error {
 		case "delete":
 			go m.Monitor.Handle(monitor.STOP, path.Base(resp.Node.Key), resp.Node.Value)
 		default:
-			m.Config.EQClient.AddWithErrorLog("error", "Received an unrecognized action -> skipping",
+			m.Config.EQClient.AddWithErrorLog("Received an unrecognized action -> skipping",
 				m.Log, log.Fields{"action": resp.Action})
 		}
 	}

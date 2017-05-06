@@ -107,7 +107,7 @@ func (d *Director) collectCheckStats() {
 		// This will *probably* be switched to utilize `state` later on.
 		checkStats, err := d.DalClient.FetchCheckStats()
 		if err != nil {
-			d.Config.EQClient.AddWithErrorLog("error", "Unable to fetch check stats", llog, log.Fields{"err": err})
+			d.Config.EQClient.AddWithErrorLog("Unable to fetch check stats", llog, log.Fields{"err": err})
 			return nil
 		}
 
@@ -137,7 +137,7 @@ OUTER:
 			}
 
 			if err := d.distributeChecks(); err != nil {
-				d.Config.EQClient.AddWithErrorLog("error", "Unable to distribute checks", llog, log.Fields{"err": err})
+				d.Config.EQClient.AddWithErrorLog("Unable to distribute checks", llog, log.Fields{"err": err})
 			}
 		case <-d.Component.Ctx.Done():
 			llog.Debug("Received a notice to shutdown")
@@ -284,10 +284,12 @@ func (d *Director) performCheckDistribution(members map[string][]string, checkKe
 		llog.Warningf("Found %v orphaned checks (unable to find any fitting nodes)", len(checkKeys))
 
 		for checkName, checkTag := range checkKeys {
-			llog.WithFields(log.Fields{
-				"check": checkName,
-				"tag":   checkTag,
-			}).Debug("Unable to find fitting member for check")
+			d.Config.EQClient.AddWithLog("warning", "Unable to find fitting member for check",
+				llog, log.Fields{
+					"check": checkName,
+					"tag":   checkTag,
+				},
+			)
 		}
 	}
 
@@ -366,7 +368,7 @@ OUTER:
 
 				// distribute checks in case we just took over as director (or first start)
 				if err := d.distributeChecks(); err != nil {
-					d.Config.EQClient.AddWithErrorLog("error", "Unable to (re)distribute checks", llog, log.Fields{"err": err})
+					d.Config.EQClient.AddWithErrorLog("Unable to (re)distribute checks", llog, log.Fields{"err": err})
 				}
 			} else {
 				llog.WithField("change", "down").Info("Shutting down etcd watchers")

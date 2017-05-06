@@ -47,7 +47,8 @@ type Queue struct {
 
 type IClient interface {
 	Add(string, string) error
-	AddWithErrorLog(string, string, log.FieldLogger, log.Fields) error
+	AddWithErrorLog(string, log.FieldLogger, log.Fields) error
+	AddWithLog(string, string, log.FieldLogger, log.Fields) error
 }
 
 type Client struct {
@@ -159,8 +160,20 @@ func (c *Client) Add(key, value string) error {
 	}
 }
 
-func (c *Client) AddWithErrorLog(key, value string, logger log.FieldLogger, fields log.Fields) error {
-	logger.WithFields(fields).Error(value)
+// Helper for AddWithLog()
+func (c *Client) AddWithErrorLog(value string, logger log.FieldLogger, fields log.Fields) error {
+	return c.AddWithLog("error", value, logger, fields)
+}
+
+func (c *Client) AddWithLog(key, value string, logger log.FieldLogger, fields log.Fields) error {
+	switch key {
+	case "error":
+		logger.WithFields(fields).Error(value)
+	case "warning":
+		logger.WithFields(fields).Warning(value)
+	default:
+		logger.WithFields(fields).Info(value)
+	}
 
 	fieldEntries := make([]string, 0)
 
