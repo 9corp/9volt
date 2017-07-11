@@ -74,6 +74,8 @@ func (a *Api) Run() {
 
 	// Prepend the access token middleware to every /api endpoint if
 	// any access tokens were given
+	//
+	// TODO: UI will currently not work if access tokens are enabled
 	if len(a.AccessTokens) != 0 {
 		a.MWHandler.Use(rye.NewMiddlewareAccessToken("X-Access-Token", a.AccessTokens))
 	}

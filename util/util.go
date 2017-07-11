@@ -97,6 +97,11 @@ func StringSliceContains(stringSlice []string, data string) bool {
 }
 
 func SplitTags(tags string) []string {
+	// If tags are empty, return empty slice
+	if tags == "" {
+		return []string{}
+	}
+
 	tags = strings.Replace(tags, " ", "", -1)
 	return strings.Split(tags, ",")
 }
